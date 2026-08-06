@@ -4,8 +4,8 @@
 !.env.example
 
 # Local data exports
-data/
-exports/
+/data/
+/exports/
 *.csv
 *.xlsx
 *.xls
