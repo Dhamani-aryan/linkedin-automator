@@ -1,0 +1,29 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Local data exports
+data/
+exports/
+*.csv
+*.xlsx
+*.xls
+
+# Logs and temporary files
+logs/
+*.log
+tmp/
+temp/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Dependencies/build outputs
+node_modules/
+dist/
+build/
+coverage/
