@@ -525,6 +525,35 @@ input {
   .notice-card {
     max-width: none;
   }
+
+  .human-touch-panel {
+    max-width: none;
+  }
+
+  .human-touch-panel > header,
+  .cooldown-row {
+    grid-template-columns: 1fr;
+  }
+
+  .human-touch-panel > header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .human-touch-grid {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .human-touch-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .time-inputs {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }
 
 .notice-card svg {
@@ -535,6 +564,132 @@ input {
 
 .notice-card p {
   margin: 6px 0 0;
+}
+
+.human-touch-panel {
+  max-width: 1120px;
+  margin-top: 22px;
+  border: 1px solid #444853;
+  border-radius: 8px;
+  background: #333640;
+  padding: 18px;
+}
+
+.human-touch-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.human-touch-panel h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.safety-summary-pill {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  color: #73e087;
+  background: #16391f;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.human-touch-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.setting-field {
+  display: grid;
+  gap: 8px;
+  border-radius: 8px;
+  background: #282b34;
+  padding: 12px;
+}
+
+.setting-field span {
+  color: #aeb5c5;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.setting-field input,
+.time-inputs input {
+  min-height: 34px;
+  border: 1px solid #4b5060;
+  border-radius: 6px;
+  background: #20232b;
+  color: #ffffff;
+  padding: 0 10px;
+}
+
+.cooldown-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.cooldown-card {
+  display: flex;
+  gap: 12px;
+  border-radius: 8px;
+  background: #282b34;
+  padding: 14px;
+}
+
+.cooldown-card svg {
+  color: #82a5ff;
+  flex: 0 0 auto;
+}
+
+.cooldown-card strong,
+.cooldown-card span {
+  display: block;
+}
+
+.cooldown-card span {
+  color: #aeb5c5;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+.time-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.time-inputs span {
+  margin: 0;
+}
+
+.toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.toggle-row label {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  background: #282b34;
+  padding: 0 12px;
+  color: #dfe4f2;
 }
 
 .error-text {

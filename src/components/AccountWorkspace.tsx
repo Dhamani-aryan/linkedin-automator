@@ -22,7 +22,7 @@ import { useState } from "react";
 import { LeadSourceWizard } from "./LeadSourceWizard";
 import { MessageTemplateEditor } from "./MessageTemplateEditor";
 import { seedCampaigns, seedLeads, seedWorkflow } from "../data/seed";
-import { safetyChecklist, safetyDefaults } from "../lib/safety";
+import { formatDelayRange, safetyChecklist, safetyDefaults } from "../lib/safety";
 import type { ChromeStatus, LinkedInAccount } from "../types";
 
 type WorkspaceProps = {
@@ -273,7 +273,7 @@ export function AccountWorkspace({
                 </div>
                 <div>
                   <span>Delay range</span>
-                  <strong>{safetyDefaults.actionDelaySeconds[0]}-{safetyDefaults.actionDelaySeconds[1]}s</strong>
+                  <strong>{formatDelayRange(safetyDefaults)}</strong>
                 </div>
               </div>
             </Panel>

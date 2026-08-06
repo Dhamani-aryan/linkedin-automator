@@ -34,6 +34,20 @@ export type LinkedInAccount = {
   lastError?: string;
 };
 
+export type HumanTouchSettings = {
+  dailyActionLimit: number;
+  dailyInviteLimit: number;
+  minDelaySeconds: number;
+  maxDelaySeconds: number;
+  batchSize: number;
+  cooldownAfterBatchMinutes: number;
+  workingHoursStart: string;
+  workingHoursEnd: string;
+  randomizeScroll: boolean;
+  randomProfileViewSeconds: [number, number];
+  pauseOnReply: boolean;
+};
+
 export type CampaignStatus = "ready" | "running" | "sleeping" | "stopped";
 
 export type CampaignSummary = {

@@ -18,9 +18,11 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { AddLinkedInAccountModal } from "./components/AddLinkedInAccountModal";
 import { AccountWorkspace } from "./components/AccountWorkspace";
+import { HumanTouchPanel } from "./components/HumanTouchPanel";
 import { getChromeStatus, openChromeUrl, startChrome, stopChrome } from "./lib/chromeApi";
+import { safetyDefaults } from "./lib/safety";
 import { clearCompanyUser, loadCompanyUser, loadLinkedInAccounts, saveCompanyUser, saveLinkedInAccounts } from "./lib/storage";
-import type { ChromeStatus, CompanyUser, LinkedInAccount } from "./types";
+import type { ChromeStatus, CompanyUser, HumanTouchSettings, LinkedInAccount } from "./types";
 
 export function App() {
   const [authMode, setAuthMode] = useState<"register" | "signin">("register");
@@ -36,6 +38,7 @@ export function App() {
   const [isBusy, setIsBusy] = useState(false);
   const [screen, setScreen] = useState<"manager" | "workspace">("manager");
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
+  const [humanTouchSettings, setHumanTouchSettings] = useState<HumanTouchSettings>(safetyDefaults);
 
   const selectedAccount = accounts.find((candidate) => candidate.id === selectedAccountId) ?? accounts[0] ?? null;
   const activeLinkedInTab = useMemo(
@@ -395,6 +398,8 @@ export function App() {
             {selectedAccount?.lastError ? <p className="error-text">{selectedAccount.lastError}</p> : null}
           </div>
         </section>
+
+        <HumanTouchPanel settings={humanTouchSettings} onChange={setHumanTouchSettings} />
       </section>
       {isAddAccountOpen ? (
         <AddLinkedInAccountModal
