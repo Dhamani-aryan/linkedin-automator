@@ -340,8 +340,14 @@ export function App() {
                     <span>Tab: {activeLinkedInTab.title || "LinkedIn"}</span>
                   ) : null}
                 </div>
-                <span className="owner-badge">{account.role}</span>
-                <span>{account.archived ? "Yes" : "No"}</span>
+                <div className="account-meta-cell">
+                  <span className="row-field-label">Access</span>
+                  <span className="owner-badge">{account.role}</span>
+                </div>
+                <div className="account-meta-cell">
+                  <span className="row-field-label">Archived</span>
+                  <span>{account.archived ? "Yes" : "No"}</span>
+                </div>
                 <div className="row-actions">
                   <button
                     className="ghost-button compact-button"
