@@ -135,6 +135,7 @@ input {
 
 .primary-button,
 .ghost-button,
+.danger-button,
 .nav-item,
 .text-link,
 .icon-button {
@@ -143,7 +144,8 @@ input {
 }
 
 .primary-button,
-.ghost-button {
+.ghost-button,
+.danger-button {
   min-height: 42px;
   display: inline-flex;
   align-items: center;
@@ -162,6 +164,10 @@ input {
 .ghost-button {
   border: 1px solid #4b5060;
   background: #30333d;
+}
+
+.danger-button {
+  background: #ef5350;
 }
 
 .compact-button {
@@ -1416,6 +1422,43 @@ input {
   background: #2d3039;
   box-shadow: 0 28px 100px rgb(0 0 0 / 0.48);
   padding: 22px;
+}
+
+.confirm-modal {
+  width: min(480px, 100%);
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  gap: 14px;
+  border: 1px solid #5a4040;
+  border-radius: 8px;
+  background: #2d3039;
+  box-shadow: 0 28px 100px rgb(0 0 0 / 0.48);
+  padding: 22px;
+}
+
+.confirm-modal h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.confirm-modal p {
+  margin: 8px 0 0;
+}
+
+.confirm-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #ffbd61;
+  background: #3a2d20;
+}
+
+.confirm-modal .modal-actions {
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+  margin-top: 4px;
 }
 
 .login-persistence-note,

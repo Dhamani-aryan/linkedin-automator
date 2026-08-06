@@ -39,6 +39,7 @@ export function App() {
   const [screen, setScreen] = useState<"manager" | "workspace">("manager");
   const [activePage, setActivePage] = useState<"accounts" | "campaigns" | "safety" | "settings">("accounts");
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
+  const [accountPendingDelete, setAccountPendingDelete] = useState<LinkedInAccount | null>(null);
   const [humanTouchSettings, setHumanTouchSettings] = useState<HumanTouchSettings>(safetyDefaults);
 
   const selectedAccount = accounts.find((candidate) => candidate.id === selectedAccountId) ?? accounts[0] ?? null;
@@ -427,7 +428,7 @@ export function App() {
                   <button
                     className="icon-button"
                     title="Delete account from this workspace"
-                    onClick={() => deleteLinkedInAccount(account.id)}
+                    onClick={() => setAccountPendingDelete(account)}
                   >
                     <Trash2 size={16} />
                   </button>
@@ -456,6 +457,37 @@ export function App() {
           onAdd={addLinkedInAccount}
           onClose={() => setIsAddAccountOpen(false)}
         />
+      ) : null}
+      {accountPendingDelete ? (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <section className="confirm-modal">
+            <div className="confirm-icon">
+              <AlertTriangle size={22} />
+            </div>
+            <div>
+              <h2>Delete LinkedIn account?</h2>
+              <p>
+                This removes <strong>{accountPendingDelete.name}</strong> from this workspace. It does not delete the
+                local Chrome profile or sign you out of LinkedIn.
+              </p>
+            </div>
+            <footer className="modal-actions">
+              <button className="ghost-button" onClick={() => setAccountPendingDelete(null)}>
+                Cancel
+              </button>
+              <button
+                className="danger-button"
+                onClick={() => {
+                  deleteLinkedInAccount(accountPendingDelete.id);
+                  setAccountPendingDelete(null);
+                }}
+              >
+                <Trash2 size={18} />
+                Delete account
+              </button>
+            </footer>
+          </section>
+        </div>
       ) : null}
     </main>
   );
