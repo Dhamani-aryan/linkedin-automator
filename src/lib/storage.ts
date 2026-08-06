@@ -3,6 +3,7 @@ import type { CompanyUser, LinkedInAccount } from "../types";
 const COMPANY_USER_KEY = "linkedin-automator.company-user";
 const LINKEDIN_ACCOUNTS_KEY = "linkedin-automator.linkedin-accounts";
 const ARYAN_ACCOUNT_RESTORE_KEY = "linkedin-automator.restore-sample-user-account-v1";
+const ARYAN_RESTORE_WORKSPACE_EMAIL = "workspace@example.test";
 
 const restoredSample UserAccount: LinkedInAccount = {
   id: "restored-sample-linkedin",
@@ -36,16 +37,23 @@ export function clearCompanyUser() {
 }
 
 export function loadLinkedInAccounts() {
-  const accounts = readJson<LinkedInAccount[]>(LINKEDIN_ACCOUNTS_KEY, []);
-  const restoreAlreadyApplied = window.localStorage.getItem(ARYAN_ACCOUNT_RESTORE_KEY) === "true";
-  if (accounts.length > 0 || restoreAlreadyApplied) return accounts;
-
-  const restoredAccounts = [restoredSample UserAccount];
-  window.localStorage.setItem(LINKEDIN_ACCOUNTS_KEY, JSON.stringify(restoredAccounts));
-  window.localStorage.setItem(ARYAN_ACCOUNT_RESTORE_KEY, "true");
-  return restoredAccounts;
+  return readJson<LinkedInAccount[]>(LINKEDIN_ACCOUNTS_KEY, []);
 }
 
 export function saveLinkedInAccounts(accounts: LinkedInAccount[]) {
   window.localStorage.setItem(LINKEDIN_ACCOUNTS_KEY, JSON.stringify(accounts));
+}
+
+export function restoreSample UserAccountForWorkspace(user: CompanyUser, accounts: LinkedInAccount[]) {
+  const workspaceEmail = user.email.trim().toLowerCase();
+  const restoreKey = `${ARYAN_ACCOUNT_RESTORE_KEY}.${workspaceEmail}`;
+  const restoreAlreadyApplied = window.localStorage.getItem(restoreKey) === "true";
+  if (workspaceEmail !== ARYAN_RESTORE_WORKSPACE_EMAIL || accounts.length > 0 || restoreAlreadyApplied) {
+    return accounts;
+  }
+
+  const restoredAccounts = [restoredSample UserAccount];
+  saveLinkedInAccounts(restoredAccounts);
+  window.localStorage.setItem(restoreKey, "true");
+  return restoredAccounts;
 }

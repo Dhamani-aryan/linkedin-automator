@@ -21,7 +21,14 @@ import { AccountWorkspace } from "./components/AccountWorkspace";
 import { SafetyLimitsPage } from "./components/SafetyLimitsPage";
 import { getChromeStatus, openChromeUrl, startChrome, stopChrome } from "./lib/chromeApi";
 import { safetyDefaults } from "./lib/safety";
-import { clearCompanyUser, loadCompanyUser, loadLinkedInAccounts, saveCompanyUser, saveLinkedInAccounts } from "./lib/storage";
+import {
+  clearCompanyUser,
+  loadCompanyUser,
+  loadLinkedInAccounts,
+  restoreSample UserAccountForWorkspace,
+  saveCompanyUser,
+  saveLinkedInAccounts
+} from "./lib/storage";
 import type { ChromeStatus, CompanyUser, HumanTouchSettings, LinkedInAccount } from "./types";
 
 export function App() {
@@ -32,8 +39,15 @@ export function App() {
     password: ""
   });
   const [companyUser, setCompanyUser] = useState<CompanyUser | null>(() => loadCompanyUser());
-  const [accounts, setAccounts] = useState<LinkedInAccount[]>(() => loadLinkedInAccounts());
-  const [selectedAccountId, setSelectedAccountId] = useState(() => loadLinkedInAccounts()[0]?.id ?? "");
+  const [accounts, setAccounts] = useState<LinkedInAccount[]>(() => {
+    const storedAccounts = loadLinkedInAccounts();
+    return companyUser ? restoreSample UserAccountForWorkspace(companyUser, storedAccounts) : storedAccounts;
+  });
+  const [selectedAccountId, setSelectedAccountId] = useState(() => {
+    const storedAccounts = loadLinkedInAccounts();
+    const restoredAccounts = companyUser ? restoreSample UserAccountForWorkspace(companyUser, storedAccounts) : storedAccounts;
+    return restoredAccounts[0]?.id ?? "";
+  });
   const [status, setStatus] = useState<ChromeStatus | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [screen, setScreen] = useState<"manager" | "workspace">("manager");
@@ -127,6 +141,9 @@ export function App() {
       createdAt: new Date().toISOString()
     };
     saveCompanyUser(nextUser);
+    const restoredAccounts = restoreSample UserAccountForWorkspace(nextUser, loadLinkedInAccounts());
+    setAccounts(restoredAccounts);
+    setSelectedAccountId(restoredAccounts[0]?.id ?? "");
     setCompanyUser(nextUser);
   }
 
