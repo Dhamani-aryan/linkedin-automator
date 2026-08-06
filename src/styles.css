@@ -610,6 +610,12 @@ input {
   padding: 4px 0 8px;
 }
 
+.workflow-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
 .workflow-node-wrap {
   width: min(420px, 100%);
   display: grid;
@@ -817,6 +823,376 @@ input {
   margin: 0;
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 0.62);
+  padding: 26px;
+}
+
+.wide-modal,
+.template-modal {
+  width: min(1240px, 100%);
+  max-height: calc(100vh - 52px);
+  overflow: auto;
+  border: 1px solid #464a55;
+  border-radius: 8px;
+  background: #2d3039;
+  box-shadow: 0 28px 100px rgb(0 0 0 / 0.48);
+  padding: 22px;
+}
+
+.template-modal {
+  width: min(1500px, 100%);
+}
+
+.modal-header,
+.modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.modal-header h2 {
+  margin: 0;
+}
+
+.modal-header p {
+  margin: 6px 0 0;
+}
+
+.source-tabs,
+.preview-tabs,
+.variation-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  overflow: hidden;
+  border-radius: 8px;
+  background: #3d404a;
+  margin: 24px 0;
+}
+
+.source-tabs button,
+.preview-tabs button,
+.variation-tabs button {
+  min-height: 40px;
+  border: 0;
+  color: #e8edf8;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.source-tabs button.active,
+.preview-tabs button.active,
+.variation-tabs button.active {
+  background: #415c9e;
+}
+
+.source-grid {
+  display: grid;
+  grid-template-columns: 290px 1fr;
+  gap: 16px;
+}
+
+.source-list {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.source-list button {
+  min-height: 50px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #e8edf8;
+  background: #42454f;
+  cursor: pointer;
+  text-align: left;
+  padding: 0 20px;
+  font-weight: 800;
+}
+
+.source-list button.active {
+  border-color: #668dff;
+}
+
+.source-preview-panel {
+  display: grid;
+  grid-template-columns: 1fr 200px;
+  gap: 16px;
+  border-radius: 8px;
+  background: #42454f;
+  padding: 20px;
+}
+
+.source-preview-panel h3,
+.source-preview-panel p {
+  margin: 0;
+}
+
+.source-preview-panel p {
+  margin-top: 8px;
+}
+
+.browser-preview {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #f4f3ee;
+  color: #1f2937;
+}
+
+.browser-topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  background: #ffffff;
+  border-bottom: 1px solid #d6d8df;
+  padding: 0 16px;
+}
+
+.browser-result-row {
+  display: grid;
+  grid-template-columns: 36px 1fr 100px;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid #dddfe5;
+  padding: 14px 18px;
+}
+
+.browser-result-row span {
+  display: block;
+  color: #647084;
+  font-size: 13px;
+}
+
+.browser-result-row button {
+  min-height: 30px;
+  border: 1px solid #3e80d8;
+  border-radius: 999px;
+  color: #1268bf;
+  background: #ffffff;
+  font-weight: 800;
+}
+
+.source-secondary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.source-card,
+.upload-strip > div {
+  display: grid;
+  gap: 8px;
+  border-radius: 8px;
+  background: #3c3f49;
+  padding: 14px;
+}
+
+.source-card svg,
+.upload-strip svg {
+  color: #82a5ff;
+}
+
+.source-card span {
+  color: #b6bdca;
+  font-size: 13px;
+}
+
+.upload-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.upload-strip > div {
+  grid-template-columns: 22px 1fr;
+  align-items: center;
+}
+
+.template-layout {
+  display: grid;
+  grid-template-columns: 1fr 430px;
+  gap: 18px;
+}
+
+.template-editor,
+.template-preview {
+  border-radius: 8px;
+  background: #3d404a;
+  padding: 16px;
+}
+
+.risk-line,
+.template-toolbar,
+.variable-chip-row,
+.modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.risk-line {
+  min-height: 38px;
+  color: #f5cf70;
+  border-bottom: 1px solid #2c2f38;
+  margin-bottom: 14px;
+}
+
+.variation-tabs {
+  grid-template-columns: 1fr 1fr 1.2fr;
+  margin: 0 0 14px;
+}
+
+.template-toolbar {
+  border-bottom: 1px solid #2c2f38;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+}
+
+.template-toolbar button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  color: #dfe4f2;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.variable-chip-row {
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.variable-chip {
+  min-height: 28px;
+  border: 1px solid #3d7445;
+  border-radius: 6px;
+  color: #75e785;
+  background: #25352b;
+  cursor: pointer;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.template-textarea {
+  width: 100%;
+  min-height: 350px;
+  resize: vertical;
+  border: 1px solid #4b5060;
+  border-radius: 8px;
+  color: #f8faff;
+  background: #272a33;
+  padding: 16px;
+  line-height: 1.7;
+}
+
+.template-count {
+  color: #9fa6b8;
+  text-align: right;
+  margin: 6px 0 16px;
+}
+
+.spintax-box {
+  border-radius: 8px;
+  background: #343741;
+  padding: 14px;
+}
+
+.spintax-box h3,
+.spintax-box p {
+  margin: 0;
+}
+
+.spintax-box p {
+  margin-top: 6px;
+}
+
+.spintax-inputs {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.spintax-inputs input {
+  min-height: 42px;
+  border: 1px solid #4b5060;
+  border-radius: 8px;
+  background: #272a33;
+  padding: 0 12px;
+}
+
+.preview-tabs {
+  grid-template-columns: 1fr 1fr;
+  margin: 0 0 14px;
+}
+
+.preview-card {
+  border-radius: 8px;
+  background: #555863;
+  margin: 14px 0 20px;
+  padding: 14px;
+}
+
+.preview-card pre {
+  min-height: 110px;
+  margin: 0;
+  color: #ffffff;
+  white-space: pre-wrap;
+  font-family: inherit;
+  line-height: 1.7;
+}
+
+.preview-card span {
+  display: block;
+  color: #c4cad7;
+  text-align: right;
+  font-size: 12px;
+}
+
+.preview-variable-list {
+  display: grid;
+  gap: 10px;
+}
+
+.preview-variable-list div {
+  display: grid;
+  gap: 6px;
+}
+
+.preview-variable-list span {
+  color: #d7dce8;
+}
+
+.preview-variable-list strong {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+  background: #272a33;
+  padding: 0 10px;
+  color: #f8faff;
+}
+
+.modal-actions {
+  justify-content: flex-start;
+  border-top: 1px solid #424652;
+  padding-top: 16px;
+  margin-top: 18px;
+}
+
 @media (max-width: 980px) {
   .manager-layout,
   .workspace-layout {
@@ -847,7 +1223,11 @@ input {
   }
 
   .workspace-grid,
-  .workspace-tabs {
+  .workspace-tabs,
+  .source-grid,
+  .source-secondary-grid,
+  .upload-strip,
+  .template-layout {
     grid-template-columns: 1fr;
   }
 

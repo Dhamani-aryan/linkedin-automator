@@ -17,6 +17,9 @@ import {
   Users,
   X
 } from "lucide-react";
+import { useState } from "react";
+import { LeadSourceWizard } from "./LeadSourceWizard";
+import { MessageTemplateEditor } from "./MessageTemplateEditor";
 import { seedCampaigns, seedLeads, seedWorkflow } from "../data/seed";
 import type { ChromeStatus, LinkedInAccount } from "../types";
 
@@ -52,6 +55,7 @@ export function AccountWorkspace({
   onStopChrome
 }: WorkspaceProps) {
   const linkedInTab = chromeStatus?.tabs.find((tab) => tab.url.includes("linkedin.com")) ?? null;
+  const [activeModal, setActiveModal] = useState<"source" | "template" | null>(null);
 
   return (
     <main className="workspace-layout">
@@ -147,6 +151,16 @@ export function AccountWorkspace({
         <section className="workspace-grid">
           <div className="workspace-column">
             <Panel title="Workflow">
+              <div className="workflow-actions">
+                <button className="primary-button" onClick={() => setActiveModal("source")}>
+                  <Plus size={17} />
+                  Choose source
+                </button>
+                <button className="ghost-button" onClick={() => setActiveModal("template")}>
+                  <Send size={17} />
+                  Edit message
+                </button>
+              </div>
               <div className="workflow-canvas">
                 {seedWorkflow.map((card, index) => (
                   <div className="workflow-node-wrap" key={card.id}>
@@ -250,6 +264,8 @@ export function AccountWorkspace({
           </div>
         </section>
       </section>
+      {activeModal === "source" ? <LeadSourceWizard onClose={() => setActiveModal(null)} /> : null}
+      {activeModal === "template" ? <MessageTemplateEditor onClose={() => setActiveModal(null)} /> : null}
     </main>
   );
 }
