@@ -1,4 +1,5 @@
 import { Check, Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { HumanTouchPanel } from "./HumanTouchPanel";
 import type { HumanTouchSettings } from "../types";
 
@@ -15,8 +16,13 @@ const actionLimits = [
 ];
 
 const workingDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const safetyTabs = ["Limits", "Working hours", "Actions", "Interface", "External CRMs"] as const;
+
+type SafetyTab = (typeof safetyTabs)[number];
 
 export function SafetyLimitsPage({ settings, onChange }: SafetyLimitsPageProps) {
+  const [activeTab, setActiveTab] = useState<SafetyTab>("Limits");
+
   return (
     <section className="safety-page">
       <header className="manager-header">
@@ -31,20 +37,24 @@ export function SafetyLimitsPage({ settings, onChange }: SafetyLimitsPageProps) 
       </header>
 
       <div className="settings-tabs">
-        <button className="active">Limits</button>
-        <button>Working hours</button>
-        <button>Actions</button>
-        <button>Interface</button>
-        <button>External CRMs</button>
+        {safetyTabs.map((tab) => (
+          <button
+            className={activeTab === tab ? "active" : ""}
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+          >
+            {tab}
+          </button>
+        ))}
       </div>
 
-      <div className="safety-page-grid">
+      {activeTab === "Limits" ? (
         <section className="limits-panel">
           <h2>Daily activity limit</h2>
           <div className="daily-limit-row">
             <label>
               <input type="checkbox" checked readOnly />
-              Max actions per 24 hours
+              <span>Max actions per 24 hours</span>
             </label>
             <input
               type="number"
@@ -63,25 +73,31 @@ export function SafetyLimitsPage({ settings, onChange }: SafetyLimitsPageProps) 
           <div className="limit-list">
             {actionLimits.map((limit) => (
               <article className="limit-row" key={limit.action}>
-                <div>
+                <div className="limit-title-cell">
                   <strong>{limit.action}</strong>
                   <span>Smart Daily Limit Adjustment</span>
                 </div>
                 <input type="number" defaultValue={limit.limit} />
-                <span>per</span>
-                <input type="text" defaultValue={limit.window} />
-                <button className="icon-button run" title="Add limit">
-                  <Plus size={16} />
-                </button>
-                <button className="icon-button stop" title="Delete limit">
-                  <Trash2 size={16} />
-                </button>
+                <div className="limit-period-cell">
+                  <span>per</span>
+                  <input type="text" defaultValue={limit.window} />
+                </div>
+                <div className="limit-icon-actions">
+                  <button className="icon-button run" title="Add limit">
+                    <Plus size={16} />
+                  </button>
+                  <button className="icon-button stop" title="Delete limit">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
                 <em>{limit.used}</em>
               </article>
             ))}
           </div>
         </section>
+      ) : null}
 
+      {activeTab === "Working hours" ? (
         <section className="working-hours-panel">
           <h2>Working hours</h2>
           <div className="timezone-select">UTC +5:30</div>
@@ -98,9 +114,25 @@ export function SafetyLimitsPage({ settings, onChange }: SafetyLimitsPageProps) 
             ))}
           </div>
         </section>
-      </div>
+      ) : null}
 
-      <HumanTouchPanel settings={settings} onChange={onChange} />
+      {activeTab === "Actions" ? <HumanTouchPanel settings={settings} onChange={onChange} /> : null}
+
+      {activeTab === "Interface" ? (
+        <section className="placeholder-page">
+          <p className="eyebrow">Interface</p>
+          <h1>Interface</h1>
+          <p className="muted">Theme, display density, and notification preferences will live here.</p>
+        </section>
+      ) : null}
+
+      {activeTab === "External CRMs" ? (
+        <section className="placeholder-page">
+          <p className="eyebrow">External CRMs</p>
+          <h1>External CRMs</h1>
+          <p className="muted">CRM exports and sync settings will live here.</p>
+        </section>
+      ) : null}
     </section>
   );
 }
