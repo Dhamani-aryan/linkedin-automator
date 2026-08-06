@@ -82,6 +82,29 @@ p {
   margin-top: 28px;
 }
 
+.segmented-control {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #252832;
+  margin-top: 22px;
+}
+
+.segmented-control button {
+  min-height: 40px;
+  border: 0;
+  color: #b8c0d1;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.segmented-control button.active {
+  color: #ffffff;
+  background: #415c9e;
+}
+
 label {
   font-size: 14px;
   font-weight: 700;
@@ -313,6 +336,17 @@ input {
 
 .account-row {
   min-height: 118px;
+}
+
+.empty-accounts {
+  display: grid;
+  gap: 6px;
+  padding: 34px 20px;
+  text-align: center;
+}
+
+.empty-accounts p {
+  margin: 0;
 }
 
 .account-person {
@@ -905,6 +939,66 @@ input {
 
 .template-modal {
   width: min(1500px, 100%);
+}
+
+.account-modal {
+  width: min(620px, 100%);
+  max-height: calc(100vh - 52px);
+  overflow: auto;
+  border: 1px solid #464a55;
+  border-radius: 8px;
+  background: #2d3039;
+  box-shadow: 0 28px 100px rgb(0 0 0 / 0.48);
+  padding: 22px;
+}
+
+.login-persistence-note,
+.chrome-flow-card {
+  display: flex;
+  gap: 12px;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.login-persistence-note {
+  border: 1px solid #6d5b2b;
+  background: #372f23;
+}
+
+.login-persistence-note svg {
+  color: #f1ba48;
+  flex: 0 0 auto;
+}
+
+.chrome-flow-card {
+  background: #282b34;
+}
+
+.chrome-flow-card svg {
+  color: #82a5ff;
+  flex: 0 0 auto;
+}
+
+.login-persistence-note strong,
+.login-persistence-note span,
+.chrome-flow-card strong,
+.chrome-flow-card span {
+  display: block;
+}
+
+.login-persistence-note span,
+.chrome-flow-card span {
+  color: #cbd0dc;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+code {
+  border-radius: 4px;
+  background: #20232b;
+  color: #ffffff;
+  padding: 1px 5px;
 }
 
 .modal-header,

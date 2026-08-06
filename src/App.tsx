@@ -16,6 +16,7 @@ import {
   UserPlus
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { AddLinkedInAccountModal } from "./components/AddLinkedInAccountModal";
 import { AccountWorkspace } from "./components/AccountWorkspace";
 import { getChromeStatus, openChromeUrl, startChrome, stopChrome } from "./lib/chromeApi";
 import { clearCompanyUser, loadCompanyUser, loadLinkedInAccounts, saveCompanyUser, saveLinkedInAccounts } from "./lib/storage";
@@ -34,6 +35,7 @@ export function App() {
   const [status, setStatus] = useState<ChromeStatus | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [screen, setScreen] = useState<"manager" | "workspace">("manager");
+  const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
 
   const selectedAccount = accounts.find((candidate) => candidate.id === selectedAccountId) ?? accounts[0] ?? null;
   const activeLinkedInTab = useMemo(
@@ -127,6 +129,21 @@ export function App() {
     clearCompanyUser();
     setCompanyUser(null);
     setScreen("manager");
+  }
+
+  function addLinkedInAccount(account: LinkedInAccount) {
+    setAccounts((currentAccounts) => [...currentAccounts, account]);
+    setSelectedAccountId(account.id);
+    setIsAddAccountOpen(false);
+  }
+
+  function deleteLinkedInAccount(accountId: string) {
+    setAccounts((currentAccounts) => currentAccounts.filter((account) => account.id !== accountId));
+    if (selectedAccountId === accountId) {
+      const remainingAccounts = accounts.filter((account) => account.id !== accountId);
+      setSelectedAccountId(remainingAccounts[0]?.id ?? "");
+      setScreen("manager");
+    }
   }
 
   if (!companyUser) {
@@ -257,7 +274,7 @@ export function App() {
               <RefreshCw size={18} />
               Refresh
             </button>
-            <button className="primary-button disabled-button" type="button">
+            <button className="primary-button" type="button" onClick={() => setIsAddAccountOpen(true)}>
               <Plus size={18} />
               Add account
             </button>
@@ -354,7 +371,11 @@ export function App() {
                   >
                     <Square size={16} />
                   </button>
-                  <button className="icon-button disabled-button" title="Delete disabled in single-profile v1">
+                  <button
+                    className="icon-button"
+                    title="Delete account from this workspace"
+                    onClick={() => deleteLinkedInAccount(account.id)}
+                  >
                     <Trash2 size={16} />
                   </button>
                 </div>
@@ -375,6 +396,12 @@ export function App() {
           </div>
         </section>
       </section>
+      {isAddAccountOpen ? (
+        <AddLinkedInAccountModal
+          onAdd={addLinkedInAccount}
+          onClose={() => setIsAddAccountOpen(false)}
+        />
+      ) : null}
     </main>
   );
 }
