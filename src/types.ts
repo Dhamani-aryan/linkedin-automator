@@ -16,6 +16,13 @@ export type ChromeStatus = {
   tabs: ChromeTabSummary[];
 };
 
+export type CompanyUser = {
+  id: string;
+  companyName: string;
+  email: string;
+  createdAt: string;
+};
+
 export type LinkedInAccount = {
   id: string;
   email: string;
