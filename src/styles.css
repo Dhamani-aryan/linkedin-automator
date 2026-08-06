@@ -314,6 +314,11 @@ input {
   background: #445f9f;
 }
 
+.pill.danger-pill {
+  color: #ffb4b1;
+  background: #452829;
+}
+
 .search-box {
   margin-left: auto;
   width: 150px;

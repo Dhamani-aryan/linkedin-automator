@@ -19,9 +19,20 @@ const workingDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Sa
 const safetyTabs = ["Limits", "Working hours", "Actions", "Interface", "External CRMs"] as const;
 
 type SafetyTab = (typeof safetyTabs)[number];
+type WorkingDayMode = "24-hours" | "do-not-work";
 
 export function SafetyLimitsPage({ settings, onChange }: SafetyLimitsPageProps) {
   const [activeTab, setActiveTab] = useState<SafetyTab>("Limits");
+  const [workingDayModes, setWorkingDayModes] = useState<Record<string, WorkingDayMode>>(() =>
+    Object.fromEntries(workingDays.map((day) => [day, "24-hours" as const]))
+  );
+
+  function setWorkingDayMode(day: string, mode: WorkingDayMode) {
+    setWorkingDayModes((currentModes) => ({
+      ...currentModes,
+      [day]: mode
+    }));
+  }
 
   return (
     <section className="safety-page">
@@ -105,8 +116,18 @@ export function SafetyLimitsPage({ settings, onChange }: SafetyLimitsPageProps) 
             {workingDays.map((day) => (
               <div className="working-day-row" key={day}>
                 <strong>{day}</strong>
-                <button className="pill active">24 hours</button>
-                <button className="pill">Do not work</button>
+                <button
+                  className={`pill ${workingDayModes[day] === "24-hours" ? "active" : ""}`}
+                  onClick={() => setWorkingDayMode(day, "24-hours")}
+                >
+                  24 hours
+                </button>
+                <button
+                  className={`pill ${workingDayModes[day] === "do-not-work" ? "active danger-pill" : ""}`}
+                  onClick={() => setWorkingDayMode(day, "do-not-work")}
+                >
+                  Do not work
+                </button>
                 <button className="icon-button run" title={`Add ${day} range`}>
                   <Plus size={16} />
                 </button>
