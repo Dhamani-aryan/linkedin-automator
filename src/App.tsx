@@ -18,7 +18,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { AddLinkedInAccountModal } from "./components/AddLinkedInAccountModal";
 import { AccountWorkspace } from "./components/AccountWorkspace";
-import { HumanTouchPanel } from "./components/HumanTouchPanel";
+import { SafetyLimitsPage } from "./components/SafetyLimitsPage";
 import { getChromeStatus, openChromeUrl, startChrome, stopChrome } from "./lib/chromeApi";
 import { safetyDefaults } from "./lib/safety";
 import { clearCompanyUser, loadCompanyUser, loadLinkedInAccounts, saveCompanyUser, saveLinkedInAccounts } from "./lib/storage";
@@ -37,6 +37,7 @@ export function App() {
   const [status, setStatus] = useState<ChromeStatus | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [screen, setScreen] = useState<"manager" | "workspace">("manager");
+  const [activePage, setActivePage] = useState<"accounts" | "campaigns" | "safety" | "settings">("accounts");
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
   const [humanTouchSettings, setHumanTouchSettings] = useState<HumanTouchSettings>(safetyDefaults);
 
@@ -132,6 +133,7 @@ export function App() {
     clearCompanyUser();
     setCompanyUser(null);
     setScreen("manager");
+    setActivePage("accounts");
   }
 
   function addLinkedInAccount(account: LinkedInAccount) {
@@ -248,10 +250,30 @@ export function App() {
             <span>Automator</span>
           </div>
           <nav className="sidebar-nav">
-            <button className="nav-item active">LinkedIn Accounts</button>
-            <button className="nav-item">Campaigns</button>
-            <button className="nav-item">Safety Limits</button>
-            <button className="nav-item">Settings</button>
+            <button
+              className={`nav-item ${activePage === "accounts" ? "active" : ""}`}
+              onClick={() => setActivePage("accounts")}
+            >
+              LinkedIn Accounts
+            </button>
+            <button
+              className={`nav-item ${activePage === "campaigns" ? "active" : ""}`}
+              onClick={() => setActivePage("campaigns")}
+            >
+              Campaigns
+            </button>
+            <button
+              className={`nav-item ${activePage === "safety" ? "active" : ""}`}
+              onClick={() => setActivePage("safety")}
+            >
+              Safety Limits
+            </button>
+            <button
+              className={`nav-item ${activePage === "settings" ? "active" : ""}`}
+              onClick={() => setActivePage("settings")}
+            >
+              Settings
+            </button>
           </nav>
         </div>
         <div className="signed-in-user">
@@ -267,6 +289,28 @@ export function App() {
       </aside>
 
       <section className="manager-content">
+        {activePage === "safety" ? (
+          <SafetyLimitsPage settings={humanTouchSettings} onChange={setHumanTouchSettings} />
+        ) : null}
+
+        {activePage === "campaigns" ? (
+          <section className="placeholder-page">
+            <p className="eyebrow">Campaigns</p>
+            <h1>Campaigns</h1>
+            <p className="muted">Campaign workspace opens from each LinkedIn account.</p>
+          </section>
+        ) : null}
+
+        {activePage === "settings" ? (
+          <section className="placeholder-page">
+            <p className="eyebrow">Workspace</p>
+            <h1>Settings</h1>
+            <p className="muted">Company and browser preferences will live here.</p>
+          </section>
+        ) : null}
+
+        {activePage === "accounts" ? (
+          <>
         <header className="manager-header">
           <div>
             <p className="eyebrow">Account Manager</p>
@@ -404,8 +448,8 @@ export function App() {
             {selectedAccount?.lastError ? <p className="error-text">{selectedAccount.lastError}</p> : null}
           </div>
         </section>
-
-        <HumanTouchPanel settings={humanTouchSettings} onChange={setHumanTouchSettings} />
+          </>
+        ) : null}
       </section>
       {isAddAccountOpen ? (
         <AddLinkedInAccountModal

@@ -594,9 +594,160 @@ input {
   margin: 6px 0 0;
 }
 
+.placeholder-page {
+  max-width: 820px;
+  border: 1px solid #444853;
+  border-radius: 8px;
+  background: #333640;
+  padding: 22px;
+}
+
+.safety-page {
+  display: grid;
+  gap: 20px;
+}
+
+.settings-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  overflow: hidden;
+  border-radius: 8px;
+  background: #343741;
+}
+
+.settings-tabs button {
+  min-height: 42px;
+  border: 0;
+  color: #dfe4f2;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.settings-tabs button.active {
+  background: #415c9e;
+}
+
+.safety-page-grid {
+  display: grid;
+  grid-template-columns: minmax(520px, 1fr) minmax(320px, 0.7fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.limits-panel,
+.working-hours-panel {
+  border: 1px solid #444853;
+  border-radius: 8px;
+  background: #333640;
+  padding: 18px;
+}
+
+.limits-panel h2,
+.working-hours-panel h2 {
+  margin: 0 0 16px;
+  font-size: 18px;
+}
+
+.daily-limit-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.daily-limit-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.daily-limit-row input[type="number"],
+.limit-row input {
+  width: 86px;
+  min-height: 34px;
+  border: 1px solid #4b5060;
+  border-radius: 6px;
+  background: #20232b;
+  color: #ffffff;
+  padding: 0 10px;
+}
+
+.limit-list {
+  display: grid;
+  gap: 12px;
+}
+
+.limit-row {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) 70px 28px 88px 36px 36px auto;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid #454956;
+  padding-top: 12px;
+}
+
+.limit-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.limit-row strong,
+.limit-row span,
+.limit-row em {
+  display: block;
+}
+
+.limit-row strong {
+  color: #ff817d;
+  font-size: 14px;
+}
+
+.limit-row span {
+  color: #aeb5c5;
+  font-size: 12px;
+}
+
+.limit-row em {
+  color: #73e087;
+  font-style: normal;
+  font-size: 13px;
+}
+
+.timezone-select {
+  width: fit-content;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #4b5060;
+  border-radius: 8px;
+  background: #272a33;
+  color: #dfe4f2;
+  padding: 0 12px;
+  margin-bottom: 16px;
+}
+
+.working-day-list {
+  display: grid;
+  gap: 12px;
+}
+
+.working-day-row {
+  display: grid;
+  grid-template-columns: 95px 90px 110px 36px;
+  align-items: center;
+  gap: 8px;
+}
+
+.working-day-row .pill {
+  min-height: 32px;
+  justify-content: center;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
 .human-touch-panel {
   max-width: 1120px;
-  margin-top: 22px;
   border: 1px solid #444853;
   border-radius: 8px;
   background: #333640;
