@@ -1,6 +1,6 @@
 # LinkedIn Automator
 
-Research notes and planning scaffold for evaluating Linked Helper and designing a responsible LinkedIn outreach workflow.
+Research notes and a local-first web app for designing a responsible LinkedIn outreach workflow.
 
 Research date: August 6, 2026
 
@@ -9,6 +9,28 @@ Research date: August 6, 2026
 Linked Helper is a standalone LinkedIn automation application focused on lead generation, outreach sequences, profile/contact data collection, CRM-style lead management, and integrations with CRMs and webhook-based tools. Its main positioning is that it is a desktop app rather than a Chrome extension or vendor-hosted cloud bot, and that each LinkedIn account can run in an isolated browser instance with separate cookies, cache, fingerprinting, proxy settings, limits, and working hours.
 
 Important risk note: LinkedIn's own Help pages say third-party software that scrapes, modifies, or automates activity on LinkedIn is not permitted and may violate LinkedIn's User Agreement. Any automation project should assume account restriction risk and should prioritize consent, low volume, data protection, and manual review.
+
+## Current App
+
+Version one is a single-profile local Chrome app:
+
+- Sign in with an email to enter the local workspace.
+- Manage one LinkedIn account/session in the account manager.
+- Start one persistent Chrome profile from this machine.
+- Open LinkedIn in that managed Chrome profile.
+- Use the same computer IP; no proxy or IP rotation is configured.
+- Build campaign/workflow screens, source selection, message variables, spintax, and safety limits.
+
+Run the local controller and web UI in separate terminals:
+
+```sh
+npm run server
+npm run dev
+```
+
+Then open `http://127.0.0.1:5173`.
+
+More implementation notes are in `docs/ARCHITECTURE.md`.
 
 ## What Linked Helper Does
 

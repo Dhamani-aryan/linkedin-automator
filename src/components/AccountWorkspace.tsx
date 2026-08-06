@@ -9,6 +9,7 @@ import {
   Layers3,
   List,
   MessageSquareReply,
+  ShieldCheck,
   Play,
   Plus,
   RefreshCw,
@@ -21,6 +22,7 @@ import { useState } from "react";
 import { LeadSourceWizard } from "./LeadSourceWizard";
 import { MessageTemplateEditor } from "./MessageTemplateEditor";
 import { seedCampaigns, seedLeads, seedWorkflow } from "../data/seed";
+import { safetyChecklist, safetyDefaults } from "../lib/safety";
 import type { ChromeStatus, LinkedInAccount } from "../types";
 
 type WorkspaceProps = {
@@ -241,6 +243,38 @@ export function AccountWorkspace({
               <div className="chart-legend">
                 <span><i className="legend-blue" />Invited</span>
                 <span><i className="legend-green" />Accepted</span>
+              </div>
+            </Panel>
+
+            <Panel title="Runner safety">
+              <div className="safety-list">
+                <div className="safety-mode">
+                  <ShieldCheck size={22} />
+                  <div>
+                    <strong>Same IP local Chrome</strong>
+                    <span>{safetyDefaults.chromeProfile}</span>
+                  </div>
+                </div>
+                {safetyChecklist.map((item) => (
+                  <div className="safety-item" key={item}>
+                    <Check size={16} />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="limit-grid">
+                <div>
+                  <span>Daily actions</span>
+                  <strong>{safetyDefaults.dailyActionLimit}</strong>
+                </div>
+                <div>
+                  <span>Daily invites</span>
+                  <strong>{safetyDefaults.dailyInviteLimit}</strong>
+                </div>
+                <div>
+                  <span>Delay range</span>
+                  <strong>{safetyDefaults.actionDelaySeconds[0]}-{safetyDefaults.actionDelaySeconds[1]}s</strong>
+                </div>
               </div>
             </Panel>
 

@@ -823,6 +823,64 @@ input {
   margin: 0;
 }
 
+.safety-list {
+  display: grid;
+  gap: 10px;
+}
+
+.safety-mode,
+.safety-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.safety-mode {
+  border-radius: 8px;
+  background: #282b34;
+  padding: 12px;
+}
+
+.safety-mode svg,
+.safety-item svg {
+  color: #73e087;
+  flex: 0 0 auto;
+}
+
+.safety-mode span,
+.safety-item span {
+  display: block;
+  color: #b8bfcd;
+  font-size: 13px;
+}
+
+.limit-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.limit-grid div {
+  border-radius: 8px;
+  background: #282b34;
+  padding: 12px;
+}
+
+.limit-grid span,
+.limit-grid strong {
+  display: block;
+}
+
+.limit-grid span {
+  color: #9fa6b8;
+  font-size: 12px;
+}
+
+.limit-grid strong {
+  margin-top: 4px;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -1227,7 +1285,8 @@ input {
   .source-grid,
   .source-secondary-grid,
   .upload-strip,
-  .template-layout {
+  .template-layout,
+  .limit-grid {
     grid-template-columns: 1fr;
   }
 

@@ -1,4 +1,5 @@
-import type { CampaignSummary, LeadProfile, WorkflowCard } from "../types";
+import { buildWorkflowWithReplyChecks, defaultWorkflowActions } from "../lib/workflow";
+import type { CampaignSummary, LeadProfile } from "../types";
 
 export const seedCampaigns: CampaignSummary[] = [
   {
@@ -65,50 +66,7 @@ export const seedLeads: LeadProfile[] = [
   }
 ];
 
-export const seedWorkflow: WorkflowCard[] = [
-  {
-    id: "source",
-    kind: "source",
-    title: "Profiles to process",
-    subtitle: "Lead queue source",
-    count: 16,
-    successful: 0,
-    failed: 0
-  },
-  {
-    id: "invite",
-    kind: "action",
-    title: "Invite 2nd and 3rd level contacts",
-    subtitle: "Connection request with message template",
-    count: 16,
-    successful: 0,
-    failed: 0
-  },
-  {
-    id: "reply-check-1",
-    kind: "reply_check",
-    title: "Check for replies",
-    subtitle: "Auto-added after invite action",
-    count: 16,
-    successful: 0,
-    failed: 0
-  },
-  {
-    id: "filter",
-    kind: "action",
-    title: "Filter contacts out of my network",
-    subtitle: "Keep accepted contacts for follow-up",
-    count: 0,
-    successful: 0,
-    failed: 0
-  },
-  {
-    id: "reply-check-2",
-    kind: "reply_check",
-    title: "Check for replies",
-    subtitle: "Auto-added after filter action",
-    count: 0,
-    successful: 0,
-    failed: 0
-  }
-];
+export const seedWorkflow = buildWorkflowWithReplyChecks({
+  actions: defaultWorkflowActions,
+  sourceCount: 16
+});
