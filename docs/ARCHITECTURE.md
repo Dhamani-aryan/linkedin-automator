@@ -1,6 +1,7 @@
 # LinkedIn Automator Architecture
 
-Version one is a local-first web app with one persistent Chrome profile.
+Version one is a local-first web app with company workspace auth, LinkedIn
+account records, and one persistent Chrome profile.
 
 ```text
 React UI
@@ -17,14 +18,58 @@ proxy or IP rotation in v1.
 
 The first milestone proves the user flow with one LinkedIn login:
 
-- sign in to the app
+- register or sign in to a company workspace
+- add a LinkedIn account record
 - view the account manager
-- start one managed Chrome session
-- open LinkedIn with a persistent local profile
+- start one managed Chrome session for the selected account
+- open LinkedIn with a persistent local profile and log in once
 - manage campaigns, profile queues, message templates, and workflow cards
 
-Multi-profile support can extend the same model by assigning a different
-Chrome `--user-data-dir` to each LinkedIn account.
+## Multi-Profile Upgrade Path
+
+The UI already treats LinkedIn accounts as records. The runner should treat
+browser control as an implementation behind an account session:
+
+```text
+LinkedInAccount
+  -> BrowserSession
+    -> chromeProfileDir
+    -> cdpPort
+    -> state/status/tabs
+```
+
+Version one maps every account to:
+
+```text
+.local/chrome-profile
+```
+
+Multi-profile support should keep the same account manager, campaign workspace,
+workflow cards, templates, and safety settings, then change the browser session
+mapping to:
+
+```text
+.local/chrome-profiles/{accountId}
+```
+
+Each future account should launch with its own `--user-data-dir` and optionally
+its own remote debugging port. The network still comes from the same computer
+unless proxy support is explicitly added later.
+
+## Safety Layer
+
+Human-like execution settings live separately from the UI workflow model:
+
+- daily action and invite limits
+- randomized delay range
+- batch cooldown
+- working hours
+- random scroll/profile dwell time
+- pause follow-ups when replies are detected
+
+The runner should read these limits before executing browser actions. The UI can
+change without changing the browser controller, and the browser controller can
+move from one profile to many profiles without changing campaign definitions.
 
 ## Workflow Rule
 
