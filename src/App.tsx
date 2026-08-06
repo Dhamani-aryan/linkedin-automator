@@ -1,5 +1,6 @@
 import { AlertTriangle, Chrome, Circle, ExternalLink, Mail, Play, Plus, RefreshCw, Search, Square, Trash2, UserPlus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { AccountWorkspace } from "./components/AccountWorkspace";
 import { getChromeStatus, openChromeUrl, startChrome, stopChrome } from "./lib/chromeApi";
 import type { ChromeStatus, LinkedInAccount } from "./types";
 
@@ -19,6 +20,7 @@ export function App() {
   const [account, setAccount] = useState<LinkedInAccount>(initialAccount);
   const [status, setStatus] = useState<ChromeStatus | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  const [screen, setScreen] = useState<"manager" | "workspace">("manager");
 
   const activeLinkedInTab = useMemo(
     () => status?.tabs.find((tab) => tab.url.includes("linkedin.com")) ?? null,
@@ -64,6 +66,10 @@ export function App() {
     }
   }
 
+  function openLinkedIn() {
+    void runChromeAction(() => openChromeUrl("https://www.linkedin.com/"));
+  }
+
   if (!isSignedIn) {
     return (
       <main className="auth-screen">
@@ -101,6 +107,21 @@ export function App() {
           </form>
         </section>
       </main>
+    );
+  }
+
+  if (screen === "workspace") {
+    return (
+      <AccountWorkspace
+        account={account}
+        chromeStatus={status}
+        isBusy={isBusy}
+        onBack={() => setScreen("manager")}
+        onOpenLinkedIn={openLinkedIn}
+        onRefreshChrome={() => void refreshStatus()}
+        onStartChrome={() => void runChromeAction(() => startChrome())}
+        onStopChrome={() => void runChromeAction(() => stopChrome())}
+      />
     );
   }
 
@@ -193,6 +214,12 @@ export function App() {
             <span className="owner-badge">{account.role}</span>
             <span>No</span>
             <div className="row-actions">
+              <button
+                className="ghost-button compact-button"
+                onClick={() => setScreen("workspace")}
+              >
+                Workspace
+              </button>
               <button
                 className="icon-button run"
                 title="Start Chrome"
