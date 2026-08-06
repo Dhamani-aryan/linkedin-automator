@@ -21,6 +21,7 @@ temp/
 Thumbs.db
 .vscode/
 .idea/
+.local/
 
 # Dependencies/build outputs
 node_modules/
