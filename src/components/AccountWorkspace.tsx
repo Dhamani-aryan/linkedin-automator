@@ -304,7 +304,9 @@ export function AccountWorkspace({
                       </span>
                       {action.automatic ? <ShieldCheck className="auto-guard-icon" size={18} /> : null}
                     </button>
-                    <AddActionButton onClick={() => openActionPicker(index + 1)} />
+                    {workspace.actions[index + 1]?.automatic ? null : (
+                      <AddActionButton onClick={() => openActionPicker(index + 1)} />
+                    )}
                   </div>
                 ))}
               </div>
