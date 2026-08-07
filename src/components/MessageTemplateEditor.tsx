@@ -1,55 +1,47 @@
-import { Bot, Copy, RefreshCw, Save, Shuffle, Sparkles, X } from "lucide-react";
+import { RefreshCw, Save, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { seedLeads } from "../data/seed";
 import { insertVariable, renderTemplate, templateVariables } from "../lib/templateEngine";
 
 type MessageTemplateEditorProps = {
+  actionLabel: string;
+  initialTemplate: string;
+  maxLength: number;
   onClose: () => void;
+  onSave: (template: string) => void;
 };
 
-const defaultTemplate = "Hi {firstName},\n\nI would like to join your professional network.\n\nCheers!";
-
-export function MessageTemplateEditor({ onClose }: MessageTemplateEditorProps) {
-  const [template, setTemplate] = useState(defaultTemplate);
+export function MessageTemplateEditor({
+  actionLabel,
+  initialTemplate,
+  maxLength,
+  onClose,
+  onSave
+}: MessageTemplateEditorProps) {
+  const [template, setTemplate] = useState(initialTemplate);
   const [previewIndex, setPreviewIndex] = useState(0);
   const previewLead = seedLeads[previewIndex % seedLeads.length];
   const preview = useMemo(() => renderTemplate(template, previewLead), [previewLead, template]);
+  const isOverLimit = template.length > maxLength;
 
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true">
-      <section className="template-modal">
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="template-editor-title">
+      <section className="template-modal compact-template-modal">
         <header className="modal-header">
           <div>
-            <h2>Message Template Editor</h2>
-            <p>Variables are filled from each profile automatically.</p>
+            <h2 id="template-editor-title">{actionLabel}</h2>
+            <p>Profile variables are filled automatically for every lead.</p>
           </div>
-          <button className="icon-text-button" onClick={onClose}>
-            <X size={20} />
+          <button className="icon-button" title="Close" onClick={onClose}>
+            <X size={19} />
           </button>
         </header>
 
         <div className="template-layout">
           <section className="template-editor">
-            <div className="risk-line">
-              <Sparkles size={18} />
-              Almost safe - more diverse messages mean less risk.
-            </div>
-
-            <div className="variation-tabs">
-              <button className="active">1</button>
-              <button>2</button>
-              <button>+ Add variation</button>
-            </div>
-
-            <div className="template-toolbar">
-              <button><Bot size={17} /> AI Message</button>
-              <button><Shuffle size={17} /> Spintax</button>
-              <button>Variables</button>
-              <button><Copy size={17} /></button>
-            </div>
-
+            <div className="editor-section-label">Insert profile variable</div>
             <div className="variable-chip-row">
-              {templateVariables.slice(0, 7).map((variable) => (
+              {templateVariables.map((variable) => (
                 <button
                   className="variable-chip"
                   key={variable.key}
@@ -60,43 +52,38 @@ export function MessageTemplateEditor({ onClose }: MessageTemplateEditorProps) {
               ))}
             </div>
 
-            <textarea
-              className="template-textarea"
-              value={template}
-              onChange={(event) => setTemplate(event.target.value)}
-            />
-            <div className="template-count">{template.length}/300</div>
-
-            <div className="spintax-box">
-              <h3>Spintax</h3>
-              <p>Use short variations for greeting or phrasing, such as {"{Hello|Hi|Greetings}"}.</p>
-              <div className="spintax-inputs">
-                <input placeholder="Enter variation" />
-                <input placeholder="Enter variation" />
-              </div>
+            <label className="message-editor-field">
+              <span>Message</span>
+              <textarea
+                className="template-textarea"
+                value={template}
+                onChange={(event) => setTemplate(event.target.value)}
+              />
+            </label>
+            <div className={`template-count ${isOverLimit ? "over-limit" : ""}`}>
+              {template.length}/{maxLength}
             </div>
           </section>
 
           <aside className="template-preview">
-            <div className="preview-tabs">
-              <button className="active">Preview</button>
-              <button>Templates gallery</button>
+            <div className="preview-heading">
+              <h3>Preview</h3>
+              <button
+                className="icon-button"
+                title="Show another profile"
+                onClick={() => setPreviewIndex((current) => current + 1)}
+              >
+                <RefreshCw size={17} />
+              </button>
             </div>
-            <button
-              className="ghost-button full-width"
-              onClick={() => setPreviewIndex((current) => current + 1)}
-            >
-              <RefreshCw size={17} />
-              Show a different preview
-            </button>
             <div className="preview-card">
               <pre>{preview}</pre>
-              <span>{preview.length}/300</span>
+              <span>{preview.length}/{maxLength}</span>
             </div>
 
-            <h3>LinkedIn variables</h3>
-            <div className="preview-variable-list">
-              {templateVariables.map((variable) => (
+            <h3>Resolved variables</h3>
+            <div className="preview-variable-list compact-variable-list">
+              {templateVariables.slice(0, 8).map((variable) => (
                 <div key={variable.key}>
                   <span>{"{"}{variable.key}{"}"}</span>
                   <strong>{variable.getValue(previewLead)}</strong>
@@ -107,13 +94,15 @@ export function MessageTemplateEditor({ onClose }: MessageTemplateEditorProps) {
         </div>
 
         <footer className="modal-actions">
-          <button className="primary-button">
+          <button
+            className="primary-button"
+            disabled={!template.trim() || isOverLimit}
+            onClick={() => onSave(template.trim())}
+          >
             <Save size={18} />
-            Save & Close
+            Save message
           </button>
-          <button className="ghost-button" onClick={onClose}>
-            Close without changes
-          </button>
+          <button className="ghost-button" onClick={onClose}>Cancel</button>
         </footer>
       </section>
     </div>

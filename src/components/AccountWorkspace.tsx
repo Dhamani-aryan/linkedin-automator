@@ -1,29 +1,47 @@
 import {
   ArrowLeft,
-  BarChart3,
   Check,
   Chrome,
-  Download,
+  Clock3,
+  ExternalLink,
   Flag,
   Inbox,
   Layers3,
+  Link,
   List,
+  MessageSquare,
   MessageSquareReply,
-  ShieldCheck,
+  Navigation,
+  Pencil,
   Play,
   Plus,
   RefreshCw,
-  Send,
+  ShieldCheck,
   Square,
+  Trash2,
+  UserPlus,
   Users,
   X
 } from "lucide-react";
-import { useState } from "react";
-import { LeadSourceWizard } from "./LeadSourceWizard";
+import { useEffect, useMemo, useState } from "react";
+import { collectVisibleProfiles } from "../lib/chromeApi";
+import {
+  createLeadFromUrl,
+  loadCampaignWorkspace,
+  saveCampaignWorkspace
+} from "../lib/campaignStorage";
+import { createWorkflowAction, removeWorkflowAction } from "../lib/workflow";
+import type {
+  CampaignWorkflowAction,
+  CampaignWorkspaceState,
+  ChromeStatus,
+  LeadSource,
+  LinkedInAccount,
+  WorkflowActionType
+} from "../types";
+import { LeadSourceWizard, type LeadImportPayload } from "./LeadSourceWizard";
 import { MessageTemplateEditor } from "./MessageTemplateEditor";
-import { seedCampaigns, seedLeads, seedWorkflow } from "../data/seed";
-import { formatDelayRange, safetyChecklist, safetyDefaults } from "../lib/safety";
-import type { ChromeStatus, LinkedInAccount } from "../types";
+import { WorkflowActionPicker } from "./WorkflowActionPicker";
 
 type WorkspaceProps = {
   account: LinkedInAccount;
@@ -36,15 +54,7 @@ type WorkspaceProps = {
   onStopChrome: () => void;
 };
 
-const activeCampaign = seedCampaigns[0];
-const chartDays = [
-  { day: "Aug 1", invited: 0, accepted: 0 },
-  { day: "Aug 2", invited: 4, accepted: 1 },
-  { day: "Aug 3", invited: 8, accepted: 1 },
-  { day: "Aug 4", invited: 0, accepted: 0 },
-  { day: "Aug 5", invited: 3, accepted: 0 },
-  { day: "Aug 6", invited: 1, accepted: 0 }
-];
+type WorkspaceTab = "workflow" | "profiles" | "browser";
 
 export function AccountWorkspace({
   account,
@@ -56,8 +66,132 @@ export function AccountWorkspace({
   onStartChrome,
   onStopChrome
 }: WorkspaceProps) {
+  const [workspace, setWorkspace] = useState<CampaignWorkspaceState>(() => loadCampaignWorkspace(account));
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>("workflow");
+  const [activeModal, setActiveModal] = useState<"source" | "action" | "template" | null>(null);
+  const [insertAt, setInsertAt] = useState(0);
+  const [selectedActionId, setSelectedActionId] = useState(() => workspace.actions[0]?.id ?? "");
   const linkedInTab = chromeStatus?.tabs.find((tab) => tab.url.includes("linkedin.com")) ?? null;
-  const [activeModal, setActiveModal] = useState<"source" | "template" | null>(null);
+  const selectedAction = workspace.actions.find((action) => action.id === selectedActionId) ?? null;
+
+  useEffect(() => {
+    const nextWorkspace = loadCampaignWorkspace(account);
+    setWorkspace(nextWorkspace);
+    setSelectedActionId(nextWorkspace.actions[0]?.id ?? "");
+  }, [account.id]);
+
+  useEffect(() => {
+    saveCampaignWorkspace(account.id, workspace);
+  }, [account.id, workspace]);
+
+  const sourceNames = useMemo(
+    () => new Map(workspace.sources.map((source) => [source.id, source.name])),
+    [workspace.sources]
+  );
+
+  function openActionPicker(index: number) {
+    setInsertAt(index);
+    setActiveModal("action");
+  }
+
+  function addAction(type: "connection_request" | "message") {
+    const addedActions = createWorkflowAction(type);
+    setWorkspace((current) => ({
+      ...current,
+      actions: [
+        ...current.actions.slice(0, insertAt),
+        ...addedActions,
+        ...current.actions.slice(insertAt)
+      ]
+    }));
+    setSelectedActionId(addedActions[0].id);
+    setActiveModal(null);
+  }
+
+  function deleteAction(actionId: string) {
+    setWorkspace((current) => ({
+      ...current,
+      actions: removeWorkflowAction(current.actions, actionId)
+    }));
+    setSelectedActionId("");
+  }
+
+  function saveTemplate(template: string) {
+    if (!selectedAction) return;
+    setWorkspace((current) => ({
+      ...current,
+      actions: current.actions.map((action) =>
+        action.id === selectedAction.id ? { ...action, template } : action
+      )
+    }));
+    setActiveModal(null);
+  }
+
+  function addProfiles(payload: LeadImportPayload) {
+    const existingUrls = new Set(workspace.leads.map((lead) => lead.linkedinUrl.toLowerCase()));
+    let duplicates = 0;
+    const sourceId = crypto.randomUUID();
+    const uniqueProfiles = payload.profiles.filter((profile) => {
+      const key = profile.url.toLowerCase();
+      if (existingUrls.has(key)) {
+        duplicates += 1;
+        return false;
+      }
+      existingUrls.add(key);
+      return true;
+    });
+    const newLeads = uniqueProfiles.map((profile) => {
+      const lead = createLeadFromUrl(profile.url, sourceId);
+      return profile.name.trim() ? { ...lead, displayName: profile.name.trim() } : lead;
+    });
+
+    if (newLeads.length > 0) {
+      const source: LeadSource = {
+        id: sourceId,
+        kind: payload.kind,
+        name: payload.name,
+        sourceUrl: payload.sourceUrl,
+        profileCount: newLeads.length,
+        createdAt: new Date().toISOString()
+      };
+      setWorkspace((current) => {
+        const leads = [...current.leads, ...newLeads];
+        return {
+          ...current,
+          campaign: {
+            ...current.campaign,
+            profilesTotal: leads.length,
+            profilesToProcess: leads.filter((lead) => lead.status === "to_process").length
+          },
+          leads,
+          sources: [...current.sources, source]
+        };
+      });
+    }
+
+    return { added: newLeads.length, duplicates };
+  }
+
+  function removeLead(leadId: string) {
+    setWorkspace((current) => {
+      const leads = current.leads.filter((lead) => lead.id !== leadId);
+      return {
+        ...current,
+        campaign: {
+          ...current.campaign,
+          profilesTotal: leads.length,
+          profilesToProcess: leads.filter((lead) => lead.status === "to_process").length
+        },
+        leads
+      };
+    });
+  }
+
+  async function collectSalesNavigator(sourceUrl: string) {
+    const result = await collectVisibleProfiles(sourceUrl);
+    onRefreshChrome();
+    return result.profiles;
+  }
 
   return (
     <main className="workspace-layout">
@@ -71,7 +205,7 @@ export function AccountWorkspace({
           <div className="profile-avatar">in</div>
           <div>
             <strong>{account.name}</strong>
-            <span>{account.role}</span>
+            <span>{chromeStatus?.connected ? "Chrome connected" : "Chrome stopped"}</span>
           </div>
         </section>
 
@@ -80,255 +214,295 @@ export function AccountWorkspace({
             <Flag size={17} />
             Campaigns
           </button>
-          <button className="nav-item">
+          <button className="nav-item" onClick={() => setActiveTab("browser")}>
             <Chrome size={17} />
-            LinkedIn
-          </button>
-          <button className="nav-item">
-            <BarChart3 size={17} />
-            Dashboard
+            LinkedIn browser
           </button>
         </nav>
 
         <section className="campaign-mini-card">
           <div className="campaign-title-row">
-            <strong>{activeCampaign.name}</strong>
-            <span className={`state-badge ${activeCampaign.status}`}>
-              {activeCampaign.status}
-            </span>
+            <strong>{workspace.campaign.name}</strong>
+            <span className="state-badge ready">Ready to start</span>
           </div>
-          <Metric label="Total profiles" value={activeCampaign.profilesTotal} />
-          <Metric label="Profiles to process" value={activeCampaign.profilesToProcess} />
-          <Metric label="Accepted" value={activeCampaign.accepted} />
-          <Metric label="Replied" value={activeCampaign.replied} />
-          <Metric label="Failed" value={activeCampaign.failed} tone="danger" />
+          <Metric label="Total profiles" value={workspace.campaign.profilesTotal} />
+          <Metric label="To process" value={workspace.campaign.profilesToProcess} />
+          <Metric label="Sources" value={workspace.sources.length} />
+          <Metric label="Actions" value={workspace.actions.filter((action) => !action.automatic).length} />
         </section>
 
-        <button className="primary-button full-width">
+        <button className="primary-button full-width" disabled={workspace.leads.length === 0}>
           <Play size={17} />
           Start campaign
         </button>
       </aside>
 
-      <section className="workspace-main">
-        <header className="workspace-header">
+      <section className="workspace-main workflow-workspace-main">
+        <header className="workspace-header compact-workspace-header">
           <div>
             <button className="icon-text-button" onClick={onBack}>
               <ArrowLeft size={18} />
             </button>
-            <h1>{activeCampaign.name}</h1>
-            <p className="status-line">Ready to start - last 24h actions 0 of 150</p>
+            <h1>{workspace.campaign.name}</h1>
+            <p className="status-line">Draft workflow · {workspace.leads.length} profiles · same-IP local Chrome</p>
           </div>
           <div className="header-actions">
             <button className="ghost-button" onClick={onStartChrome} disabled={isBusy}>
               <Play size={18} />
               Start Chrome
             </button>
-            <button className="ghost-button" onClick={onStopChrome} disabled={isBusy}>
-              <Square size={18} />
-              Stop
+            <button className="icon-button stop" title="Stop Chrome" onClick={onStopChrome} disabled={isBusy}>
+              <Square size={17} />
             </button>
           </div>
         </header>
 
-        <section className="workspace-tabs">
-          <button className="tab-button active">
+        <section className="workspace-tabs basic-workspace-tabs">
+          <button className={`tab-button ${activeTab === "workflow" ? "active" : ""}`} onClick={() => setActiveTab("workflow")}>
             <Layers3 size={17} />
             Workflow
           </button>
-          <button className="tab-button">
+          <button className={`tab-button ${activeTab === "profiles" ? "active" : ""}`} onClick={() => setActiveTab("profiles")}>
             <List size={17} />
-            Profile lists
+            Profiles <span className="tab-count">{workspace.leads.length}</span>
           </button>
-          <button className="tab-button">
-            <Inbox size={17} />
-            Inbox
-          </button>
-          <button className="tab-button">
-            <BarChart3 size={17} />
-            Dashboard
+          <button className={`tab-button ${activeTab === "browser" ? "active" : ""}`} onClick={() => setActiveTab("browser")}>
+            <Chrome size={17} />
+            Browser
           </button>
         </section>
 
-        <section className="workspace-grid">
-          <div className="workspace-column">
-            <Panel title="Workflow">
-              <div className="workflow-actions">
+        {activeTab === "workflow" ? (
+          <section className="workflow-builder-layout">
+            <div className="workflow-stage">
+              <header className="workflow-stage-header">
+                <div>
+                  <span className="section-kicker">Profiles to process</span>
+                  <strong>{workspace.leads.length}</strong>
+                </div>
                 <button className="primary-button" onClick={() => setActiveModal("source")}>
                   <Plus size={17} />
-                  Choose source
+                  Add profiles
                 </button>
-                <button className="ghost-button" onClick={() => setActiveModal("template")}>
-                  <Send size={17} />
-                  Edit message
-                </button>
-              </div>
-              <div className="workflow-canvas">
-                {seedWorkflow.map((card, index) => (
-                  <div className="workflow-node-wrap" key={card.id}>
-                    {index > 0 ? <button className="workflow-plus"><Plus size={18} /></button> : null}
-                    <article className={`workflow-card ${card.kind}`}>
-                      <div>
-                        <span>{card.subtitle}</span>
-                        <strong>{card.title}</strong>
-                      </div>
-                      <div className="workflow-card-footer">
-                        <span><Check size={17} />{card.successful}</span>
-                        <span><X size={17} />{card.failed}</span>
-                        <span><Users size={17} />{card.count}</span>
-                      </div>
-                    </article>
+              </header>
+
+              <div className="workflow-canvas functional-workflow-canvas">
+                <AddActionButton label="Add first action" onClick={() => openActionPicker(0)} />
+                {workspace.actions.map((action, index) => (
+                  <div className="workflow-node-wrap" key={action.id}>
+                    <button
+                      className={`workflow-card functional-workflow-card ${action.type} ${
+                        selectedActionId === action.id ? "selected" : ""
+                      }`}
+                      onClick={() => setSelectedActionId(action.id)}
+                    >
+                      <span className="workflow-card-icon"><ActionIcon type={action.type} /></span>
+                      <span className="workflow-card-copy">
+                        <small>{action.automatic ? "Automatic safety step" : `Action ${manualActionNumber(workspace.actions, index)}`}</small>
+                        <strong>{action.name}</strong>
+                        <span>{action.description}</span>
+                      </span>
+                      {action.automatic ? <ShieldCheck className="auto-guard-icon" size={18} /> : null}
+                    </button>
+                    <AddActionButton onClick={() => openActionPicker(index + 1)} />
                   </div>
                 ))}
               </div>
-            </Panel>
+            </div>
 
-            <Panel title="Profile lists">
-              <div className="lead-table">
-                {seedLeads.map((lead) => (
-                  <div className="lead-row" key={lead.id}>
-                    <div className="profile-avatar small">in</div>
+            <aside className="workflow-inspector">
+              {selectedAction ? (
+                <>
+                  <div className="inspector-title">
+                    <span className={`workflow-card-icon ${selectedAction.type}`}>
+                      <ActionIcon type={selectedAction.type} />
+                    </span>
                     <div>
-                      <strong>{lead.displayName}</strong>
-                      <span>{lead.position} at {lead.company}</span>
+                      <span>{selectedAction.automatic ? "Automatic step" : "Workflow action"}</span>
+                      <h2>{selectedAction.name}</h2>
                     </div>
-                    <span>{lead.status.replace("_", " ")}</span>
-                    <span>{lead.addedAt}</span>
+                  </div>
+                  <p className="inspector-description">{selectedAction.description}</p>
+
+                  {selectedAction.template !== undefined ? (
+                    <section className="message-summary">
+                      <div className="message-summary-heading">
+                        <span>Message</span>
+                        <button className="icon-button" title="Edit message" onClick={() => setActiveModal("template")}>
+                          <Pencil size={16} />
+                        </button>
+                      </div>
+                      <pre>{selectedAction.template}</pre>
+                      <button className="ghost-button" onClick={() => setActiveModal("template")}>
+                        <MessageSquare size={16} />
+                        Edit message
+                      </button>
+                    </section>
+                  ) : (
+                    <section className="automatic-step-note">
+                      <ShieldCheck size={20} />
+                      <div>
+                        <strong>Managed automatically</strong>
+                        <p>This guard keeps the workflow from contacting profiles at the wrong time.</p>
+                      </div>
+                    </section>
+                  )}
+
+                  {!selectedAction.automatic ? (
+                    <button className="danger-text-button" onClick={() => deleteAction(selectedAction.id)}>
+                      <Trash2 size={16} />
+                      Remove action and its guard
+                    </button>
+                  ) : null}
+                </>
+              ) : (
+                <div className="empty-inspector">
+                  <Layers3 size={26} />
+                  <strong>Select an action</strong>
+                  <p>Choose a card to review its message and behavior.</p>
+                </div>
+              )}
+
+              <section className="source-summary-list">
+                <header>
+                  <span>Lead sources</span>
+                  <button className="icon-button" title="Add profiles" onClick={() => setActiveModal("source")}>
+                    <Plus size={16} />
+                  </button>
+                </header>
+                {workspace.sources.length === 0 ? (
+                  <p>No source lists added yet.</p>
+                ) : workspace.sources.map((source) => (
+                  <div key={source.id}>
+                    {source.kind === "sales_navigator" ? <Navigation size={16} /> : <Link size={16} />}
+                    <span><strong>{source.name}</strong><small>{source.profileCount} profiles</small></span>
+                  </div>
+                ))}
+              </section>
+            </aside>
+          </section>
+        ) : null}
+
+        {activeTab === "profiles" ? (
+          <section className="profiles-view">
+            <header>
+              <div>
+                <p className="section-kicker">Campaign queue</p>
+                <h2>Profiles to process</h2>
+              </div>
+              <button className="primary-button" onClick={() => setActiveModal("source")}>
+                <Plus size={17} />
+                Add profiles
+              </button>
+            </header>
+            {workspace.leads.length === 0 ? (
+              <div className="empty-profile-list">
+                <Users size={28} />
+                <strong>No profiles added</strong>
+                <p>Add individual LinkedIn URLs, paste a list, upload a file, or collect from Sales Navigator.</p>
+              </div>
+            ) : (
+              <div className="functional-lead-table">
+                <div className="functional-lead-header">
+                  <span>Profile</span><span>Source</span><span>Status</span><span>Added</span><span />
+                </div>
+                {workspace.leads.map((lead) => (
+                  <div className="functional-lead-row" key={lead.id}>
+                    <div className="lead-identity">
+                      <div className="profile-avatar small">in</div>
+                      <div>
+                        <strong>{lead.displayName}</strong>
+                        <a href={lead.linkedinUrl} target="_blank" rel="noreferrer">
+                          {lead.linkedinUrl}<ExternalLink size={12} />
+                        </a>
+                      </div>
+                    </div>
+                    <span>{sourceNames.get(lead.sourceId) ?? "Imported list"}</span>
+                    <span className="queue-status">To process</span>
+                    <span>{formatDate(lead.addedAt)}</span>
+                    <button className="icon-button" title="Remove profile" onClick={() => removeLead(lead.id)}>
+                      <Trash2 size={15} />
+                    </button>
                   </div>
                 ))}
               </div>
-            </Panel>
-          </div>
+            )}
+          </section>
+        ) : null}
 
-          <div className="workspace-column">
-            <Panel
-              title="Browser session"
-              action={
-                <button className="icon-text-button" onClick={onRefreshChrome}>
-                  <RefreshCw size={17} />
+        {activeTab === "browser" ? (
+          <section className="browser-view">
+            <div className="browser-view-copy">
+              <p className="section-kicker">Persistent local session</p>
+              <h2>{chromeStatus?.connected ? "Managed Chrome is connected" : "Start managed Chrome"}</h2>
+              <p>The LinkedIn login stays in this computer’s existing profile directory and uses this computer’s IP.</p>
+              <div className="browser-view-actions">
+                <button className="primary-button" onClick={onOpenLinkedIn} disabled={isBusy}>
+                  <Chrome size={18} /> Open LinkedIn
                 </button>
-              }
-            >
-              <div className="browser-session-card">
-                <div className={`session-light ${chromeStatus?.connected ? "online" : ""}`} />
-                <div>
-                  <strong>{chromeStatus?.connected ? "Chrome connected" : "Chrome not connected"}</strong>
-                  <span>{chromeStatus?.profileDir ?? ".local/chrome-profile"}</span>
-                </div>
+                <button className="ghost-button" onClick={onRefreshChrome}>
+                  <RefreshCw size={17} /> Refresh status
+                </button>
               </div>
-              <button className="primary-button full-width" onClick={onOpenLinkedIn} disabled={isBusy}>
-                <Chrome size={18} />
-                Open LinkedIn in managed Chrome
-              </button>
-              {linkedInTab ? (
-                <div className="active-tab-card">
-                  <strong>{linkedInTab.title || "LinkedIn"}</strong>
-                  <span>{linkedInTab.url}</span>
-                </div>
-              ) : null}
-            </Panel>
-
-            <Panel title="Dashboard">
-              <div className="chart-card">
-                {chartDays.map((day) => (
-                  <div className="chart-day" key={day.day}>
-                    <div className="bar-stack">
-                      <span style={{ height: `${Math.max(day.invited * 12, 2)}px` }} />
-                      <span style={{ height: `${Math.max(day.accepted * 18, 2)}px` }} />
-                    </div>
-                    <small>{day.day}</small>
-                  </div>
-                ))}
-              </div>
-              <div className="chart-legend">
-                <span><i className="legend-blue" />Invited</span>
-                <span><i className="legend-green" />Accepted</span>
-              </div>
-            </Panel>
-
-            <Panel title="Runner safety">
-              <div className="safety-list">
-                <div className="safety-mode">
-                  <ShieldCheck size={22} />
-                  <div>
-                    <strong>Same IP local Chrome</strong>
-                    <span>{safetyDefaults.chromeProfile}</span>
-                  </div>
-                </div>
-                {safetyChecklist.map((item) => (
-                  <div className="safety-item" key={item}>
-                    <Check size={16} />
-                    <span>{item}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="limit-grid">
-                <div>
-                  <span>Daily actions</span>
-                  <strong>{safetyDefaults.dailyActionLimit}</strong>
-                </div>
-                <div>
-                  <span>Daily invites</span>
-                  <strong>{safetyDefaults.dailyInviteLimit}</strong>
-                </div>
-                <div>
-                  <span>Delay range</span>
-                  <strong>{formatDelayRange(safetyDefaults)}</strong>
-                </div>
-              </div>
-            </Panel>
-
-            <Panel title="Inbox">
-              <div className="empty-shell">
-                <MessageSquareReply size={28} />
-                <strong>No replies yet</strong>
-                <p>Reply checks will move leads here once the workflow runner is connected.</p>
-              </div>
-            </Panel>
-
-            <Panel
-              title="Exports"
-              action={<Download size={17} />}
-            >
-              <button className="ghost-button full-width">
-                <Send size={17} />
-                Export reviewed leads
-              </button>
-            </Panel>
-          </div>
-        </section>
+            </div>
+            <div className="browser-status-panel">
+              <div><span>Status</span><strong>{chromeStatus?.connected ? "Connected" : "Stopped"}</strong></div>
+              <div><span>Profile directory</span><strong>{chromeStatus?.profileDir ?? ".local/chrome-profile"}</strong></div>
+              <div><span>LinkedIn tab</span><strong>{linkedInTab?.title || "Not open"}</strong></div>
+              {linkedInTab ? <a href={linkedInTab.url} target="_blank" rel="noreferrer">{linkedInTab.url}</a> : null}
+            </div>
+          </section>
+        ) : null}
       </section>
-      {activeModal === "source" ? <LeadSourceWizard onClose={() => setActiveModal(null)} /> : null}
-      {activeModal === "template" ? <MessageTemplateEditor onClose={() => setActiveModal(null)} /> : null}
+
+      {activeModal === "source" ? (
+        <LeadSourceWizard
+          onAddProfiles={addProfiles}
+          onClose={() => setActiveModal(null)}
+          onCollectSalesNavigator={collectSalesNavigator}
+        />
+      ) : null}
+      {activeModal === "action" ? (
+        <WorkflowActionPicker onAdd={addAction} onClose={() => setActiveModal(null)} />
+      ) : null}
+      {activeModal === "template" && selectedAction?.template !== undefined ? (
+        <MessageTemplateEditor
+          actionLabel={selectedAction.name}
+          initialTemplate={selectedAction.template}
+          maxLength={selectedAction.type === "connection_request" ? 300 : 8000}
+          onClose={() => setActiveModal(null)}
+          onSave={saveTemplate}
+        />
+      ) : null}
     </main>
   );
 }
 
-function Metric({ label, value, tone }: { label: string; value: number; tone?: "danger" }) {
+function AddActionButton({ label, onClick }: { label?: string; onClick: () => void }) {
   return (
-    <div className={`mini-metric ${tone ?? ""}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
+    <button className={`workflow-plus ${label ? "with-label" : ""}`} title="Add action" onClick={onClick}>
+      <Plus size={17} />
+      {label ? <span>{label}</span> : null}
+    </button>
   );
 }
 
-function Panel({
-  action,
-  children,
-  title
-}: {
-  action?: React.ReactNode;
-  children: React.ReactNode;
-  title: string;
-}) {
-  return (
-    <section className="workspace-panel">
-      <header>
-        <h2>{title}</h2>
-        {action}
-      </header>
-      {children}
-    </section>
-  );
+function ActionIcon({ type }: { type: WorkflowActionType }) {
+  if (type === "connection_request") return <UserPlus size={20} />;
+  if (type === "wait_for_acceptance") return <Clock3 size={20} />;
+  if (type === "message") return <MessageSquare size={20} />;
+  return <MessageSquareReply size={20} />;
+}
+
+function manualActionNumber(actions: CampaignWorkflowAction[], index: number) {
+  return actions.slice(0, index + 1).filter((action) => !action.automatic).length;
+}
+
+function Metric({ label, value }: { label: string; value: number }) {
+  return <div className="mini-metric"><span>{label}</span><strong>{value}</strong></div>;
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+    .format(new Date(value));
 }
