@@ -27,7 +27,7 @@ select {
   font: inherit;
 }
 
-button > svg {
+button svg {
   display: block;
   flex: 0 0 auto;
 }
@@ -1172,14 +1172,12 @@ input {
   padding: 14px;
 }
 
-.workflow-card span,
 .active-tab-card span {
   display: block;
   color: #aeb5c5;
   font-size: 13px;
 }
 
-.workflow-card strong,
 .active-tab-card strong {
   display: block;
   margin-top: 4px;
@@ -1990,15 +1988,23 @@ code {
 }
 
 .functional-workflow-canvas {
-  padding: 18px 20px 60px;
+  padding: 24px 20px 64px;
 }
 
 .functional-workflow-canvas .workflow-node-wrap {
   width: min(500px, 100%);
 }
 
+.functional-workflow-canvas .workflow-node-wrap + .workflow-node-wrap {
+  margin-top: 6px;
+}
+
 .workflow-plus {
   cursor: pointer;
+}
+
+.functional-workflow-canvas .workflow-plus {
+  margin-block: 16px;
 }
 
 .workflow-plus.with-label {
@@ -2018,16 +2024,16 @@ code {
 }
 
 .functional-workflow-card {
-  min-height: 96px;
+  min-height: 100px;
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) 24px;
   align-items: center;
-  gap: 12px;
+  column-gap: 16px;
   border: 1px solid #4b505d;
   border-left: 4px solid #6d7484;
   color: #f4f6fb;
   background: #3c404a;
-  padding: 12px 14px;
+  padding: 14px 16px;
   text-align: left;
   cursor: pointer;
 }
@@ -2067,6 +2073,10 @@ code {
   line-height: 1;
 }
 
+.workflow-card-icon svg {
+  display: block;
+}
+
 .workflow-card-icon.message {
   color: #77e1c8;
 }
@@ -2080,7 +2090,7 @@ code {
   min-width: 0;
   display: grid;
   align-content: center;
-  gap: 3px;
+  gap: 4px;
 }
 
 .workflow-card-copy small,
@@ -2121,7 +2131,7 @@ code {
   min-width: 0;
   border-left: 1px solid #414651;
   background: #333640;
-  padding: 20px;
+  padding: 22px 20px;
 }
 
 .inspector-title {
@@ -2137,7 +2147,7 @@ code {
   gap: 3px;
 }
 
-.inspector-title span,
+.inspector-title > div > span,
 .inspector-title h2 {
   display: block;
   margin: 0;
@@ -2157,14 +2167,14 @@ code {
 .inspector-description {
   color: #bec5d2;
   line-height: 1.55;
-  margin: 16px 0;
+  margin: 18px 0;
 }
 
 .message-summary,
 .automatic-step-note {
   border-top: 1px solid #4a4e5a;
   border-bottom: 1px solid #4a4e5a;
-  padding: 16px 0;
+  padding: 18px 0;
 }
 
 .message-summary-heading,
@@ -2243,8 +2253,8 @@ code {
 
 .source-summary-list {
   border-top: 1px solid #4a4e5a;
-  margin-top: 20px;
-  padding-top: 16px;
+  margin-top: 22px;
+  padding-top: 18px;
 }
 
 .source-summary-list > p {
