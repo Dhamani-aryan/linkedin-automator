@@ -66,14 +66,50 @@ export type CampaignSummary = {
 
 export type LeadProfile = {
   id: string;
+  linkedinUrl: string;
   displayName: string;
   firstName: string;
   lastName: string;
   company: string;
   position: string;
   location: string;
+  sourceId: string;
   status: "to_process" | "processing" | "processed" | "accepted" | "replied" | "failed" | "excluded";
   addedAt: string;
+};
+
+export type LeadSourceKind = "linkedin_urls" | "sales_navigator" | "file_upload";
+
+export type LeadSource = {
+  id: string;
+  kind: LeadSourceKind;
+  name: string;
+  sourceUrl?: string;
+  profileCount: number;
+  createdAt: string;
+};
+
+export type WorkflowActionType =
+  | "connection_request"
+  | "wait_for_acceptance"
+  | "message"
+  | "reply_check";
+
+export type CampaignWorkflowAction = {
+  id: string;
+  type: WorkflowActionType;
+  name: string;
+  description: string;
+  template?: string;
+  automatic: boolean;
+  createdAt: string;
+};
+
+export type CampaignWorkspaceState = {
+  campaign: CampaignSummary;
+  actions: CampaignWorkflowAction[];
+  leads: LeadProfile[];
+  sources: LeadSource[];
 };
 
 export type WorkflowCardKind = "source" | "action" | "reply_check";

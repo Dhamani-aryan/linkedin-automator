@@ -33,34 +33,40 @@ export const seedCampaigns: CampaignSummary[] = [
 export const seedLeads: LeadProfile[] = [
   {
     id: "lead-001",
+    linkedinUrl: "https://www.linkedin.com/in/sample-lead-one/",
     displayName: "avery-stone",
     firstName: "Avery",
     lastName: "Stone",
     company: "Advisory Services",
     position: "IT Systems Manager",
     location: "Cebu, Philippines",
+    sourceId: "seed-source",
     status: "to_process",
     addedAt: "Aug 3, 2026, 3:29 PM"
   },
   {
     id: "lead-002",
+    linkedinUrl: "https://www.linkedin.com/in/sample-lead-two/",
     displayName: "jordan-lee",
     firstName: "Jordan",
     lastName: "Lee",
     company: "CloudWorks",
     position: "Head of IT",
     location: "Austin, TX",
+    sourceId: "seed-source",
     status: "to_process",
     addedAt: "Aug 3, 2026, 3:29 PM"
   },
   {
     id: "lead-003",
+    linkedinUrl: "https://www.linkedin.com/in/sample-lead-three/",
     displayName: "morgan-srivastava",
     firstName: "Morgan",
     lastName: "Srivastava",
     company: "Northline Systems",
     position: "SAP Program Lead",
     location: "Bengaluru, India",
+    sourceId: "seed-source",
     status: "accepted",
     addedAt: "Aug 4, 2026, 9:18 AM"
   }
