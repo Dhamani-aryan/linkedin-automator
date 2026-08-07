@@ -5,7 +5,7 @@ const CAMPAIGN_WORKSPACE_KEY = "linkedin-automator.campaign-workspace-v1";
 
 export function loadCampaignWorkspace(account: LinkedInAccount): CampaignWorkspaceState {
   const stored = readWorkspaceMap();
-  return stored[account.id] ?? createInitialCampaignWorkspace(account.id);
+  return stored[account.id] ? normalizeWorkspace(stored[account.id]) : createInitialCampaignWorkspace(account.id);
 }
 
 export function saveCampaignWorkspace(accountId: string, state: CampaignWorkspaceState) {
@@ -65,6 +65,23 @@ function readWorkspaceMap(): Record<string, CampaignWorkspaceState> {
   } catch {
     return {};
   }
+}
+
+function normalizeWorkspace(state: CampaignWorkspaceState): CampaignWorkspaceState {
+  const sources = state.sources.flatMap((source) => {
+    const profileCount = state.leads.filter((lead) => lead.sourceId === source.id).length;
+    return profileCount > 0 ? [{ ...source, profileCount }] : [];
+  });
+
+  return {
+    ...state,
+    campaign: {
+      ...state.campaign,
+      profilesTotal: state.leads.length,
+      profilesToProcess: state.leads.filter((lead) => lead.status === "to_process").length
+    },
+    sources
+  };
 }
 
 function extractPublicId(url: string): string {

@@ -174,7 +174,15 @@ export function AccountWorkspace({
 
   function removeLead(leadId: string) {
     setWorkspace((current) => {
+      const removedLead = current.leads.find((lead) => lead.id === leadId);
       const leads = current.leads.filter((lead) => lead.id !== leadId);
+      const sources = removedLead
+        ? current.sources.flatMap((source) => {
+            if (source.id !== removedLead.sourceId) return [source];
+            const profileCount = leads.filter((lead) => lead.sourceId === source.id).length;
+            return profileCount > 0 ? [{ ...source, profileCount }] : [];
+          })
+        : current.sources;
       return {
         ...current,
         campaign: {
@@ -182,7 +190,8 @@ export function AccountWorkspace({
           profilesTotal: leads.length,
           profilesToProcess: leads.filter((lead) => lead.status === "to_process").length
         },
-        leads
+        leads,
+        sources
       };
     });
   }
