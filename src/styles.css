@@ -27,6 +27,11 @@ select {
   font: inherit;
 }
 
+button > svg {
+  display: block;
+  flex: 0 0 auto;
+}
+
 .auth-screen {
   min-height: 100vh;
   display: grid;
@@ -155,6 +160,7 @@ input {
   padding: 0 16px;
   color: #ffffff;
   font-weight: 800;
+  line-height: 1;
 }
 
 .primary-button {
@@ -994,6 +1000,7 @@ input {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  line-height: 1;
 }
 
 .campaign-mini-card {
@@ -1078,6 +1085,7 @@ input {
   background: transparent;
   cursor: pointer;
   font-weight: 800;
+  line-height: 1;
 }
 
 .tab-button.active {
@@ -1997,6 +2005,8 @@ code {
   width: auto;
   height: 34px;
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
   gap: 7px;
   padding: 0 12px;
 }
@@ -2020,6 +2030,10 @@ code {
   padding: 12px 14px;
   text-align: left;
   cursor: pointer;
+}
+
+.functional-workflow-card > * {
+  align-self: center;
 }
 
 .functional-workflow-card.connection_request {
@@ -2050,6 +2064,7 @@ code {
   border-radius: 8px;
   color: #cbd8fb;
   background: #292d36;
+  line-height: 1;
 }
 
 .workflow-card-icon.message {
@@ -2063,6 +2078,9 @@ code {
 
 .workflow-card-copy {
   min-width: 0;
+  display: grid;
+  align-content: center;
+  gap: 3px;
 }
 
 .workflow-card-copy small,
@@ -2075,23 +2093,27 @@ code {
   color: #9ea7b8;
   font-size: 11px;
   font-weight: 700;
+  line-height: 1.2;
   text-transform: uppercase;
 }
 
 .workflow-card-copy strong {
-  margin: 4px 0;
+  margin: 0;
   font-size: 15px;
+  line-height: 1.3;
 }
 
 .workflow-card-copy > span {
   overflow: hidden;
   color: #b5bdcc;
   font-size: 12px;
+  line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .auto-guard-icon {
+  justify-self: center;
   color: #75d88a;
 }
 
@@ -2108,6 +2130,13 @@ code {
   gap: 12px;
 }
 
+.inspector-title > div {
+  min-width: 0;
+  display: grid;
+  align-content: center;
+  gap: 3px;
+}
+
 .inspector-title span,
 .inspector-title h2 {
   display: block;
@@ -2117,11 +2146,12 @@ code {
 .inspector-title > div > span {
   color: #9fa8ba;
   font-size: 12px;
+  line-height: 1.2;
 }
 
 .inspector-title h2 {
-  margin-top: 3px;
   font-size: 18px;
+  line-height: 1.25;
 }
 
 .inspector-description {
@@ -2140,6 +2170,7 @@ code {
 .message-summary-heading,
 .source-summary-list > header,
 .preview-heading {
+  min-height: 36px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2191,6 +2222,7 @@ code {
   padding: 0;
   margin-top: 14px;
   font-weight: 800;
+  line-height: 1.25;
   cursor: pointer;
 }
 

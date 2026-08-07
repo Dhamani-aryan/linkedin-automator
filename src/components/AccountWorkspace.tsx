@@ -305,7 +305,7 @@ export function AccountWorkspace({
                       }`}
                       onClick={() => setSelectedActionId(action.id)}
                     >
-                      <span className="workflow-card-icon"><ActionIcon type={action.type} /></span>
+                      <span className={`workflow-card-icon ${action.type}`}><ActionIcon type={action.type} /></span>
                       <span className="workflow-card-copy">
                         <small>{action.automatic ? "Automatic safety step" : `Action ${manualActionNumber(workspace.actions, index)}`}</small>
                         <strong>{action.name}</strong>
