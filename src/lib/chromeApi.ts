@@ -32,6 +32,26 @@ export async function openChromeUrl(url: string): Promise<ChromeStatus> {
   });
 }
 
+export type CollectedProfileLink = {
+  url: string;
+  name: string;
+};
+
+export type ProfileCollectionResult = {
+  ok: true;
+  pageUrl: string;
+  pageTitle: string;
+  profiles: CollectedProfileLink[];
+};
+
+export async function collectVisibleProfiles(sourceUrl?: string): Promise<ProfileCollectionResult> {
+  return request<ProfileCollectionResult>("/api/chrome/collect-profiles", {
+    method: "POST",
+    headers: defaultHeaders,
+    body: JSON.stringify({ sourceUrl })
+  });
+}
+
 export async function stopChrome(): Promise<{ ok: true; stopped: boolean; message?: string }> {
   return request<{ ok: true; stopped: boolean; message?: string }>("/api/chrome/stop", {
     method: "POST"

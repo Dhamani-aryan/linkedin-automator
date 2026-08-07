@@ -55,6 +55,12 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === "POST" && requestUrl.pathname === "/api/chrome/collect-profiles") {
+      const body = await readJsonBody(request);
+      sendJson(response, 200, await collectVisibleProfiles(readOptionalUrl(body, "")));
+      return;
+    }
+
     if (request.method === "POST" && requestUrl.pathname === "/api/chrome/stop") {
       sendJson(response, 200, await stopChrome());
       return;
@@ -149,6 +155,103 @@ async function openChromeUrl(url) {
   }
 
   return await getChromeStatus();
+}
+
+async function collectVisibleProfiles(sourceUrl) {
+  if (sourceUrl) {
+    await openChromeUrl(sourceUrl);
+    await sleep(1_800);
+  }
+
+  const tabs = await tryReadChromeTabs();
+  if (tabs === null) {
+    throw new Error("Chrome is not connected. Start the managed Chrome profile first.");
+  }
+
+  const sourcePath = sourceUrl ? new URL(sourceUrl).pathname : "";
+  const tab = tabs.find((candidate) =>
+    candidate.webSocketDebuggerUrl &&
+    candidate.url.includes("linkedin.com") &&
+    (sourcePath.length === 0 || candidate.url.includes(sourcePath))
+  ) ?? tabs.find((candidate) =>
+    candidate.webSocketDebuggerUrl && candidate.url.includes("linkedin.com/sales/")
+  ) ?? tabs.find((candidate) =>
+    candidate.webSocketDebuggerUrl && candidate.url.includes("linkedin.com")
+  );
+
+  if (!tab?.webSocketDebuggerUrl) {
+    throw new Error("Open a LinkedIn or Sales Navigator page in managed Chrome before collecting profiles.");
+  }
+
+  const result = await evaluateInChrome(tab.webSocketDebuggerUrl, `(() => {
+    const profiles = [];
+    const seen = new Set();
+    for (const anchor of document.querySelectorAll('a[href]')) {
+      try {
+        const url = new URL(anchor.href, location.href);
+        const isLinkedInProfile = url.hostname.endsWith('linkedin.com') && /^\\/in\\/[^/]+/.test(url.pathname);
+        const isSalesLead = url.hostname.endsWith('linkedin.com') && /^\\/sales\\/lead\\/[^/]+/.test(url.pathname);
+        if (!isLinkedInProfile && !isSalesLead) continue;
+        const normalized = url.origin + url.pathname;
+        if (seen.has(normalized)) continue;
+        seen.add(normalized);
+        const name = (anchor.textContent || anchor.getAttribute('aria-label') || '')
+          .replace(/\\s+/g, ' ')
+          .trim()
+          .slice(0, 120);
+        profiles.push({ url: normalized, name });
+      } catch {}
+    }
+    return { pageUrl: location.href, pageTitle: document.title, profiles: profiles.slice(0, 250) };
+  })()`);
+
+  const value = result?.result?.result?.value;
+  if (!value || !Array.isArray(value.profiles)) {
+    throw new Error("Could not read profile links from the current LinkedIn page.");
+  }
+
+  return {
+    ok: true,
+    pageUrl: typeof value.pageUrl === "string" ? value.pageUrl : tab.url,
+    pageTitle: typeof value.pageTitle === "string" ? value.pageTitle : tab.title,
+    profiles: value.profiles
+  };
+}
+
+async function evaluateInChrome(webSocketUrl, expression) {
+  return await new Promise((resolveEvaluation, rejectEvaluation) => {
+    const socket = new WebSocket(webSocketUrl);
+    const commandId = 1;
+    const timeout = setTimeout(() => {
+      socket.close();
+      rejectEvaluation(new Error("Timed out while reading the current Chrome page."));
+    }, 8_000);
+
+    socket.addEventListener("open", () => {
+      socket.send(JSON.stringify({
+        id: commandId,
+        method: "Runtime.evaluate",
+        params: { expression, returnByValue: true }
+      }));
+    });
+
+    socket.addEventListener("message", (event) => {
+      const message = JSON.parse(String(event.data));
+      if (message.id !== commandId) return;
+      clearTimeout(timeout);
+      socket.close();
+      if (message.error) {
+        rejectEvaluation(new Error(message.error.message ?? "Chrome evaluation failed."));
+        return;
+      }
+      resolveEvaluation(message);
+    });
+
+    socket.addEventListener("error", () => {
+      clearTimeout(timeout);
+      rejectEvaluation(new Error("Could not connect to the managed Chrome tab."));
+    });
+  });
 }
 
 async function getChromeStatus() {
