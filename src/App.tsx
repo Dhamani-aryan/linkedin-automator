@@ -19,6 +19,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AddLinkedInAccountModal } from "./components/AddLinkedInAccountModal";
 import { AccountWorkspace } from "./components/AccountWorkspace";
 import { SafetyLimitsPage } from "./components/SafetyLimitsPage";
+import { readAppRoute, routeToHash, type AppRoute } from "./lib/appRoute";
 import { getChromeStatus, openChromeUrl, startChrome, stopChrome } from "./lib/chromeApi";
 import { safetyDefaults } from "./lib/safety";
 import {
@@ -50,13 +51,17 @@ export function App() {
   });
   const [status, setStatus] = useState<ChromeStatus | null>(null);
   const [isBusy, setIsBusy] = useState(false);
-  const [screen, setScreen] = useState<"manager" | "workspace">("manager");
-  const [activePage, setActivePage] = useState<"accounts" | "safety" | "settings">("accounts");
+  const [route, setRoute] = useState<AppRoute>(() => readAppRoute());
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
   const [accountPendingDelete, setAccountPendingDelete] = useState<LinkedInAccount | null>(null);
   const [humanTouchSettings, setHumanTouchSettings] = useState<HumanTouchSettings>(safetyDefaults);
 
-  const selectedAccount = accounts.find((candidate) => candidate.id === selectedAccountId) ?? accounts[0] ?? null;
+  const routeAccount =
+    route.kind === "workspace"
+      ? accounts.find((candidate) => candidate.id === route.profileId) ?? null
+      : null;
+  const selectedAccount = routeAccount ?? accounts.find((candidate) => candidate.id === selectedAccountId) ?? accounts[0] ?? null;
+  const activePage = route.kind === "manager" ? route.page : "profiles";
   const activeLinkedInTab = useMemo(
     () => status?.tabs.find((tab) => tab.url.includes("linkedin.com")) ?? null,
     [status]
@@ -66,6 +71,24 @@ export function App() {
     if (!companyUser) return;
     void refreshStatus();
   }, [companyUser]);
+
+  useEffect(() => {
+    const syncRoute = () => setRoute(readAppRoute());
+    window.addEventListener("hashchange", syncRoute);
+    window.addEventListener("popstate", syncRoute);
+    if (!window.location.hash) {
+      window.history.replaceState(null, "", routeToHash(route));
+    }
+    return () => {
+      window.removeEventListener("hashchange", syncRoute);
+      window.removeEventListener("popstate", syncRoute);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (route.kind !== "workspace" || routeAccount) return;
+    navigate({ kind: "manager", page: "profiles" }, true);
+  }, [route, routeAccount]);
 
   useEffect(() => {
     saveLinkedInAccounts(accounts);
@@ -131,6 +154,12 @@ export function App() {
     void runChromeAction(() => openChromeUrl("https://www.linkedin.com/"));
   }
 
+  function navigate(nextRoute: AppRoute, replace = false) {
+    const nextHash = routeToHash(nextRoute);
+    window.history[replace ? "replaceState" : "pushState"](null, "", nextHash);
+    setRoute(nextRoute);
+  }
+
   function submitAuth(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!authForm.email.trim() || !authForm.password.trim()) return;
@@ -150,8 +179,7 @@ export function App() {
   function signOut() {
     clearCompanyUser();
     setCompanyUser(null);
-    setScreen("manager");
-    setActivePage("accounts");
+    navigate({ kind: "manager", page: "profiles" }, true);
   }
 
   function addLinkedInAccount(account: LinkedInAccount) {
@@ -165,7 +193,7 @@ export function App() {
     if (selectedAccountId === accountId) {
       const remainingAccounts = accounts.filter((account) => account.id !== accountId);
       setSelectedAccountId(remainingAccounts[0]?.id ?? "");
-      setScreen("manager");
+      navigate({ kind: "manager", page: "profiles" }, true);
     }
   }
 
@@ -244,13 +272,13 @@ export function App() {
     );
   }
 
-  if (screen === "workspace" && selectedAccount) {
+  if (route.kind === "workspace" && routeAccount) {
     return (
       <AccountWorkspace
-        account={selectedAccount}
+        account={routeAccount}
         chromeStatus={status}
         isBusy={isBusy}
-        onBack={() => setScreen("manager")}
+        onBack={() => navigate({ kind: "manager", page: "profiles" })}
         onOpenLinkedIn={openLinkedIn}
         onRefreshChrome={() => void refreshStatus()}
         onStartChrome={() => void runChromeAction(() => startChrome())}
@@ -269,20 +297,20 @@ export function App() {
           </div>
           <nav className="sidebar-nav">
             <button
-              className={`nav-item ${activePage === "accounts" ? "active" : ""}`}
-              onClick={() => setActivePage("accounts")}
+              className={`nav-item ${activePage === "profiles" ? "active" : ""}`}
+              onClick={() => navigate({ kind: "manager", page: "profiles" })}
             >
               LinkedIn Profiles
             </button>
             <button
               className={`nav-item ${activePage === "safety" ? "active" : ""}`}
-              onClick={() => setActivePage("safety")}
+              onClick={() => navigate({ kind: "manager", page: "safety" })}
             >
               Safety Limits
             </button>
             <button
               className={`nav-item ${activePage === "settings" ? "active" : ""}`}
-              onClick={() => setActivePage("settings")}
+              onClick={() => navigate({ kind: "manager", page: "settings" })}
             >
               Settings
             </button>
@@ -313,7 +341,7 @@ export function App() {
           </section>
         ) : null}
 
-        {activePage === "accounts" ? (
+        {activePage === "profiles" ? (
           <>
         <header className="manager-header">
           <div>
@@ -401,7 +429,7 @@ export function App() {
                     className="ghost-button compact-button"
                     onClick={() => {
                       setSelectedAccountId(account.id);
-                      setScreen("workspace");
+                      navigate({ kind: "workspace", profileId: account.id, tab: "workflow" });
                     }}
                   >
                     Open workspace
