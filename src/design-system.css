@@ -2056,14 +2056,14 @@ p {
   border-left: 3px solid #657084;
   border-radius: var(--app-radius-lg);
   color: var(--app-text);
-  background: var(--app-surface-raised);
+  background: var(--app-surface);
   padding: 17px 18px;
   box-shadow: var(--app-shadow-sm);
 }
 
 .functional-workflow-card:hover {
   border-color: var(--app-border-strong);
-  background: #252c36;
+  background: var(--app-surface-raised);
 }
 
 .functional-workflow-card.connection_request {
@@ -2078,14 +2078,22 @@ p {
 .functional-workflow-card.reply_check {
   min-height: 92px;
   border-left-color: var(--app-success);
-  background: #1d2925;
+  background: var(--app-surface-subtle);
   box-shadow: none;
 }
 
 .functional-workflow-card.selected {
-  border-color: #668dff;
+  border-color: #4b5668;
+  background: #202630;
+  box-shadow: 0 0 0 1px rgb(102 141 255 / 0.42) inset, 0 8px 24px rgb(0 0 0 / 0.16);
+}
+
+.functional-workflow-card.selected.connection_request {
   border-left-color: #668dff;
-  box-shadow: 0 0 0 1px #668dff inset, 0 8px 24px rgb(0 0 0 / 0.2);
+}
+
+.functional-workflow-card.selected.message {
+  border-left-color: #49c8ad;
 }
 
 .workflow-card-icon {
@@ -2105,7 +2113,7 @@ p {
 .workflow-card-icon.reply_check {
   color: #6cdb98;
   border-color: #28583c;
-  background: #173122;
+  background: var(--app-bg);
 }
 
 .workflow-card-copy {
