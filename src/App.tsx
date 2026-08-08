@@ -6,13 +6,17 @@ import {
   ExternalLink,
   Lock,
   LogOut,
+  Linkedin,
   Mail,
   Play,
   Plus,
   RefreshCw,
   Search,
+  Settings2,
+  ShieldCheck,
   Square,
   Trash2,
+  UsersRound,
   UserPlus
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -294,26 +298,29 @@ export function App() {
       <aside className="manager-sidebar">
         <div>
           <div className="app-logo">
-            <Chrome size={22} />
-            <span>Automator</span>
+            <span className="app-logo-mark"><Linkedin size={18} /></span>
+            <span>LinkedIn Automator</span>
           </div>
           <nav className="sidebar-nav">
             <button
               className={`nav-item ${activePage === "profiles" ? "active" : ""}`}
               onClick={() => navigate({ kind: "manager", page: "profiles" })}
             >
+              <UsersRound size={17} />
               LinkedIn Profiles
             </button>
             <button
               className={`nav-item ${activePage === "safety" ? "active" : ""}`}
               onClick={() => navigate({ kind: "manager", page: "safety" })}
             >
+              <ShieldCheck size={17} />
               Safety Limits
             </button>
             <button
               className={`nav-item ${activePage === "settings" ? "active" : ""}`}
               onClick={() => navigate({ kind: "manager", page: "settings" })}
             >
+              <Settings2 size={17} />
               Settings
             </button>
           </nav>
