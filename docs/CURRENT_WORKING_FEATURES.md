@@ -36,6 +36,8 @@ Last verified: 2026-08-08
 ### Message templates
 
 - Edit connection notes and direct-message templates.
+- Configure a message delay in minutes, hours, or days after the previous workflow step.
+- Persist message delays and show the configured timing in the workflow inspector.
 - Insert LinkedIn lead variables such as first name, last name, company, position, and location.
 - Preview resolved variables against sample lead data.
 - Enforce the 300-character connection-note limit and the 8,000-character message limit.
@@ -60,10 +62,8 @@ Last verified: 2026-08-08
 ## Not working yet
 
 - The Start Campaign control does not execute LinkedIn actions yet.
-- Message delays are not yet part of workflow actions.
 - Logical LinkedIn profiles are not isolated into separate Chrome data directories yet.
 - Safety settings are not yet enforced by a campaign runner.
 - Reply detection, inbox synchronization, analytics, and campaign history are not implemented.
 - Sales Navigator collection reads only links currently loaded in the page; it does not paginate or scroll automatically.
 - Company authentication and data are local to this browser, not backed by a production server or database.
-
