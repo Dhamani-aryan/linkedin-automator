@@ -80,11 +80,15 @@ function normalizeWorkspace(state: CampaignWorkspaceState): CampaignWorkspaceSta
       profilesTotal: state.leads.length,
       profilesToProcess: state.leads.filter((lead) => lead.status === "to_process").length
     },
-    actions: state.actions.map((action) =>
-      action.type === "message" && !action.delay
-        ? { ...action, delay: { ...defaultMessageDelay } }
-        : action
-    ),
+    actions: state.actions.map((action) => {
+      if (action.type === "message" && !action.delay) {
+        return { ...action, delay: { ...defaultMessageDelay } };
+      }
+      if (action.type === "reply_check") {
+        return { ...action, description: "Replies stop follow-ups and move the lead to the inbox." };
+      }
+      return action;
+    }),
     sources
   };
 }

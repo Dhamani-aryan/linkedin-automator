@@ -152,7 +152,7 @@ function createAutomaticGuard(
     description:
       type === "wait_for_acceptance"
         ? "Only accepted connections continue to the next action."
-        : "Replies stop follow-ups and move the profile to the inbox.",
+        : "Replies stop follow-ups and move the lead to the inbox.",
     automatic: true,
     createdAt
   };
