@@ -276,6 +276,7 @@ export function App() {
     return (
       <AccountWorkspace
         account={routeAccount}
+        activeTab={route.tab}
         chromeStatus={status}
         isBusy={isBusy}
         onBack={() => navigate({ kind: "manager", page: "profiles" })}
@@ -283,6 +284,7 @@ export function App() {
         onRefreshChrome={() => void refreshStatus()}
         onStartChrome={() => void runChromeAction(() => startChrome())}
         onStopChrome={() => void runChromeAction(() => stopChrome())}
+        onTabChange={(tab) => navigate({ kind: "workspace", profileId: routeAccount.id, tab })}
       />
     );
   }

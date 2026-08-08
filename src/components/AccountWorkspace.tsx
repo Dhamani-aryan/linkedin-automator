@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { collectVisibleProfiles } from "../lib/chromeApi";
+import type { WorkspaceRouteTab } from "../lib/appRoute";
 import {
   createLeadFromUrl,
   loadCampaignWorkspace,
@@ -45,29 +46,30 @@ import { WorkflowActionPicker } from "./WorkflowActionPicker";
 
 type WorkspaceProps = {
   account: LinkedInAccount;
+  activeTab: WorkspaceRouteTab;
   chromeStatus: ChromeStatus | null;
   isBusy: boolean;
   onBack: () => void;
+  onTabChange: (tab: WorkspaceRouteTab) => void;
   onOpenLinkedIn: () => void;
   onRefreshChrome: () => void;
   onStartChrome: () => void;
   onStopChrome: () => void;
 };
 
-type WorkspaceTab = "workflow" | "profiles" | "browser";
-
 export function AccountWorkspace({
   account,
+  activeTab,
   chromeStatus,
   isBusy,
   onBack,
+  onTabChange,
   onOpenLinkedIn,
   onRefreshChrome,
   onStartChrome,
   onStopChrome
 }: WorkspaceProps) {
   const [workspace, setWorkspace] = useState<CampaignWorkspaceState>(() => loadCampaignWorkspace(account));
-  const [activeTab, setActiveTab] = useState<WorkspaceTab>("workflow");
   const [activeModal, setActiveModal] = useState<"source" | "action" | "template" | null>(null);
   const [insertAt, setInsertAt] = useState(0);
   const [selectedActionId, setSelectedActionId] = useState(() => workspace.actions[0]?.id ?? "");
@@ -225,7 +227,7 @@ export function AccountWorkspace({
             <Layers3 size={17} />
             Workspace
           </button>
-          <button className="nav-item" onClick={() => setActiveTab("browser")}>
+          <button className="nav-item" onClick={() => onTabChange("browser")}>
             <Chrome size={17} />
             LinkedIn browser
           </button>
@@ -269,15 +271,15 @@ export function AccountWorkspace({
         </header>
 
         <section className="workspace-tabs basic-workspace-tabs">
-          <button className={`tab-button ${activeTab === "workflow" ? "active" : ""}`} onClick={() => setActiveTab("workflow")}>
+          <button className={`tab-button ${activeTab === "workflow" ? "active" : ""}`} onClick={() => onTabChange("workflow")}>
             <Layers3 size={17} />
             Workflow
           </button>
-          <button className={`tab-button ${activeTab === "profiles" ? "active" : ""}`} onClick={() => setActiveTab("profiles")}>
+          <button className={`tab-button ${activeTab === "leads" ? "active" : ""}`} onClick={() => onTabChange("leads")}>
             <List size={17} />
             Leads <span className="tab-count">{workspace.leads.length}</span>
           </button>
-          <button className={`tab-button ${activeTab === "browser" ? "active" : ""}`} onClick={() => setActiveTab("browser")}>
+          <button className={`tab-button ${activeTab === "browser" ? "active" : ""}`} onClick={() => onTabChange("browser")}>
             <Chrome size={17} />
             Browser
           </button>
@@ -406,7 +408,7 @@ export function AccountWorkspace({
           </section>
         ) : null}
 
-        {activeTab === "profiles" ? (
+        {activeTab === "leads" ? (
           <section className="profiles-view">
             <header>
               <div>
