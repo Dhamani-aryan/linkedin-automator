@@ -14,7 +14,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       accentColor="blue"
       grayColor="gray"
       panelBackground="solid"
-      radius="medium"
+      radius="large"
       scaling="100%"
     >
       <App />

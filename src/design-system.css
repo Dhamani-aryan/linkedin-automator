@@ -24,8 +24,10 @@
   --app-warning-soft: #3a2d18;
   --app-danger: #f06468;
   --app-danger-soft: #3d2228;
-  --app-radius-sm: 6px;
-  --app-radius: 8px;
+  --app-radius-sm: 9px;
+  --app-radius: 14px;
+  --app-radius-lg: 18px;
+  --app-radius-pill: 999px;
   --app-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.22);
   --app-shadow-md: 0 16px 40px rgb(0 0 0 / 0.26);
   --app-transition: 150ms ease;
