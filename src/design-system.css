@@ -453,6 +453,10 @@ p {
   line-height: 1.45;
 }
 
+.session-detail span {
+  overflow-wrap: anywhere;
+}
+
 .text-link {
   gap: 5px;
   color: #7ea2ff;
@@ -577,6 +581,7 @@ p {
   }
 
   .manager-sidebar {
+    display: flex;
     position: static;
     height: auto;
     padding-bottom: 10px;
@@ -2391,6 +2396,7 @@ p {
   }
 
   .workspace-sidebar {
+    display: block;
     position: static;
     height: auto;
     overflow: visible;
@@ -2441,6 +2447,7 @@ p {
   .workspace-tabs,
   .basic-workspace-tabs {
     overflow-x: auto;
+    overflow-y: hidden;
   }
 
   .tab-button {
