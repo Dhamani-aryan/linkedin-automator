@@ -1,4 +1,4 @@
-import { createDefaultWorkflow } from "./workflow";
+import { createDefaultWorkflow, defaultMessageDelay } from "./workflow";
 import type { CampaignWorkspaceState, LeadProfile, LinkedInAccount } from "../types";
 
 const CAMPAIGN_WORKSPACE_KEY = "linkedin-automator.campaign-workspace-v1";
@@ -80,6 +80,11 @@ function normalizeWorkspace(state: CampaignWorkspaceState): CampaignWorkspaceSta
       profilesTotal: state.leads.length,
       profilesToProcess: state.leads.filter((lead) => lead.status === "to_process").length
     },
+    actions: state.actions.map((action) =>
+      action.type === "message" && !action.delay
+        ? { ...action, delay: { ...defaultMessageDelay } }
+        : action
+    ),
     sources
   };
 }

@@ -1,4 +1,4 @@
-import type { CampaignWorkflowAction, WorkflowActionType, WorkflowCard } from "../types";
+import type { CampaignWorkflowAction, WorkflowActionType, WorkflowCard, WorkflowDelay } from "../types";
 
 export type WorkflowActionInput = {
   id: string;
@@ -75,6 +75,11 @@ export const connectionRequestTemplate =
 export const directMessageTemplate =
   "Hi {firstName},\n\nThanks for connecting. I wanted to reach out about your work at {company}.";
 
+export const defaultMessageDelay: WorkflowDelay = {
+  amount: 1,
+  unit: "days"
+};
+
 export function createWorkflowAction(type: "connection_request" | "message"): CampaignWorkflowAction[] {
   const createdAt = new Date().toISOString();
   const actionId = crypto.randomUUID();
@@ -101,6 +106,7 @@ export function createWorkflowAction(type: "connection_request" | "message"): Ca
       name: "Send message",
       description: "Send a personalized message to 1st-degree connections.",
       template: directMessageTemplate,
+      delay: { ...defaultMessageDelay },
       automatic: false,
       createdAt
     },

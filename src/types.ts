@@ -95,12 +95,20 @@ export type WorkflowActionType =
   | "message"
   | "reply_check";
 
+export type WorkflowDelayUnit = "minutes" | "hours" | "days";
+
+export type WorkflowDelay = {
+  amount: number;
+  unit: WorkflowDelayUnit;
+};
+
 export type CampaignWorkflowAction = {
   id: string;
   type: WorkflowActionType;
   name: string;
   description: string;
   template?: string;
+  delay?: WorkflowDelay;
   automatic: boolean;
   createdAt: string;
 };
