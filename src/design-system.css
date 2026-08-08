@@ -151,10 +151,10 @@ p {
 .primary-button,
 .ghost-button,
 .danger-button {
-  min-height: 40px;
+  min-height: 42px;
   gap: 8px;
-  border-radius: var(--app-radius);
-  padding: 0 14px;
+  border-radius: var(--app-radius-pill);
+  padding: 0 17px;
   font-size: 13px;
   font-weight: 700;
   box-shadow: var(--app-shadow-sm);
@@ -193,7 +193,7 @@ p {
   display: inline-grid;
   place-items: center;
   border: 1px solid transparent;
-  border-radius: var(--app-radius-sm);
+  border-radius: 50%;
   color: var(--app-text-muted);
   background: var(--app-surface-subtle);
 }
@@ -274,7 +274,7 @@ p {
   display: flex;
   align-items: center;
   gap: 11px;
-  border-radius: var(--app-radius);
+  border-radius: 12px;
   color: var(--app-text-muted);
   padding: 0 12px;
   font-size: 13px;
@@ -353,7 +353,7 @@ p {
   margin: 24px 0 16px;
   padding: 5px;
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
+  border-radius: var(--app-radius-lg);
   background: var(--app-surface-subtle);
 }
 
@@ -361,7 +361,7 @@ p {
 .search-box {
   min-height: 36px;
   border-color: transparent;
-  border-radius: var(--app-radius-sm);
+  border-radius: 12px;
   color: var(--app-text-muted);
   background: transparent;
   font-size: 13px;
@@ -370,7 +370,7 @@ p {
 .select-like {
   width: 210px;
   border-right-color: var(--app-border);
-  border-radius: 4px 0 0 4px;
+  border-radius: 12px;
 }
 
 .search-box {
@@ -383,7 +383,7 @@ p {
 .pill {
   min-height: 34px;
   border: 1px solid transparent;
-  border-radius: var(--app-radius-sm);
+  border-radius: var(--app-radius-pill);
   color: var(--app-text-muted);
   background: transparent;
   padding: 0 12px;
@@ -400,7 +400,7 @@ p {
 .accounts-table {
   overflow: hidden;
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
+  border-radius: var(--app-radius-lg);
   background: var(--app-surface);
   box-shadow: var(--app-shadow-sm);
 }
@@ -521,7 +521,7 @@ p {
   gap: 12px;
   margin-top: 16px;
   border: 1px solid #59461f;
-  border-radius: var(--app-radius);
+  border-radius: var(--app-radius-lg);
   color: #f5c86f;
   background: var(--app-warning-soft);
   padding: 14px 16px;
@@ -560,7 +560,7 @@ p {
     grid-template-columns: minmax(220px, 1fr) minmax(220px, 0.8fr);
     gap: 16px 24px;
     border: 1px solid var(--app-border);
-    border-radius: var(--app-radius);
+    border-radius: var(--app-radius-lg);
     background: var(--app-surface);
     padding: 18px;
   }
@@ -668,20 +668,23 @@ p {
 }
 
 .settings-tabs {
+  width: fit-content;
+  max-width: 100%;
   display: flex;
   gap: 4px;
   overflow-x: auto;
-  border-bottom: 1px solid var(--app-border);
-  background: transparent;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-pill);
+  background: var(--app-surface-subtle);
   margin: 24px 0 20px;
+  padding: 4px;
 }
 
 .settings-tabs button {
-  position: relative;
   min-width: 128px;
-  min-height: 44px;
-  border: 0;
-  border-radius: var(--app-radius-sm) var(--app-radius-sm) 0 0;
+  min-height: 36px;
+  border: 1px solid transparent;
+  border-radius: var(--app-radius-pill);
   color: var(--app-text-muted);
   background: transparent;
   padding: 0 16px;
@@ -696,19 +699,14 @@ p {
 }
 
 .settings-tabs button.active {
-  color: var(--app-text);
-  background: var(--app-surface);
+  color: #e7edff;
+  border-color: #3c548d;
+  background: var(--app-accent-soft);
+  box-shadow: var(--app-shadow-sm);
 }
 
 .settings-tabs button.active::after {
-  position: absolute;
-  right: 12px;
-  bottom: -1px;
-  left: 12px;
-  height: 2px;
-  border-radius: 2px 2px 0 0;
-  background: var(--app-accent);
-  content: "";
+  display: none;
 }
 
 .limits-panel,
@@ -717,7 +715,7 @@ p {
 .placeholder-page {
   max-width: none;
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
+  border-radius: var(--app-radius-lg);
   background: var(--app-surface);
   padding: 22px;
   box-shadow: var(--app-shadow-sm);
@@ -740,7 +738,7 @@ p {
   align-items: center;
   gap: 16px;
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
+  border-radius: var(--app-radius-lg);
   background: var(--app-surface-subtle);
   padding: 8px 12px;
 }
@@ -776,7 +774,7 @@ p {
   overflow: hidden;
   gap: 0;
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
+  border-radius: var(--app-radius-lg);
 }
 
 .limit-row {
@@ -856,7 +854,7 @@ p {
   margin-top: 18px;
   overflow: hidden;
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
+  border-radius: var(--app-radius-lg);
 }
 
 .working-day-row {
@@ -953,7 +951,7 @@ p {
   align-items: flex-start;
   gap: 10px;
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
+  border-radius: var(--app-radius-lg);
   background: var(--app-surface-subtle);
   padding: 13px;
 }
@@ -995,7 +993,7 @@ p {
   grid-template-columns: 18px minmax(0, 1fr);
   gap: 9px;
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
+  border-radius: var(--app-radius-lg);
   color: var(--app-text-secondary);
   background: var(--app-surface-subtle);
   padding: 9px 12px;
@@ -1072,7 +1070,7 @@ p {
 .auth-card {
   width: min(460px, 100%);
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
+  border-radius: var(--app-radius-lg);
   background: var(--app-surface);
   padding: 30px;
   box-shadow: var(--app-shadow-md);
@@ -1104,7 +1102,7 @@ p {
   gap: 4px;
   overflow: visible;
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
+  border-radius: var(--app-radius-pill);
   background: var(--app-bg);
   margin-top: 22px;
   padding: 4px;
@@ -1112,7 +1110,7 @@ p {
 
 .segmented-control button {
   min-height: 36px;
-  border-radius: var(--app-radius-sm);
+  border-radius: var(--app-radius-pill);
   color: var(--app-text-muted);
   font-size: 12px;
   font-weight: 600;
@@ -1149,7 +1147,7 @@ p {
 .delay-unit-select {
   min-height: 40px;
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-sm);
+  border-radius: 12px;
   color: var(--app-text-muted);
   background: var(--app-bg);
 }
@@ -1193,7 +1191,7 @@ p {
   max-height: calc(100vh - 48px);
   overflow: auto;
   border: 1px solid var(--app-border-strong);
-  border-radius: var(--app-radius);
+  border-radius: var(--app-radius-lg);
   background: var(--app-surface);
   box-shadow: 0 28px 80px rgb(0 0 0 / 0.48);
 }
@@ -1243,7 +1241,7 @@ p {
   align-items: flex-start;
   gap: 10px;
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
+  border-radius: var(--app-radius-lg);
   background: var(--app-surface-subtle);
   padding: 12px;
 }
@@ -1292,7 +1290,7 @@ p {
   width: 40px;
   height: 40px;
   border: 1px solid #66323a;
-  border-radius: var(--app-radius);
+  border-radius: 14px;
   color: #ff8e91;
   background: var(--app-danger-soft);
 }
@@ -1332,7 +1330,7 @@ p {
   gap: 4px;
   overflow: visible;
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
+  border-radius: var(--app-radius-pill);
   background: var(--app-bg);
   margin-bottom: 16px;
   padding: 4px;
@@ -1340,7 +1338,7 @@ p {
 
 .source-tabs button {
   min-height: 36px;
-  border-radius: var(--app-radius-sm);
+  border-radius: var(--app-radius-pill);
   color: var(--app-text-muted);
   font-size: 11px;
   font-weight: 600;
@@ -1370,7 +1368,7 @@ p {
 .lead-import-form {
   min-width: 0;
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
+  border-radius: var(--app-radius-lg);
   background: var(--app-surface-subtle);
   padding: 18px;
 }
@@ -1423,7 +1421,7 @@ p {
   width: 100%;
   resize: vertical;
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-sm);
+  border-radius: 12px;
   outline: 0;
   color: var(--app-text);
   background: var(--app-bg);
@@ -1445,7 +1443,7 @@ p {
 
 .import-summary {
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
+  border-radius: var(--app-radius-lg);
   background: var(--app-bg);
   padding: 18px;
 }
@@ -1494,7 +1492,7 @@ p {
   grid-template-columns: 42px minmax(0, 1fr) 22px;
   gap: 13px;
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
+  border-radius: var(--app-radius-lg);
   color: var(--app-text-secondary);
   background: var(--app-surface-subtle);
   padding: 14px;
@@ -1511,7 +1509,7 @@ p {
   width: 40px;
   height: 40px;
   border: 1px solid #3c4d77;
-  border-radius: var(--app-radius-sm);
+  border-radius: 13px;
   color: #a9bdff;
   background: var(--app-accent-soft);
 }
@@ -1550,7 +1548,7 @@ p {
 .template-preview {
   min-width: 0;
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
+  border-radius: var(--app-radius-lg);
   background: var(--app-surface-subtle);
   padding: 16px;
 }
@@ -1570,7 +1568,7 @@ p {
 .variable-chip {
   min-height: 28px;
   border: 1px solid #344c83;
-  border-radius: var(--app-radius-sm);
+  border-radius: var(--app-radius-pill);
   color: #a9bdff;
   background: var(--app-accent-soft);
   padding: 0 8px;
@@ -1644,7 +1642,7 @@ p {
 
 .preview-card {
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
+  border-radius: var(--app-radius-lg);
   background: var(--app-surface);
   padding: 13px;
 }
@@ -1904,23 +1902,26 @@ p {
 
 .workspace-tabs,
 .basic-workspace-tabs {
-  min-height: 44px;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 46px;
   display: flex;
   gap: 4px;
-  overflow: visible;
-  border-bottom: 1px solid var(--app-border);
-  border-radius: 0;
-  background: transparent;
-  margin-bottom: 16px;
+  overflow: hidden;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-pill);
+  background: var(--app-surface-subtle);
+  margin-bottom: 18px;
+  padding: 4px;
 }
 
 .tab-button {
-  position: relative;
   min-width: 132px;
-  min-height: 43px;
-  justify-content: flex-start;
+  min-height: 36px;
+  justify-content: center;
   gap: 8px;
-  border-radius: var(--app-radius-sm) var(--app-radius-sm) 0 0;
+  border: 1px solid transparent;
+  border-radius: var(--app-radius-pill);
   color: var(--app-text-muted);
   padding: 0 14px;
   font-size: 12px;
@@ -1929,23 +1930,18 @@ p {
 
 .tab-button:hover:not(.active) {
   color: var(--app-text-secondary);
-  background: var(--app-surface-subtle);
+  background: var(--app-surface-raised);
 }
 
 .tab-button.active {
-  color: var(--app-text);
-  background: var(--app-surface);
+  color: #e7edff;
+  border-color: #3c548d;
+  background: var(--app-accent-soft);
+  box-shadow: var(--app-shadow-sm);
 }
 
 .tab-button.active::after {
-  position: absolute;
-  right: 10px;
-  bottom: -1px;
-  left: 10px;
-  height: 2px;
-  border-radius: 2px 2px 0 0;
-  background: var(--app-accent);
-  content: "";
+  display: none;
 }
 
 .tab-count {
@@ -1963,7 +1959,7 @@ p {
   grid-template-columns: minmax(520px, 1fr) 344px;
   overflow: hidden;
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
+  border-radius: var(--app-radius-lg);
   background: var(--app-surface);
   box-shadow: var(--app-shadow-sm);
 }
@@ -2022,11 +2018,11 @@ p {
 .functional-workflow-canvas .workflow-plus {
   position: relative;
   z-index: 1;
-  width: 32px;
-  height: 32px;
-  margin-block: 14px;
+  width: 36px;
+  height: 36px;
+  margin-block: 17px;
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-sm);
+  border-radius: 50%;
   color: var(--app-text-muted);
   background: var(--app-surface-raised);
   box-shadow: var(--app-shadow-sm);
@@ -2040,9 +2036,10 @@ p {
 
 .workflow-plus.with-label {
   width: auto;
-  height: 34px;
+  height: 38px;
   gap: 7px;
-  padding: 0 11px;
+  border-radius: var(--app-radius-pill);
+  padding: 0 15px;
 }
 
 .workflow-plus.with-label span {
@@ -2052,15 +2049,15 @@ p {
 }
 
 .functional-workflow-card {
-  min-height: 92px;
-  grid-template-columns: 40px minmax(0, 1fr) 20px;
-  column-gap: 14px;
+  min-height: 104px;
+  grid-template-columns: 44px minmax(0, 1fr) 22px;
+  column-gap: 16px;
   border: 1px solid var(--app-border);
   border-left: 3px solid #657084;
-  border-radius: var(--app-radius);
+  border-radius: var(--app-radius-lg);
   color: var(--app-text);
   background: var(--app-surface-raised);
-  padding: 13px 15px;
+  padding: 17px 18px;
   box-shadow: var(--app-shadow-sm);
 }
 
@@ -2079,7 +2076,7 @@ p {
 
 .functional-workflow-card.wait_for_acceptance,
 .functional-workflow-card.reply_check {
-  min-height: 82px;
+  min-height: 92px;
   border-left-color: var(--app-success);
   background: #1d2925;
   box-shadow: none;
@@ -2092,10 +2089,10 @@ p {
 }
 
 .workflow-card-icon {
-  width: 38px;
-  height: 38px;
+  width: 42px;
+  height: 42px;
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-sm);
+  border-radius: 13px;
   color: #b9c9f6;
   background: var(--app-surface-subtle);
 }
@@ -2112,7 +2109,7 @@ p {
 }
 
 .workflow-card-copy {
-  gap: 3px;
+  gap: 5px;
 }
 
 .workflow-card-copy small {
@@ -2122,14 +2119,15 @@ p {
 }
 
 .workflow-card-copy strong {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
 }
 
 .workflow-card-copy > span {
   color: var(--app-text-secondary);
   font-size: 11px;
-  line-height: 1.4;
+  line-height: 1.5;
+  white-space: normal;
 }
 
 .auto-guard-icon {
@@ -2262,7 +2260,7 @@ p {
 .browser-view {
   overflow: hidden;
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
+  border-radius: var(--app-radius-lg);
   background: var(--app-surface);
   box-shadow: var(--app-shadow-sm);
 }
