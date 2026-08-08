@@ -51,7 +51,7 @@ export function App() {
   const [status, setStatus] = useState<ChromeStatus | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [screen, setScreen] = useState<"manager" | "workspace">("manager");
-  const [activePage, setActivePage] = useState<"accounts" | "campaigns" | "safety" | "settings">("accounts");
+  const [activePage, setActivePage] = useState<"accounts" | "safety" | "settings">("accounts");
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
   const [accountPendingDelete, setAccountPendingDelete] = useState<LinkedInAccount | null>(null);
   const [humanTouchSettings, setHumanTouchSettings] = useState<HumanTouchSettings>(safetyDefaults);
@@ -275,12 +275,6 @@ export function App() {
               LinkedIn Accounts
             </button>
             <button
-              className={`nav-item ${activePage === "campaigns" ? "active" : ""}`}
-              onClick={() => setActivePage("campaigns")}
-            >
-              Campaigns
-            </button>
-            <button
               className={`nav-item ${activePage === "safety" ? "active" : ""}`}
               onClick={() => setActivePage("safety")}
             >
@@ -309,14 +303,6 @@ export function App() {
       <section className="manager-content">
         {activePage === "safety" ? (
           <SafetyLimitsPage settings={humanTouchSettings} onChange={setHumanTouchSettings} />
-        ) : null}
-
-        {activePage === "campaigns" ? (
-          <section className="placeholder-page">
-            <p className="eyebrow">Campaigns</p>
-            <h1>Campaigns</h1>
-            <p className="muted">Campaign workspace opens from each LinkedIn account.</p>
-          </section>
         ) : null}
 
         {activePage === "settings" ? (
@@ -418,7 +404,7 @@ export function App() {
                       setScreen("workspace");
                     }}
                   >
-                    Workspace
+                    Open workspace
                   </button>
                   <button
                     className="icon-button run"

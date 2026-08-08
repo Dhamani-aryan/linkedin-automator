@@ -4,7 +4,6 @@ import {
   Chrome,
   Clock3,
   ExternalLink,
-  Flag,
   Inbox,
   Layers3,
   Link,
@@ -220,8 +219,8 @@ export function AccountWorkspace({
 
         <nav className="campaign-nav">
           <button className="nav-item active">
-            <Flag size={17} />
-            Campaigns
+            <Layers3 size={17} />
+            Workspace
           </button>
           <button className="nav-item" onClick={() => setActiveTab("browser")}>
             <Chrome size={17} />
