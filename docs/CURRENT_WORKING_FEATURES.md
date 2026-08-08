@@ -8,6 +8,8 @@ Last verified: 2026-08-08
 
 - Register and sign in to a local company workspace.
 - Keep the local workspace signed in across reloads.
+- Preserve manager pages, the selected LinkedIn workspace, and its active tab across refreshes.
+- Support browser Back and Forward navigation between routed views.
 - Sign out from the manager sidebar.
 
 ### LinkedIn profile manager
