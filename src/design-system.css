@@ -5,13 +5,13 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 
-  --app-bg: #12151b;
-  --app-sidebar: #171b22;
-  --app-surface: #1c212a;
-  --app-surface-raised: #222832;
-  --app-surface-subtle: #191e26;
-  --app-border: #303744;
-  --app-border-strong: #3c4554;
+  --app-bg: #0f1114;
+  --app-sidebar: #14171b;
+  --app-surface: #1a1e23;
+  --app-surface-raised: #22272d;
+  --app-surface-subtle: #161a1f;
+  --app-border: #2d333a;
+  --app-border-strong: #3a424b;
   --app-text: #f4f6f8;
   --app-text-secondary: #bdc5d1;
   --app-text-muted: #8792a2;
