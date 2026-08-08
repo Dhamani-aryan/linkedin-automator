@@ -179,7 +179,7 @@ export function App() {
           <p className="eyebrow">LinkedIn Automator</p>
           <h1>{authMode === "register" ? "Create your company workspace" : "Sign in to your company workspace"}</h1>
           <p className="muted">
-            Manage LinkedIn accounts from one company login. Version one keeps a single persistent Chrome session
+            Manage LinkedIn profiles from one company login. Version one keeps a single persistent Chrome session
             on this computer, using your normal IP address.
           </p>
           <div className="segmented-control">
@@ -272,7 +272,7 @@ export function App() {
               className={`nav-item ${activePage === "accounts" ? "active" : ""}`}
               onClick={() => setActivePage("accounts")}
             >
-              LinkedIn Accounts
+              LinkedIn Profiles
             </button>
             <button
               className={`nav-item ${activePage === "safety" ? "active" : ""}`}
@@ -317,8 +317,8 @@ export function App() {
           <>
         <header className="manager-header">
           <div>
-            <p className="eyebrow">Account Manager</p>
-            <h1>LinkedIn accounts</h1>
+            <p className="eyebrow">Profile Manager</p>
+            <h1>LinkedIn profiles</h1>
           </div>
           <div className="header-actions">
             <button className="ghost-button" onClick={() => void refreshStatus()} disabled={isBusy}>
@@ -327,13 +327,13 @@ export function App() {
             </button>
             <button className="primary-button" type="button" onClick={() => setIsAddAccountOpen(true)}>
               <Plus size={18} />
-              Add account
+              Add profile
             </button>
           </div>
         </header>
 
         <div className="toolbar">
-          <div className="select-like">All accounts</div>
+          <div className="select-like">All profiles</div>
           <div className="pill active">In use</div>
           <div className="pill">Running</div>
           <div className="pill">Stopped</div>
@@ -345,7 +345,7 @@ export function App() {
 
         <section className="accounts-table">
           <div className="table-header">
-            <span>LinkedIn account</span>
+            <span>LinkedIn profile</span>
             <span>State</span>
             <span>Chrome session</span>
             <span>Access</span>
@@ -354,8 +354,8 @@ export function App() {
           </div>
           {accounts.length === 0 ? (
             <div className="empty-accounts">
-              <strong>No LinkedIn accounts added yet</strong>
-              <p>Add your first LinkedIn account, start the managed Chrome window, and log in once.</p>
+              <strong>No LinkedIn profiles added yet</strong>
+              <p>Add your first LinkedIn profile, start the managed Chrome window, and log in once.</p>
             </div>
           ) : (
             accounts.map((account) => (
@@ -430,7 +430,7 @@ export function App() {
                   </button>
                   <button
                     className="icon-button"
-                    title="Delete account from this workspace"
+                    title="Delete LinkedIn profile"
                     onClick={() => setAccountPendingDelete(account)}
                   >
                     <Trash2 size={16} />
@@ -447,7 +447,7 @@ export function App() {
             <strong>Single-profile v1</strong>
             <p>
               This build keeps one persistent Chrome login on this computer and does not use proxies or rotating IPs.
-              Multi-profile account isolation will be added after the single-profile flow is proven.
+              Multi-profile Chrome isolation will be added after the single-profile flow is proven.
             </p>
             {selectedAccount?.lastError ? <p className="error-text">{selectedAccount.lastError}</p> : null}
           </div>
@@ -468,7 +468,7 @@ export function App() {
               <AlertTriangle size={22} />
             </div>
             <div>
-              <h2>Delete LinkedIn account?</h2>
+              <h2>Delete LinkedIn profile?</h2>
               <p>
                 This removes <strong>{accountPendingDelete.name}</strong> from this workspace. It does not delete the
                 local Chrome profile or sign you out of LinkedIn.
@@ -486,7 +486,7 @@ export function App() {
                 }}
               >
                 <Trash2 size={18} />
-                Delete account
+                Delete profile
               </button>
             </footer>
           </section>

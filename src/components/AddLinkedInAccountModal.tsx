@@ -35,7 +35,7 @@ export function AddLinkedInAccountModal({ onAdd, onClose }: AddLinkedInAccountMo
       <section className="account-modal">
         <header className="modal-header">
           <div>
-            <h2>Add LinkedIn account</h2>
+            <h2>Add LinkedIn profile</h2>
             <p>Start Chrome after adding it, log in once, and this computer keeps that LinkedIn session.</p>
           </div>
           <button className="icon-text-button" onClick={onClose}>
@@ -44,7 +44,7 @@ export function AddLinkedInAccountModal({ onAdd, onClose }: AddLinkedInAccountMo
         </header>
 
         <form className="auth-form" onSubmit={submitAccount}>
-          <label htmlFor="linkedin-name">Account label</label>
+          <label htmlFor="linkedin-name">Profile label</label>
           <div className="input-with-icon">
             <User size={18} />
             <input
@@ -61,7 +61,7 @@ export function AddLinkedInAccountModal({ onAdd, onClose }: AddLinkedInAccountMo
             <input
               id="linkedin-email"
               type="email"
-              placeholder="linkedin-account@example.com"
+              placeholder="linkedin-profile@example.com"
               value={form.email}
               onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
             />
@@ -73,7 +73,7 @@ export function AddLinkedInAccountModal({ onAdd, onClose }: AddLinkedInAccountMo
               <strong>Single-profile v1</strong>
               <span>
                 Uses one local Chrome profile at <code>.local/chrome-profile</code>, no proxy rotation, same machine IP.
-                Multi-profile isolation will map each account to its own profile folder later.
+                Multi-profile isolation will map each LinkedIn profile to its own Chrome folder later.
               </span>
             </div>
           </div>
@@ -92,7 +92,7 @@ export function AddLinkedInAccountModal({ onAdd, onClose }: AddLinkedInAccountMo
             </button>
             <button className="primary-button" type="submit">
               <Save size={18} />
-              Add account
+              Add profile
             </button>
           </footer>
         </form>
