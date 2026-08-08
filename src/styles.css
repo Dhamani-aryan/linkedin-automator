@@ -2861,4 +2861,8 @@ button:disabled {
   .compact-variable-list {
     grid-template-columns: 1fr;
   }
+
+  .delay-control-row {
+    grid-template-columns: 1fr;
+  }
 }
