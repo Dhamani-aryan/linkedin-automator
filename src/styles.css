@@ -2177,6 +2177,34 @@ code {
   padding: 18px 0;
 }
 
+.message-delay-summary {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid #4a4e5a;
+  padding: 12px 0;
+}
+
+.message-delay-summary > svg {
+  color: #82a5ff;
+}
+
+.message-delay-summary span,
+.message-delay-summary small,
+.message-delay-summary strong {
+  display: block;
+}
+
+.message-delay-summary small {
+  color: #9fa8ba;
+  font-size: 12px;
+}
+
+.message-delay-summary strong {
+  margin-top: 3px;
+}
+
 .message-summary-heading,
 .source-summary-list > header,
 .preview-heading {
@@ -2724,6 +2752,41 @@ code {
 
 .template-count.over-limit {
   color: #ff8b87;
+}
+
+.message-delay-editor {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid #484d59;
+  margin-top: 18px;
+  padding-top: 18px;
+}
+
+.delay-control-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.8fr) minmax(150px, 1fr);
+  gap: 10px;
+}
+
+.delay-amount-field {
+  margin: 0;
+}
+
+.delay-unit-select {
+  min-height: 42px;
+  border: 1px solid #4b5060;
+  border-radius: 8px;
+  outline: 0;
+  color: #f8faff;
+  background: #272a33;
+  padding: 0 12px;
+}
+
+.message-delay-editor p {
+  margin: 0;
+  color: #aeb6c6;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .preview-heading h3 {

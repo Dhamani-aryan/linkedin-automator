@@ -36,6 +36,7 @@ import type {
   ChromeStatus,
   LeadSource,
   LinkedInAccount,
+  WorkflowDelay,
   WorkflowActionType
 } from "../types";
 import { LeadSourceWizard, type LeadImportPayload } from "./LeadSourceWizard";
@@ -115,12 +116,14 @@ export function AccountWorkspace({
     setSelectedActionId("");
   }
 
-  function saveTemplate(template: string) {
+  function saveTemplate(template: string, delay?: WorkflowDelay) {
     if (!selectedAction) return;
     setWorkspace((current) => ({
       ...current,
       actions: current.actions.map((action) =>
-        action.id === selectedAction.id ? { ...action, template } : action
+        action.id === selectedAction.id
+          ? { ...action, template, ...(action.type === "message" && delay ? { delay } : {}) }
+          : action
       )
     }));
     setActiveModal(null);
@@ -334,6 +337,16 @@ export function AccountWorkspace({
                   </div>
                   <p className="inspector-description">{selectedAction.description}</p>
 
+                  {selectedAction.type === "message" && selectedAction.delay ? (
+                    <section className="message-delay-summary">
+                      <Clock3 size={19} />
+                      <span>
+                        <small>Delivery delay</small>
+                        <strong>{formatDelay(selectedAction.delay)}</strong>
+                      </span>
+                    </section>
+                  ) : null}
+
                   {selectedAction.template !== undefined ? (
                     <section className="message-summary">
                       <div className="message-summary-heading">
@@ -478,6 +491,7 @@ export function AccountWorkspace({
       {activeModal === "template" && selectedAction?.template !== undefined ? (
         <MessageTemplateEditor
           actionLabel={selectedAction.name}
+          initialDelay={selectedAction.type === "message" ? selectedAction.delay : undefined}
           initialTemplate={selectedAction.template}
           maxLength={selectedAction.type === "connection_request" ? 300 : 8000}
           onClose={() => setActiveModal(null)}
@@ -515,4 +529,10 @@ function Metric({ label, value }: { label: string; value: number }) {
 function formatDate(value: string) {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
     .format(new Date(value));
+}
+
+function formatDelay(delay: WorkflowDelay) {
+  if (delay.amount === 0) return "Send immediately";
+  const unit = delay.amount === 1 ? delay.unit.replace(/s$/, "") : delay.unit;
+  return `Wait ${delay.amount} ${unit}`;
 }
