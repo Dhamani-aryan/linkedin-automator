@@ -206,7 +206,7 @@ export function AccountWorkspace({
       <aside className="workspace-sidebar">
         <button className="back-link" onClick={onBack}>
           <ArrowLeft size={18} />
-          All accounts
+          All profiles
         </button>
 
         <section className="workspace-profile">
@@ -233,7 +233,7 @@ export function AccountWorkspace({
             <strong>{workspace.campaign.name}</strong>
             <span className="state-badge ready">Ready to start</span>
           </div>
-          <Metric label="Total profiles" value={workspace.campaign.profilesTotal} />
+          <Metric label="Total leads" value={workspace.campaign.profilesTotal} />
           <Metric label="To process" value={workspace.campaign.profilesToProcess} />
           <Metric label="Sources" value={workspace.sources.length} />
           <Metric label="Actions" value={workspace.actions.filter((action) => !action.automatic).length} />
@@ -252,7 +252,7 @@ export function AccountWorkspace({
               <ArrowLeft size={18} />
             </button>
             <h1>{workspace.campaign.name}</h1>
-            <p className="status-line">Draft workflow · {workspace.leads.length} profiles · same-IP local Chrome</p>
+            <p className="status-line">Draft workflow · {workspace.leads.length} leads · same-IP local Chrome</p>
           </div>
           <div className="header-actions">
             <button className="ghost-button" onClick={onStartChrome} disabled={isBusy}>
@@ -272,7 +272,7 @@ export function AccountWorkspace({
           </button>
           <button className={`tab-button ${activeTab === "profiles" ? "active" : ""}`} onClick={() => setActiveTab("profiles")}>
             <List size={17} />
-            Profiles <span className="tab-count">{workspace.leads.length}</span>
+            Leads <span className="tab-count">{workspace.leads.length}</span>
           </button>
           <button className={`tab-button ${activeTab === "browser" ? "active" : ""}`} onClick={() => setActiveTab("browser")}>
             <Chrome size={17} />
@@ -285,12 +285,12 @@ export function AccountWorkspace({
             <div className="workflow-stage">
               <header className="workflow-stage-header">
                 <div>
-                  <span className="section-kicker">Profiles to process</span>
+                  <span className="section-kicker">Leads to process</span>
                   <strong>{workspace.leads.length}</strong>
                 </div>
                 <button className="primary-button" onClick={() => setActiveModal("source")}>
                   <Plus size={17} />
-                  Add profiles
+                  Add leads
                 </button>
               </header>
 
@@ -353,7 +353,7 @@ export function AccountWorkspace({
                       <ShieldCheck size={20} />
                       <div>
                         <strong>Managed automatically</strong>
-                        <p>This guard keeps the workflow from contacting profiles at the wrong time.</p>
+                        <p>This guard keeps the workflow from contacting leads at the wrong time.</p>
                       </div>
                     </section>
                   )}
@@ -376,7 +376,7 @@ export function AccountWorkspace({
               <section className="source-summary-list">
                 <header>
                   <span>Lead sources</span>
-                  <button className="icon-button" title="Add profiles" onClick={() => setActiveModal("source")}>
+                  <button className="icon-button" title="Add leads" onClick={() => setActiveModal("source")}>
                     <Plus size={16} />
                   </button>
                 </header>
@@ -385,7 +385,7 @@ export function AccountWorkspace({
                 ) : workspace.sources.map((source) => (
                   <div key={source.id}>
                     {source.kind === "sales_navigator" ? <Navigation size={16} /> : <Link size={16} />}
-                    <span><strong>{source.name}</strong><small>{source.profileCount} profiles</small></span>
+                    <span><strong>{source.name}</strong><small>{source.profileCount} leads</small></span>
                   </div>
                 ))}
               </section>
@@ -398,18 +398,18 @@ export function AccountWorkspace({
             <header>
               <div>
                 <p className="section-kicker">Campaign queue</p>
-                <h2>Profiles to process</h2>
+                <h2>Leads to process</h2>
               </div>
               <button className="primary-button" onClick={() => setActiveModal("source")}>
                 <Plus size={17} />
-                Add profiles
+                Add leads
               </button>
             </header>
             {workspace.leads.length === 0 ? (
               <div className="empty-profile-list">
                 <Users size={28} />
-                <strong>No profiles added</strong>
-                <p>Add individual LinkedIn URLs, paste a list, upload a file, or collect from Sales Navigator.</p>
+                <strong>No leads added</strong>
+                <p>Add individual LinkedIn URLs, paste a list, upload a file, or collect leads from Sales Navigator.</p>
               </div>
             ) : (
               <div className="functional-lead-table">

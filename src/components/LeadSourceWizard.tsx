@@ -69,7 +69,7 @@ export function LeadSourceWizard({ onAddProfiles, onClose, onCollectSalesNavigat
     });
     setFeedback({
       tone: "success",
-      message: `${result.added} profile${result.added === 1 ? "" : "s"} added${
+      message: `${result.added} lead${result.added === 1 ? "" : "s"} added${
         result.duplicates > 0 ? `, ${result.duplicates} duplicate${result.duplicates === 1 ? "" : "s"} skipped` : ""
       }.`
     });
@@ -108,14 +108,14 @@ export function LeadSourceWizard({ onAddProfiles, onClose, onCollectSalesNavigat
       });
       setFeedback({
         tone: "success",
-        message: `${result.added} visible profile${result.added === 1 ? "" : "s"} collected from Sales Navigator${
+        message: `${result.added} visible lead${result.added === 1 ? "" : "s"} collected from Sales Navigator${
           result.duplicates > 0 ? `; ${result.duplicates} duplicate${result.duplicates === 1 ? "" : "s"} skipped` : ""
         }.`
       });
     } catch (error) {
       setFeedback({
         tone: "error",
-        message: error instanceof Error ? error.message : "Could not collect profiles from Sales Navigator."
+        message: error instanceof Error ? error.message : "Could not collect leads from Sales Navigator."
       });
     } finally {
       setIsCollecting(false);
@@ -141,7 +141,7 @@ export function LeadSourceWizard({ onAddProfiles, onClose, onCollectSalesNavigat
               <ArrowLeft size={18} />
             </button>
             <div>
-              <h2 id="lead-source-title">Add profiles to campaign</h2>
+              <h2 id="lead-source-title">Add leads to campaign</h2>
               <p>Import LinkedIn URLs directly or collect visible leads from Sales Navigator.</p>
             </div>
           </div>
@@ -172,7 +172,7 @@ export function LeadSourceWizard({ onAddProfiles, onClose, onCollectSalesNavigat
               <div className="section-heading">
                 <Link size={19} />
                 <div>
-                  <h3>Individual profile</h3>
+                <h3>Individual LinkedIn URL</h3>
                   <p>Add one standard LinkedIn or Sales Navigator lead URL.</p>
                 </div>
               </div>
@@ -227,7 +227,7 @@ export function LeadSourceWizard({ onAddProfiles, onClose, onCollectSalesNavigat
                   onClick={() => importProfiles("linkedin_urls")}
                 >
                   <Upload size={17} />
-                  Add {customProfiles.length || ""} profile{customProfiles.length === 1 ? "" : "s"}
+                  Add {customProfiles.length || ""} lead{customProfiles.length === 1 ? "" : "s"}
                 </button>
               </div>
             </section>
@@ -264,7 +264,7 @@ export function LeadSourceWizard({ onAddProfiles, onClose, onCollectSalesNavigat
                 onClick={() => void collectSalesNavigator()}
               >
                 {isCollecting ? <LoaderCircle className="spin" size={17} /> : <ExternalLink size={17} />}
-                {isCollecting ? "Collecting visible profiles" : "Open and collect visible profiles"}
+                {isCollecting ? "Collecting visible leads" : "Open and collect visible leads"}
               </button>
 
               <div className="section-divider" />
@@ -316,7 +316,7 @@ function ImportSummary({ count, salesNavigator = false }: { count: number; sales
     <aside className="import-summary">
       <span className="summary-label">Ready to add</span>
       <strong>{count}</strong>
-      <span>{salesNavigator ? "pasted Sales Navigator leads" : "unique LinkedIn profiles"}</span>
+      <span>{salesNavigator ? "pasted Sales Navigator leads" : "unique LinkedIn leads"}</span>
       <div className="summary-rule" />
       <p>Duplicates already in this campaign are skipped automatically.</p>
       {salesNavigator ? <p>Search/list collection reads only links currently loaded in managed Chrome.</p> : null}
