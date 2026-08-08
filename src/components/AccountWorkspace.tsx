@@ -257,7 +257,7 @@ export function AccountWorkspace({
               <ArrowLeft size={18} />
             </button>
             <h1>{workspace.campaign.name}</h1>
-            <p className="status-line">Draft workflow · {workspace.leads.length} leads · same-IP local Chrome</p>
+            <p className="status-line">Draft workflow <span>|</span> {workspace.leads.length} leads <span>|</span> same-IP local Chrome</p>
           </div>
           <div className="header-actions">
             <button className="ghost-button" onClick={onStartChrome} disabled={isBusy}>
@@ -460,7 +460,7 @@ export function AccountWorkspace({
             <div className="browser-view-copy">
               <p className="section-kicker">Persistent local session</p>
               <h2>{chromeStatus?.connected ? "Managed Chrome is connected" : "Start managed Chrome"}</h2>
-              <p>The LinkedIn login stays in this computer’s existing profile directory and uses this computer’s IP.</p>
+              <p>The LinkedIn login stays in this computer's existing profile directory and uses this computer's IP.</p>
               <div className="browser-view-actions">
                 <button className="primary-button" onClick={onOpenLinkedIn} disabled={isBusy}>
                   <Chrome size={18} /> Open LinkedIn
