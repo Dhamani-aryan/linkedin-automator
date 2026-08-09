@@ -367,8 +367,13 @@ async function readComposer(session, recipientName) {
       return output.replace(/\r\n/g, "\n").replace(/\n$/, "");
     };
     const shadowRoot = document.querySelector("#interop-outlet")?.shadowRoot;
-    const shadowBubble = shadowRoot && [...shadowRoot.querySelectorAll(".msg-overlay-conversation-bubble")].find((candidate) =>
+    const shadowBubbles = shadowRoot ? [...shadowRoot.querySelectorAll(".msg-overlay-conversation-bubble")] : [];
+    const shadowBubble = shadowBubbles.find((candidate) =>
       normalize(candidate.querySelector(".msg-overlay-bubble-header__title")?.textContent) === expectedRecipient
+    ) ?? shadowBubbles.find((candidate) =>
+      candidate.classList.contains("msg-overlay-conversation-bubble--is-compose") &&
+      normalize(candidate.querySelector('.msg-connections-typeahead__added-recipients button[aria-label^="Remove "]')
+        ?.getAttribute("aria-label")?.replace(/^Remove\s+/i, "")) === expectedRecipient
     );
     const pageThread = document.querySelector(".msg-compose-container");
     const pageRecipient = pageThread?.querySelector('.msg-connections-typeahead__added-recipients button[aria-label^="Remove "]')
@@ -379,9 +384,7 @@ async function readComposer(session, recipientName) {
     const editor = container?.querySelector('.msg-form__contenteditable[contenteditable="true"][role="textbox"]');
     if (!container || !editor) return null;
     return {
-      recipientName: shadowBubble
-        ? normalize(shadowBubble.querySelector(".msg-overlay-bubble-header__title")?.textContent)
-        : pageRecipient,
+      recipientName: shadowBubble ? expectedRecipient : pageRecipient,
       text: readStructuredText(editor),
       matchingMessageCount: 0
     };
@@ -392,8 +395,13 @@ async function focusComposer(session, recipientName) {
   return await evaluate(session, (expectedRecipient) => {
     const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
     const shadowRoot = document.querySelector("#interop-outlet")?.shadowRoot;
-    const shadowBubble = shadowRoot && [...shadowRoot.querySelectorAll(".msg-overlay-conversation-bubble")].find((candidate) =>
+    const shadowBubbles = shadowRoot ? [...shadowRoot.querySelectorAll(".msg-overlay-conversation-bubble")] : [];
+    const shadowBubble = shadowBubbles.find((candidate) =>
       normalize(candidate.querySelector(".msg-overlay-bubble-header__title")?.textContent) === expectedRecipient
+    ) ?? shadowBubbles.find((candidate) =>
+      candidate.classList.contains("msg-overlay-conversation-bubble--is-compose") &&
+      normalize(candidate.querySelector('.msg-connections-typeahead__added-recipients button[aria-label^="Remove "]')
+        ?.getAttribute("aria-label")?.replace(/^Remove\s+/i, "")) === expectedRecipient
     );
     const pageThread = document.querySelector(".msg-compose-container");
     const pageRecipient = pageThread?.querySelector('.msg-connections-typeahead__added-recipients button[aria-label^="Remove "]')
@@ -430,8 +438,13 @@ async function readComposerText(session, recipientName, expectedText) {
       return output.replace(/\r\n/g, "\n").replace(/\n$/, "");
     };
     const shadowRoot = document.querySelector("#interop-outlet")?.shadowRoot;
-    const shadowBubble = shadowRoot && [...shadowRoot.querySelectorAll(".msg-overlay-conversation-bubble")].find((candidate) =>
+    const shadowBubbles = shadowRoot ? [...shadowRoot.querySelectorAll(".msg-overlay-conversation-bubble")] : [];
+    const shadowBubble = shadowBubbles.find((candidate) =>
       normalize(candidate.querySelector(".msg-overlay-bubble-header__title")?.textContent) === expectedRecipient
+    ) ?? shadowBubbles.find((candidate) =>
+      candidate.classList.contains("msg-overlay-conversation-bubble--is-compose") &&
+      normalize(candidate.querySelector('.msg-connections-typeahead__added-recipients button[aria-label^="Remove "]')
+        ?.getAttribute("aria-label")?.replace(/^Remove\s+/i, "")) === expectedRecipient
     );
     const pageThread = document.querySelector(".msg-compose-container");
     const pageRecipient = pageThread?.querySelector('.msg-connections-typeahead__added-recipients button[aria-label^="Remove "]')
@@ -453,8 +466,13 @@ async function readSendPoint(session, recipientName) {
   return await evaluate(session, (expectedRecipient) => {
     const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
     const shadowRoot = document.querySelector("#interop-outlet")?.shadowRoot;
-    const shadowBubble = shadowRoot && [...shadowRoot.querySelectorAll(".msg-overlay-conversation-bubble")].find((candidate) =>
+    const shadowBubbles = shadowRoot ? [...shadowRoot.querySelectorAll(".msg-overlay-conversation-bubble")] : [];
+    const shadowBubble = shadowBubbles.find((candidate) =>
       normalize(candidate.querySelector(".msg-overlay-bubble-header__title")?.textContent) === expectedRecipient
+    ) ?? shadowBubbles.find((candidate) =>
+      candidate.classList.contains("msg-overlay-conversation-bubble--is-compose") &&
+      normalize(candidate.querySelector('.msg-connections-typeahead__added-recipients button[aria-label^="Remove "]')
+        ?.getAttribute("aria-label")?.replace(/^Remove\s+/i, "")) === expectedRecipient
     );
     const pageThread = document.querySelector(".msg-compose-container");
     const pageRecipient = pageThread?.querySelector('.msg-connections-typeahead__added-recipients button[aria-label^="Remove "]')
@@ -492,8 +510,13 @@ async function readSentConfirmation(session, recipientName, expectedText, before
       return output.replace(/\r\n/g, "\n").replace(/\n$/, "");
     };
     const shadowRoot = document.querySelector("#interop-outlet")?.shadowRoot;
-    const shadowBubble = shadowRoot && [...shadowRoot.querySelectorAll(".msg-overlay-conversation-bubble")].find((candidate) =>
+    const shadowBubbles = shadowRoot ? [...shadowRoot.querySelectorAll(".msg-overlay-conversation-bubble")] : [];
+    const shadowBubble = shadowBubbles.find((candidate) =>
       normalize(candidate.querySelector(".msg-overlay-bubble-header__title")?.textContent) === expectedRecipient
+    ) ?? shadowBubbles.find((candidate) =>
+      candidate.classList.contains("msg-overlay-conversation-bubble--is-compose") &&
+      normalize(candidate.querySelector('.msg-connections-typeahead__added-recipients button[aria-label^="Remove "]')
+        ?.getAttribute("aria-label")?.replace(/^Remove\s+/i, "")) === expectedRecipient
     );
     const pageThread = document.querySelector(".msg-compose-container");
     const pageRecipient = pageThread?.querySelector('.msg-connections-typeahead__added-recipients button[aria-label^="Remove "]')
