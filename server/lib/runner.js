@@ -12,7 +12,7 @@ import { executeMessage } from "./actions/message.js";
 import { AppError, ErrorCodes } from "./errors.js";
 import {
   createCampaignRun,
-  delayToMs,
+  followUpSchedule,
   isRunFinished,
   leadStates,
   runStates,
@@ -191,6 +191,7 @@ async function runLoop(runId) {
 
     await ensureAuthenticated(run);
     run = await loadRun(runId);
+    run = await reconcileFollowUpDelays(run);
 
     const now = new Date();
     const selected = pickNextLead(run, now);
@@ -200,30 +201,6 @@ async function runLoop(runId) {
     }
 
     const action = run.snapshot.actions[selected.lead.actionCursor];
-    const delayMs = action.type === "message" ? delayToMs(action.delay) : 0;
-    if (
-      selected.lead.state === leadStates.QUEUED &&
-      delayMs > 0 &&
-      !selected.lead.delaysSatisfiedActionIds?.includes(action.id)
-    ) {
-      selected.lead = transition(selected.lead, {
-        type: "WAITING_DELAY",
-        actionId: action.id,
-        nextEligibleAt: new Date(now.getTime() + delayMs).toISOString(),
-        now: now.toISOString()
-      }, run.snapshot.actions);
-      run.leads[selected.index] = selected.lead;
-      await appendAudit(run.id, {
-        event: "workflow_delay_scheduled",
-        leadId: selected.lead.id,
-        actionId: action.id,
-        outcome: "sleeping",
-        detail: { delayMs }
-      });
-      await saveRun({ ...run, state: runStates.RUNNING, updatedAt: new Date().toISOString() });
-      continue;
-    }
-
     if (selected.lead.state === leadStates.WAITING_DELAY) {
       selected.lead = transition(selected.lead, {
         type: "DELAY_ELAPSED",
@@ -346,12 +323,29 @@ async function executeLeadAction(run, leadIndex, action) {
         now: new Date().toISOString()
       }, run.snapshot.actions);
     } else {
+      const completedAt = new Date().toISOString();
       lead = transition(lead, {
         type: "ACTION_SUCCEEDED",
         outcome: result.outcome,
         detail: result.detail,
-        now: new Date().toISOString()
+        now: completedAt
       }, run.snapshot.actions);
+      const schedule = followUpSchedule(lead, run.snapshot.actions);
+      if (schedule) {
+        lead = transition(lead, {
+          type: "WAITING_DELAY",
+          actionId: schedule.actionId,
+          nextEligibleAt: schedule.dueAt,
+          now: completedAt
+        }, run.snapshot.actions);
+        await appendAudit(run.id, {
+          event: "workflow_delay_scheduled",
+          leadId: lead.id,
+          actionId: schedule.actionId,
+          outcome: "sleeping",
+          detail: schedule
+        });
+      }
     }
 
     run.leads[leadIndex] = lead;
@@ -362,6 +356,35 @@ async function executeLeadAction(run, leadIndex, action) {
     session.close();
     if (tab?.id && !keepProfileTabOpen) await closeTab(tab.id).catch(() => false);
   }
+}
+
+async function reconcileFollowUpDelays(run) {
+  let changed = false;
+  for (const [index, lead] of run.leads.entries()) {
+    if (![leadStates.QUEUED, leadStates.WAITING_DELAY].includes(lead.state)) continue;
+    const schedule = followUpSchedule(lead, run.snapshot.actions);
+    if (!schedule || (lead.state === leadStates.WAITING_DELAY && lead.nextEligibleAt === schedule.dueAt)) continue;
+
+    run.leads[index] = transition(lead, {
+      type: "WAITING_DELAY",
+      actionId: schedule.actionId,
+      nextEligibleAt: schedule.dueAt,
+      now: new Date().toISOString()
+    }, run.snapshot.actions);
+    await appendAudit(run.id, {
+      event: "workflow_delay_reconciled",
+      leadId: lead.id,
+      actionId: schedule.actionId,
+      outcome: "sleeping",
+      detail: schedule
+    });
+    changed = true;
+  }
+
+  if (!changed) return run;
+  run.updatedAt = new Date().toISOString();
+  await saveRun(run);
+  return run;
 }
 
 function scheduleRunLoop(run) {

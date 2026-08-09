@@ -286,7 +286,7 @@ export function transition(leadRun, event, actions = []) {
       return touch(lead, now);
 
     case "WAITING_DELAY":
-      assertState(lead, [leadStates.RUNNING, leadStates.QUEUED]);
+      assertState(lead, [leadStates.RUNNING, leadStates.QUEUED, leadStates.WAITING_DELAY]);
       lead.state = leadStates.WAITING_DELAY;
       lead.nextEligibleAt = event.nextEligibleAt;
       return touch(lead, now);
