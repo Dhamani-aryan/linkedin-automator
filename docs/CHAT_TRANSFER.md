@@ -49,6 +49,8 @@ There is no proxy or rotating-IP requirement in the current product direction.
   guard.
 - Messages automatically receive a `Check for replies` guard.
 - Messages support a configurable delay after the previous workflow step.
+- The first message action offers an explicit `Send now` option. It removes the
+  workflow delay but does not bypass global safety pacing.
 - Safety controls belong only on the Safety Limits page.
 - UI direction is modern, restrained, minimal, and operational rather than a
   card-heavy marketing interface.
@@ -111,6 +113,8 @@ in browser `localStorage`.
   `{position}`, and `{location}`.
 - Preview template variables against sample lead data.
 - Configure message delays in minutes, hours, or days.
+- Choose `Send now` on the first message action; later message actions retain
+  their normal delay controls.
 
 ### Lead intake
 

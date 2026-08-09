@@ -39,6 +39,7 @@ Last verified: 2026-08-08
 
 - Edit connection notes and direct-message templates.
 - Configure a message delay in minutes, hours, or days after the previous workflow step.
+- Choose `Send now` for the first message action instead of a workflow delay; global safety pacing still applies.
 - Persist message delays and show the configured timing in the workflow inspector.
 - Insert LinkedIn lead variables such as first name, last name, company, position, and location.
 - Preview resolved variables against sample lead data.
