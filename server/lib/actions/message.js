@@ -97,7 +97,8 @@ async function sendLiveMessage({ session, recipientName, classification, resolve
 
   const composer = opening.composer;
 
-  if (composer.text.length > 0) {
+  const hasExactPreparedDraft = composer.text === resolved.text;
+  if (composer.text.length > 0 && !hasExactPreparedDraft) {
     return {
       outcome: "needs_review",
       errorCode: ErrorCodes.AMBIGUOUS_OUTCOME,
@@ -110,16 +111,18 @@ async function sendLiveMessage({ session, recipientName, classification, resolve
     };
   }
 
-  const prepared = await focusComposer(session, recipientName);
-  if (!prepared) {
-    return {
-      outcome: "needs_review",
-      errorCode: ErrorCodes.ELEMENT_NOT_FOUND,
-      detail: { actionType: "message", reason: "The message editor could not be focused.", recipientName }
-    };
-  }
+  if (!hasExactPreparedDraft) {
+    const prepared = await focusComposer(session, recipientName);
+    if (!prepared) {
+      return {
+        outcome: "needs_review",
+        errorCode: ErrorCodes.ELEMENT_NOT_FOUND,
+        detail: { actionType: "message", reason: "The message editor could not be focused.", recipientName }
+      };
+    }
 
-  await insertText(session, resolved.text);
+    await insertText(session, resolved.text);
+  }
   const verified = await waitForComposerText(session, recipientName, resolved.text, 5_000);
   if (!verified?.matches) {
     return {
