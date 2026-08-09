@@ -1,17 +1,9 @@
-import { evaluate, navigate } from "../browserSession.js";
+import { clickAt, evaluate, insertText, navigate } from "../browserSession.js";
 import { ErrorCodes } from "../errors.js";
 import { renderTemplate } from "../template.js";
 import { selectors } from "./selectors.js";
 
 export async function executeMessage({ session, lead, action, mode }) {
-  if (mode !== "dry_run") {
-    return {
-      outcome: "needs_review",
-      errorCode: ErrorCodes.AMBIGUOUS_OUTCOME,
-      detail: { reason: "Live messages require the controlled verification gate." }
-    };
-  }
-
   const page = await navigate(session, lead.linkedinUrl, { timeoutMs: 25_000 });
   const classification = await readMessageEligibility(session);
 
@@ -35,6 +27,10 @@ export async function executeMessage({ session, lead, action, mode }) {
   }
 
   const resolved = renderTemplate(action.template ?? "", lead, { missingVariable: "empty" });
+  if (mode === "live") {
+    return await sendLiveMessage({ session, page, classification, resolved });
+  }
+
   return {
     outcome: "dry_run_ok",
     event: "would_send_message",
@@ -48,6 +44,307 @@ export async function executeMessage({ session, lead, action, mode }) {
       missingVariables: resolved.missing
     }
   };
+}
+
+async function sendLiveMessage({ session, page, classification, resolved }) {
+  const recipientName = page.title.replace(/\s*\|\s*LinkedIn\s*$/i, "").trim();
+  const opened = await openMessageComposer(session, recipientName);
+  if (!opened) {
+    return {
+      outcome: "needs_review",
+      errorCode: ErrorCodes.ELEMENT_NOT_FOUND,
+      detail: {
+        actionType: "message",
+        reason: "The profile Message control did not open a composer.",
+        recipientName,
+        ...classification
+      }
+    };
+  }
+
+  const composer = await waitForComposer(session, recipientName, 10_000);
+  if (!composer) {
+    return {
+      outcome: "needs_review",
+      errorCode: ErrorCodes.ELEMENT_NOT_FOUND,
+      detail: {
+        actionType: "message",
+        reason: "LinkedIn opened messaging, but the message editor was not found.",
+        recipientName
+      }
+    };
+  }
+
+  if (composer.text.length > 0) {
+    return {
+      outcome: "needs_review",
+      errorCode: ErrorCodes.AMBIGUOUS_OUTCOME,
+      detail: {
+        actionType: "message",
+        reason: "The composer already contains a draft. It was left untouched.",
+        recipientName,
+        draftText: composer.text
+      }
+    };
+  }
+
+  const prepared = await focusComposer(session, recipientName);
+  if (!prepared) {
+    return {
+      outcome: "needs_review",
+      errorCode: ErrorCodes.ELEMENT_NOT_FOUND,
+      detail: { actionType: "message", reason: "The message editor could not be focused.", recipientName }
+    };
+  }
+
+  await insertText(session, resolved.text);
+  const verified = await waitForComposerText(session, recipientName, resolved.text, 5_000);
+  if (!verified?.matches) {
+    return {
+      outcome: "needs_review",
+      errorCode: ErrorCodes.AMBIGUOUS_OUTCOME,
+      detail: {
+        actionType: "message",
+        reason: "The composer text did not exactly match the resolved template. Send was not clicked.",
+        recipientName,
+        expectedText: resolved.text,
+        actualText: verified?.text ?? null
+      }
+    };
+  }
+
+  const beforeCount = verified.matchingMessageCount;
+  const sendPoint = await waitForSendPoint(session, recipientName, 5_000);
+  if (!sendPoint) {
+    return {
+      outcome: "needs_review",
+      errorCode: ErrorCodes.ELEMENT_NOT_FOUND,
+      detail: {
+        actionType: "message",
+        reason: "The Send button did not become available after the composer was verified.",
+        recipientName
+      }
+    };
+  }
+
+  await clickAt(session, sendPoint);
+  const confirmation = await waitForSentMessage(session, recipientName, resolved.text, beforeCount, 12_000);
+  if (!confirmation?.confirmed) {
+    return {
+      outcome: "needs_review",
+      errorCode: ErrorCodes.AMBIGUOUS_OUTCOME,
+      detail: {
+        actionType: "message",
+        reason: "Send was clicked, but LinkedIn did not provide an authoritative sent confirmation. The runner will not retry.",
+        recipientName,
+        resolvedText: resolved.text
+      }
+    };
+  }
+
+  return {
+    outcome: "sent",
+    event: "message_sent",
+    detail: {
+      actionType: "message",
+      recipientName,
+      resolvedText: resolved.text,
+      missingVariables: resolved.missing,
+      confirmation: confirmation.indicator,
+      sentAt: confirmation.sentAt
+    }
+  };
+}
+
+async function openMessageComposer(session, recipientName) {
+  const existing = await readComposer(session, recipientName);
+  if (existing) return true;
+
+  const directPoint = await evaluate(session, (selector) => {
+    const candidates = [...document.querySelectorAll(selector)]
+      .filter((element) => isVisible(element))
+      .map((element) => ({ element, rect: element.getBoundingClientRect() }))
+      .sort((left, right) => right.rect.y - left.rect.y);
+    return candidates[0] ? center(candidates[0].rect) : null;
+
+    function isVisible(element) {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < innerHeight &&
+        style.visibility !== "hidden" && style.display !== "none";
+    }
+    function center(rect) {
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    }
+  }, [selectors.profileMessageControl]);
+
+  if (directPoint) {
+    await clickAt(session, directPoint);
+    if (await waitForComposer(session, recipientName, 5_000)) return true;
+  }
+
+  let menuPoint = await readOverflowMessagePoint(session);
+  if (!menuPoint) {
+    const morePoint = await evaluate(session, (selector) => {
+      const candidates = [...document.querySelectorAll(selector)]
+        .filter((element) => {
+          const rect = element.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < innerHeight;
+        })
+        .map((element) => element.getBoundingClientRect())
+        .sort((left, right) => right.y - left.y);
+      const rect = candidates[0];
+      return rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : null;
+    }, [selectors.profileOverflowControl]);
+    if (!morePoint) return false;
+    await clickAt(session, morePoint);
+    menuPoint = await waitForValue(() => readOverflowMessagePoint(session), Boolean, 3_000);
+  }
+
+  if (!menuPoint) return false;
+  await clickAt(session, menuPoint);
+  return Boolean(await waitForComposer(session, recipientName, 8_000));
+}
+
+async function readOverflowMessagePoint(session) {
+  return await evaluate(session, (messageText) => {
+    const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+    const controls = [...document.querySelectorAll('[role="menuitem"], [role="menu"] button, [role="menu"] a')];
+    const element = controls.find((control) => {
+      const rect = control.getBoundingClientRect();
+      const label = `${normalize(control.textContent)} ${normalize(control.getAttribute("aria-label"))}`;
+      return rect.width > 0 && rect.height > 0 && label.includes(messageText);
+    });
+    if (!element) return null;
+    const rect = element.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  }, [selectors.messageButtonText]);
+}
+
+async function readComposer(session, recipientName) {
+  return await evaluate(session, (expectedRecipient) => {
+    const root = document.querySelector("#interop-outlet")?.shadowRoot;
+    if (!root) return null;
+    const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
+    const bubble = [...root.querySelectorAll(".msg-overlay-conversation-bubble")].find((candidate) =>
+      normalize(candidate.querySelector(".msg-overlay-bubble-header__title")?.textContent) === expectedRecipient
+    );
+    const editor = bubble?.querySelector('.msg-form__contenteditable[contenteditable="true"][role="textbox"]');
+    if (!bubble || !(editor instanceof HTMLElement)) return null;
+    return {
+      recipientName: normalize(bubble.querySelector(".msg-overlay-bubble-header__title")?.textContent),
+      text: normalizeEditorText(editor.innerText),
+      matchingMessageCount: 0
+    };
+
+    function normalizeEditorText(value) {
+      return String(value ?? "").replace(/\r\n/g, "\n").replace(/\n$/, "");
+    }
+  }, [recipientName]);
+}
+
+async function focusComposer(session, recipientName) {
+  return await evaluate(session, (expectedRecipient) => {
+    const root = document.querySelector("#interop-outlet")?.shadowRoot;
+    const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
+    const bubble = root && [...root.querySelectorAll(".msg-overlay-conversation-bubble")].find((candidate) =>
+      normalize(candidate.querySelector(".msg-overlay-bubble-header__title")?.textContent) === expectedRecipient
+    );
+    const editor = bubble?.querySelector('.msg-form__contenteditable[contenteditable="true"][role="textbox"]');
+    if (!(editor instanceof HTMLElement)) return false;
+    editor.focus();
+    return document.activeElement === editor || root.activeElement === editor;
+  }, [recipientName], { userGesture: true });
+}
+
+async function readComposerText(session, recipientName, expectedText) {
+  return await evaluate(session, (expectedRecipient, expected) => {
+    const root = document.querySelector("#interop-outlet")?.shadowRoot;
+    const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
+    const normalizeText = (value) => String(value ?? "").replace(/\r\n/g, "\n").replace(/\n$/, "");
+    const bubble = root && [...root.querySelectorAll(".msg-overlay-conversation-bubble")].find((candidate) =>
+      normalize(candidate.querySelector(".msg-overlay-bubble-header__title")?.textContent) === expectedRecipient
+    );
+    const editor = bubble?.querySelector('.msg-form__contenteditable[contenteditable="true"][role="textbox"]');
+    if (!(editor instanceof HTMLElement)) return null;
+    const text = normalizeText(editor.innerText);
+    const matchingMessageCount = [...bubble.querySelectorAll(".msg-s-event-listitem__body")]
+      .filter((element) => normalizeText(element.innerText) === normalizeText(expected))
+      .length;
+    return { text, matches: text === normalizeText(expected), matchingMessageCount };
+  }, [recipientName, expectedText]);
+}
+
+async function readSendPoint(session, recipientName) {
+  return await evaluate(session, (expectedRecipient) => {
+    const root = document.querySelector("#interop-outlet")?.shadowRoot;
+    const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
+    const bubble = root && [...root.querySelectorAll(".msg-overlay-conversation-bubble")].find((candidate) =>
+      normalize(candidate.querySelector(".msg-overlay-bubble-header__title")?.textContent) === expectedRecipient
+    );
+    const button = bubble?.querySelector('button.msg-form__send-button[type="submit"]:not([disabled])');
+    if (!(button instanceof HTMLElement)) return null;
+    const rect = button.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return null;
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  }, [recipientName]);
+}
+
+async function readSentConfirmation(session, recipientName, expectedText, beforeCount) {
+  return await evaluate(session, (expectedRecipient, expected, priorCount) => {
+    const root = document.querySelector("#interop-outlet")?.shadowRoot;
+    const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
+    const normalizeText = (value) => String(value ?? "").replace(/\r\n/g, "\n").replace(/\n$/, "");
+    const bubble = root && [...root.querySelectorAll(".msg-overlay-conversation-bubble")].find((candidate) =>
+      normalize(candidate.querySelector(".msg-overlay-bubble-header__title")?.textContent) === expectedRecipient
+    );
+    if (!bubble) return null;
+    const matching = [...bubble.querySelectorAll(".msg-s-event-listitem__body")]
+      .filter((element) => normalizeText(element.innerText) === normalizeText(expected));
+    if (matching.length <= priorCount) return { confirmed: false };
+    const event = matching.at(-1)?.closest(".msg-s-event-with-indicator");
+    const indicator = event?.querySelector(".msg-s-event-with-indicator__sending-indicator--sent");
+    return {
+      confirmed: Boolean(indicator),
+      indicator: indicator ? "sent_indicator" : null,
+      sentAt: indicator?.getAttribute("title") ?? new Date().toISOString()
+    };
+  }, [recipientName, expectedText, beforeCount]);
+}
+
+async function waitForComposer(session, recipientName, timeoutMs) {
+  return await waitForValue(() => readComposer(session, recipientName), Boolean, timeoutMs);
+}
+
+async function waitForComposerText(session, recipientName, expectedText, timeoutMs) {
+  return await waitForValue(
+    () => readComposerText(session, recipientName, expectedText),
+    (value) => value?.matches === true,
+    timeoutMs
+  );
+}
+
+async function waitForSendPoint(session, recipientName, timeoutMs) {
+  return await waitForValue(() => readSendPoint(session, recipientName), Boolean, timeoutMs);
+}
+
+async function waitForSentMessage(session, recipientName, expectedText, beforeCount, timeoutMs) {
+  return await waitForValue(
+    () => readSentConfirmation(session, recipientName, expectedText, beforeCount),
+    (value) => value?.confirmed === true,
+    timeoutMs
+  );
+}
+
+async function waitForValue(read, accept, timeoutMs) {
+  const startedAt = Date.now();
+  let value = null;
+  while (Date.now() - startedAt < timeoutMs) {
+    value = await read();
+    if (accept(value)) return value;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  return value;
 }
 
 async function readMessageEligibility(session) {
