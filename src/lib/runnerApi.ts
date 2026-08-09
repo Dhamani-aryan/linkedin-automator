@@ -32,6 +32,11 @@ export type CampaignRunSnapshot = {
   leads: LeadProfile[];
   safety: HumanTouchSettings & { timeZone?: string };
   mode: "dry_run" | "live";
+  liveConfirmation?: {
+    confirmed: true;
+    leadId: string;
+    firstMessageText: string;
+  };
 };
 
 export async function startCampaignRun(snapshot: CampaignRunSnapshot): Promise<CampaignRun> {
