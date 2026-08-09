@@ -17,6 +17,7 @@ import {
   runStates,
   summarizeRun,
   transition,
+  validateLiveRun,
   validateRun
 } from "./runModel.js";
 import { appendAudit, loadRun, readAudit, recoverInterruptedRuns, saveRun } from "./runStore.js";
@@ -40,11 +41,10 @@ export async function startCampaignRun(snapshot) {
     throw new AppError("ACTIVE_RUN_EXISTS", "A campaign run is already active.", { activeRunId });
   }
 
-  if (mode !== "dry_run") {
-    throw new AppError("LIVE_RUN_NOT_VERIFIED", "Live sending is not enabled until the controlled verification gate is implemented.");
-  }
-
-  const validationFailures = validateRun(snapshot);
+  const validationFailures = [
+    ...validateRun(snapshot),
+    ...validateLiveRun({ ...snapshot, mode })
+  ];
   if (validationFailures.length > 0) {
     return { ok: false, validationFailures };
   }
