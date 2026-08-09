@@ -6,6 +6,7 @@ import {
   remainingDelayMs,
   runStates,
   transition,
+  updatePendingActionDelays,
   validateLiveRun,
   validateRun
 } from "./runModel.js";
@@ -386,5 +387,46 @@ describe("followUpSchedule", () => {
       "2026-08-09T11:00:00.000Z",
       new Date("2026-08-09T13:00:00.000Z")
     )).toBe(0);
+  });
+});
+
+describe("updatePendingActionDelays", () => {
+  it("updates an unattempted follow-up without changing completed actions", () => {
+    const run = {
+      snapshot: {
+        actions: [
+          { id: "first", type: "message", delay: { amount: 0, unit: "minutes" } },
+          { id: "follow-up", type: "message", delay: { amount: 1, unit: "hours" } }
+        ]
+      },
+      leads: [{ attempts: [{ actionId: "first", outcome: "sent" }] }]
+    };
+    const result = updatePendingActionDelays(run, [
+      { id: "first", type: "message", delay: { amount: 5, unit: "minutes" } },
+      { id: "follow-up", type: "message", delay: { amount: 15, unit: "minutes" } }
+    ]);
+
+    expect(result.run.snapshot.actions).toEqual([
+      { id: "first", type: "message", delay: { amount: 0, unit: "minutes" } },
+      { id: "follow-up", type: "message", delay: { amount: 15, unit: "minutes" } }
+    ]);
+    expect(result.updates).toEqual([{
+      actionId: "follow-up",
+      previousDelay: { amount: 1, unit: "hours" },
+      nextDelay: { amount: 15, unit: "minutes" }
+    }]);
+  });
+
+  it("does not change a follow-up that any lead has already attempted", () => {
+    const run = {
+      snapshot: {
+        actions: [{ id: "follow-up", type: "message", delay: { amount: 1, unit: "hours" } }]
+      },
+      leads: [{ attempts: [{ actionId: "follow-up", outcome: "sent" }] }]
+    };
+
+    expect(updatePendingActionDelays(run, [
+      { id: "follow-up", type: "message", delay: { amount: 15, unit: "minutes" } }
+    ]).updates).toEqual([]);
   });
 });

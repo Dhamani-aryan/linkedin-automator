@@ -428,6 +428,30 @@ export function remainingDelayMs(nextEligibleAt, now = new Date()) {
   return Math.max(0, dueMs - now.getTime());
 }
 
+export function updatePendingActionDelays(run, proposedActions) {
+  const nextRun = clone(run);
+  const updates = [];
+  if (!Array.isArray(proposedActions)) return { run: nextRun, updates };
+
+  for (const action of nextRun.snapshot.actions) {
+    if (action.type !== "message") continue;
+    const proposed = proposedActions.find((candidate) => candidate?.id === action.id);
+    if (!proposed || proposed.type !== action.type || sameDelay(action.delay, proposed.delay)) continue;
+    if (!isValidDelay(proposed.delay)) {
+      throw new Error(`Invalid pending delay for action ${action.id}.`);
+    }
+    const alreadyAttempted = nextRun.leads.some((lead) =>
+      lead.attempts.some((attempt) => attempt.actionId === action.id)
+    );
+    if (alreadyAttempted) continue;
+
+    updates.push({ actionId: action.id, previousDelay: action.delay, nextDelay: proposed.delay });
+    action.delay = clone(proposed.delay);
+  }
+
+  return { run: nextRun, updates };
+}
+
 function firstExecutableCursor(actions) {
   return nextExecutableCursor(actions, 0);
 }
@@ -439,6 +463,16 @@ function nextExecutableCursor(actions, startIndex) {
     }
   }
   return actions.length;
+}
+
+function sameDelay(left, right) {
+  return left?.amount === right?.amount && left?.unit === right?.unit;
+}
+
+function isValidDelay(delay) {
+  return Number.isFinite(delay?.amount) &&
+    delay.amount >= 0 &&
+    ["minutes", "hours", "days"].includes(delay.unit);
 }
 
 function validateSafety(safety) {
