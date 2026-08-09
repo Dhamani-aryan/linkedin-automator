@@ -263,6 +263,7 @@ async function executeLeadAction(run, leadIndex, action) {
 
   const tab = await openTab(lead.lead.linkedinUrl);
   const session = await attach(tab.id);
+  let keepProfileTabOpen = false;
   try {
     const result = await executeAction({
       session,
@@ -272,6 +273,13 @@ async function executeLeadAction(run, leadIndex, action) {
       shouldStop: async () => (await loadRun(run.id)).stopRequested,
       shouldPause: async () => (await loadRun(run.id)).pauseRequested
     });
+    keepProfileTabOpen = Boolean(result.errorCode && !result.stopped);
+    if (keepProfileTabOpen) {
+      result.detail = {
+        ...result.detail,
+        profileTabKeptOpen: true
+      };
+    }
     await appendAudit(run.id, {
       leadId: lead.id,
       actionId: action.id,
@@ -332,7 +340,7 @@ async function executeLeadAction(run, leadIndex, action) {
     await saveRun(run);
   } finally {
     session.close();
-    if (tab?.id) await closeTab(tab.id).catch(() => false);
+    if (tab?.id && !keepProfileTabOpen) await closeTab(tab.id).catch(() => false);
   }
 }
 
