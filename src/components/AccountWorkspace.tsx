@@ -26,7 +26,7 @@ import {
   X
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { collectVisibleProfiles } from "../lib/chromeApi";
+import { collectVisibleProfiles, resolveProfileIdentities } from "../lib/chromeApi";
 import type { WorkspaceRouteTab } from "../lib/appRoute";
 import { SafetyLimitsPage } from "./SafetyLimitsPage";
 import {
@@ -307,7 +307,7 @@ export function AccountWorkspace({
     return result.profiles;
   }
 
-  function requestCampaignStart() {
+  async function requestCampaignStart() {
     setCampaignNotice(null);
     if (workspace.leads.length === 0) {
       setActiveModal("source");
@@ -320,8 +320,51 @@ export function AccountWorkspace({
       });
       return;
     }
-    setLiveSendConfirmed(false);
-    setIsStartConfirmationOpen(true);
+
+    setIsCampaignBusy(true);
+    try {
+      const chromeReady = chromeStatus?.connected || (await onStartChrome());
+      if (!chromeReady) {
+        throw new Error("Managed Chrome must be connected before profile names can be read.");
+      }
+
+      const identityResult = await resolveProfileIdentities(
+        workspace.leads.map((lead) => ({ id: lead.id, url: lead.linkedinUrl }))
+      );
+      const unresolved = identityResult.profiles.filter((profile) =>
+        !profile.resolved || !profile.displayName || !profile.firstName
+      );
+      if (unresolved.length > 0) {
+        throw new Error(
+          `${unresolved.length} profile name${unresolved.length === 1 ? "" : "s"} could not be read from LinkedIn. No campaign was started.`
+        );
+      }
+
+      const identities = new Map(identityResult.profiles.map((profile) => [profile.id, profile]));
+      setWorkspace((current) => ({
+        ...current,
+        leads: current.leads.map((lead) => {
+          const identity = identities.get(lead.id);
+          return identity?.displayName && identity.firstName !== undefined && identity.lastName !== undefined
+            ? {
+                ...lead,
+                displayName: identity.displayName,
+                firstName: identity.firstName,
+                lastName: identity.lastName
+              }
+            : lead;
+        })
+      }));
+      setLiveSendConfirmed(false);
+      setIsStartConfirmationOpen(true);
+    } catch (error) {
+      setCampaignNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Profile names could not be resolved."
+      });
+    } finally {
+      setIsCampaignBusy(false);
+    }
   }
 
   async function confirmCampaignStart() {
@@ -540,12 +583,14 @@ export function AccountWorkspace({
         ) : (
           <button
             className="full-width primary-button"
-            onClick={requestCampaignStart}
+            onClick={() => void requestCampaignStart()}
             disabled={isCampaignBusy || isStartPending}
           >
-            {isStartPending ? <LoaderCircle className="spin" size={17} /> : <Play size={17} />}
+            {isCampaignBusy || isStartPending ? <LoaderCircle className="spin" size={17} /> : <Play size={17} />}
             {isStartPending
               ? "Starting campaign"
+              : isCampaignBusy
+                ? "Reading profiles"
               : workspace.leads.length === 0
                 ? "Add leads to start"
                 : "Start campaign"}
