@@ -32,6 +32,13 @@ export function SafetyLimitsPage({ settings, onChange }: SafetyLimitsPageProps) 
       ...currentModes,
       [day]: mode
     }));
+    if (mode === "24-hours") {
+      onChange({
+        ...settings,
+        workingHoursStart: "00:00",
+        workingHoursEnd: "00:00"
+      });
+    }
   }
 
   return (
@@ -112,6 +119,27 @@ export function SafetyLimitsPage({ settings, onChange }: SafetyLimitsPageProps) 
         <section className="working-hours-panel">
           <h2>Working hours</h2>
           <div className="timezone-select">UTC +5:30</div>
+          <div className="daily-limit-row">
+            <label>
+              <input
+                type="checkbox"
+                checked={settings.workingHoursStart === settings.workingHoursEnd}
+                onChange={(event) => {
+                  onChange({
+                    ...settings,
+                    workingHoursStart: event.target.checked ? "00:00" : "09:30",
+                    workingHoursEnd: event.target.checked ? "00:00" : "18:30"
+                  });
+                }}
+              />
+              <span>Run 24 hours</span>
+            </label>
+            <strong>
+              {settings.workingHoursStart === settings.workingHoursEnd
+                ? "Always allowed"
+                : `${settings.workingHoursStart}-${settings.workingHoursEnd}`}
+            </strong>
+          </div>
           <div className="working-day-list">
             {workingDays.map((day) => (
               <div className="working-day-row" key={day}>
