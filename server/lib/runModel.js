@@ -320,7 +320,17 @@ export function transition(leadRun, event, actions = []) {
 
     case "STOPPED":
       if (terminalLeadStates.has(lead.state)) return touch(lead, now);
+      if (lead.state === leadStates.RUNNING) {
+        completeLatestAttempt(
+          lead,
+          event.outcome ?? "stopped",
+          event.errorCode ?? "RUN_STOPPED",
+          event.detail ?? null,
+          now
+        );
+      }
       lead.state = leadStates.STOPPED;
+      lead.lastErrorCode = event.errorCode ?? "RUN_STOPPED";
       lead.nextEligibleAt = null;
       return touch(lead, now);
 

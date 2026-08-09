@@ -215,4 +215,37 @@ describe("transition", () => {
 
     expect(() => transition(run.leads[0], { type: "ACTION_SUCCEEDED" }, actions)).toThrow(/Illegal transition/);
   });
+
+  it("records a stopped in-flight attempt", () => {
+    const run = createCampaignRun({
+      runId: "run-stop",
+      snapshot: {
+        profileId: "profile-1",
+        campaign: { id: "campaign-1" },
+        actions: [actions[2]],
+        leads: [lead],
+        safety
+      },
+      mode: "live"
+    });
+    const runningLead = transition(run.leads[0], {
+      type: "ACTION_STARTED",
+      actionId: actions[2].id,
+      now: "2026-08-09T10:00:01.000Z"
+    }, [actions[2]]);
+    const stoppedLead = transition(runningLead, {
+      type: "STOPPED",
+      errorCode: "RUN_STOPPED",
+      detail: { stage: "before_send" },
+      now: "2026-08-09T10:00:02.000Z"
+    }, [actions[2]]);
+
+    expect(stoppedLead.state).toBe(leadStates.STOPPED);
+    expect(stoppedLead.attempts[0]).toMatchObject({
+      completedAt: "2026-08-09T10:00:02.000Z",
+      outcome: "stopped",
+      errorCode: "RUN_STOPPED",
+      detail: { stage: "before_send" }
+    });
+  });
 });
