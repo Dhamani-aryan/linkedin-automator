@@ -4,13 +4,48 @@ Last updated: 2026-08-09
 Repository: `https://github.com/repository-owner/linkedin-automator.git`  
 Local workspace: `C:\Projects\linkedin-automator`  
 Branch: `main`  
-Verified HEAD before this document: `1155b85 Adopt modern carbon background palette`
+Verified HEAD before this update: `e01a107 Document controller and campaign lifecycle`
 
 ## Purpose Of This Document
 
 This is the handoff context for continuing the LinkedIn Automator project in a
 new chat or coding session. Read this document before changing code. It
 separates working implementation from UI-only concepts and future plans.
+
+## Current Checkpoint
+
+The project is at the boundary between a functional campaign builder and a
+real automation runner.
+
+**A configured campaign cannot send LinkedIn actions yet.** The current
+`Start campaign` control performs preflight, starts managed Chrome when needed,
+and persists `Running` or `Stopped`. It does not process the lead queue, send a
+connection request, send a message, check acceptance, or check replies.
+
+The latest verified behavior is:
+
+- One `npm run dev` command starts the Vite UI and supervised local controller.
+- `Start Chrome` opens the real persistent Chrome profile and displays progress
+  or a visible error.
+- The persistent profile was verified logged into LinkedIn and reachable over
+  the local DevTools port.
+- Starting an empty campaign opens lead intake.
+- Starting a populated campaign shows a confirmation and persists its lifecycle
+  state.
+- The confirmation and running-state notice explicitly say browser execution is
+  not enabled, so the UI does not falsely claim outreach was sent.
+- `Send now` is available for the first message action; it means no workflow
+  delay, while global safety pacing still applies once the runner exists.
+
+Recent checkpoint commits:
+
+- `849df22` - start the local Chrome controller with the dev server
+- `0910017` - surface managed Chrome startup state and errors
+- `fd52104` - add campaign preflight and start/stop lifecycle
+- `e01a107` - update architecture and working-feature documentation
+
+Do not describe campaign execution as working until an executor has processed a
+controlled test lead and returned a verifiable action result.
 
 ## Product Goal
 
@@ -320,27 +355,116 @@ added later for browser commands if it proves more reliable than direct CDP.
 
 Keep each milestone in small commits.
 
-1. Define shared cloud/agent protocol types: device, browser session, job,
-   heartbeat, command result, and error.
-2. Refactor the current single browser controller behind a `BrowserSession`
-   interface without changing behavior.
-3. Implement one-profile campaign execution as an explicit state machine.
-4. Enforce working hours, rolling limits, randomized delays, cooldowns, and
-   stop/pause controls in the runner.
-5. Add durable local job state and an append-only action audit log.
-6. Add connection-request execution with manual test fixtures and guarded
-   failure handling.
-7. Add message execution, template resolution, configured delay, and reply
-   guard behavior.
-8. Add real hosted authentication, Postgres persistence, and company/profile
-   ownership.
-9. Add local-agent pairing and outbound WSS communication.
-10. Package and sign the Windows companion installer.
-11. Only after one-profile execution is stable, map each profile to an isolated
-    Chrome data directory and port.
+The immediate milestone is a **single-profile local campaign runner**. Build it
+before hosted infrastructure, installers, or multi-profile orchestration.
+
+### 1. Extract browser control boundaries
+
+- Move Chrome process and CDP operations out of the monolithic
+  `server/index.js` into a `BrowserSession` module.
+- Preserve the current profile directory and port behavior.
+- Add typed command results and stable error codes for disconnected Chrome,
+  logged-out LinkedIn, missing elements, timeouts, and interrupted runs.
+- Keep all LinkedIn page interaction behind the browser-session boundary so a
+  Chrome extension or different controller can replace direct CDP later.
+
+### 2. Define the runner state machine
+
+- Add structured `CampaignRun`, `LeadRun`, and `ActionAttempt` models.
+- Give every lead an action cursor, status, attempt count, `nextEligibleAt`, and
+  last error.
+- Use explicit states such as `queued`, `running`, `waiting_acceptance`,
+  `waiting_delay`, `replied`, `completed`, `failed`, and `stopped`.
+- Define transitions centrally instead of updating counters ad hoc in React.
+- Validate workflows before accepting a run: no orphan guards, supported action
+  types, valid templates, valid delays, and at least one queued lead.
+
+### 3. Add durable local execution storage
+
+- Store run state under `.local/` using atomic JSON writes for the first
+  version; do not keep active jobs only in memory or React state.
+- Add an append-only audit log containing timestamp, profile, campaign, lead,
+  action, attempt, outcome, and error code.
+- Recover an interrupted run as `stopped` or safely resumable after controller
+  restart. Never automatically resend an action with an unknown outcome.
+
+### 4. Expose runner APIs
+
+- `POST /api/campaign-runs` to validate and start a run.
+- `GET /api/campaign-runs/:id` for status and progress.
+- `POST /api/campaign-runs/:id/stop` for cooperative cancellation.
+- `POST /api/campaign-runs/:id/resume` only after durable recovery exists.
+- Return structured preflight failures to the workspace instead of generic
+  server errors.
+- Update the React workspace from server-reported run state. The UI must not be
+  the source of truth for execution.
+
+### 5. Enforce safety before browser actions
+
+- Persist Safety Limits settings and send a validated snapshot with each run.
+- Enforce working days/hours, rolling daily action caps, invite caps,
+  randomized delays, profile dwell time, batch size, and cooldown.
+- Apply a single-run mutex so two campaigns cannot control the same Chrome
+  profile concurrently.
+- Make Stop cooperative and check it before navigation, before clicking, and
+  during every delay.
+- Record why a run is sleeping and its next eligible time.
+
+### 6. Implement connection requests first
+
+- Begin with a dry-run mode that navigates to one controlled test profile,
+  reads the visible state, resolves the note template, and records the action it
+  would take without clicking Send.
+- Require an explicit test confirmation before enabling a live send.
+- Handle already connected, invitation pending, Connect unavailable, weekly
+  limit reached, auth challenge, and page-layout mismatch as separate outcomes.
+- Mark success only after the LinkedIn UI provides an authoritative success or
+  pending-invitation signal.
+- Stop or quarantine the lead when the result is uncertain; do not retry an
+  ambiguous send automatically.
+
+### 7. Implement acceptance waiting and messages
+
+- Make `Wait for connection acceptance` a real deferred state, not a blocking
+  loop that keeps Chrome busy.
+- Recheck eligible waiting leads on later runner passes.
+- Resolve message variables from stored lead data immediately before sending.
+- Apply `Send now` or the configured workflow delay in addition to global
+  safety pacing.
+- Handle unavailable Message controls, composer failures, character limits,
+  duplicate/uncertain sends, and navigation interruptions explicitly.
+
+### 8. Implement reply guards
+
+- Check for replies before every follow-up message, not only after sending.
+- Persist conversation identity and last observed inbound message timestamp.
+- Move replied leads to a terminal `replied` state and suppress all later
+  automated follow-ups.
+- Never infer “no reply” solely because one selector is missing.
+
+### 9. Add tests and controlled verification
+
+- Unit-test workflow validation, transitions, limits, delay calculation,
+  template resolution, recovery, and idempotency.
+- Test browser adapters against saved sanitized HTML fixtures before live use.
+- Use one explicitly approved test profile for the first live connection and
+  message checks.
+- Verify Stop, restart recovery, and ambiguous-outcome handling before running
+  more than one lead.
+
+### 10. Continue the broader product only after the runner is proven
+
+- Add real hosted authentication, Postgres persistence, and company ownership.
+- Add local-agent pairing, heartbeat, and outbound WSS communication.
+- Package and sign the Windows companion installer.
+- Add one isolated Chrome profile and port per LinkedIn profile.
+- Add analytics, inbox views, exports, and integrations from audited run data.
 
 Do not begin multi-profile process orchestration before the one-profile runner,
 limits, recovery, and audit logging are proven.
+
+Do not spend the next implementation cycle on additional visual redesign. The
+current blocking capability is execution correctness and recoverability.
 
 ## Key Files
 
