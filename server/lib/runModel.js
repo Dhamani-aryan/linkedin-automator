@@ -147,19 +147,19 @@ export function validateLiveRun(snapshot) {
     : [];
   const confirmation = snapshot.liveConfirmation;
 
-  if (leads.length !== 1) {
+  if (leads.length === 0) {
     failures.push({
       field: "leads",
-      code: "LIVE_REQUIRES_ONE_LEAD",
-      message: "Controlled live sending requires exactly one selected lead."
+      code: "LIVE_REQUIRES_LEADS",
+      message: "Live sending requires at least one lead."
     });
   }
 
-  if (actions.length !== 1 || actions[0]?.type !== "message") {
+  if (actions.length === 0 || actions.some((action) => action.type !== "message")) {
     failures.push({
       field: "actions",
-      code: "LIVE_REQUIRES_ONE_MESSAGE",
-      message: "Controlled live sending requires exactly one message action."
+      code: "LIVE_MESSAGES_ONLY",
+      message: "Live campaign execution currently supports message actions only."
     });
   }
 
@@ -183,7 +183,8 @@ export function validateLiveRun(snapshot) {
       message: "Confirm the exact lead and first message before starting a live run."
     });
   } else if (
-    confirmation.leadId !== firstLead?.id ||
+    !sameIds(confirmation.leadIds, leads.map((lead) => lead.id)) ||
+    !sameIds(confirmation.actionIds, actions.map((action) => action.id)) ||
     confirmation.firstMessageText !== firstMessage
   ) {
     failures.push({
@@ -194,6 +195,12 @@ export function validateLiveRun(snapshot) {
   }
 
   return failures;
+}
+
+function sameIds(actual, expected) {
+  return Array.isArray(actual) &&
+    actual.length === expected.length &&
+    actual.every((value, index) => value === expected[index]);
 }
 
 export function createCampaignRun({ runId, snapshot, mode, now = new Date() }) {

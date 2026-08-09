@@ -115,26 +115,27 @@ describe("validateLiveRun", () => {
       leads: [lead],
       liveConfirmation: {
         confirmed: true,
-        leadId: lead.id,
+        leadIds: [lead.id],
+        actionIds: [messageAction.id],
         firstMessageText: "Hi Example\n\nWelcome"
       }
     })).toEqual([]);
   });
 
-  it("rejects multiple leads and stale confirmation text", () => {
+  it("rejects a confirmation that does not cover every lead", () => {
     const failures = validateLiveRun({
       mode: "live",
       actions: [messageAction],
       leads: [lead, { ...lead, id: "lead-2" }],
       liveConfirmation: {
         confirmed: true,
-        leadId: lead.id,
-        firstMessageText: "Old preview"
+        leadIds: [lead.id],
+        actionIds: [messageAction.id],
+        firstMessageText: "Hi Example\n\nWelcome"
       }
     });
 
     expect(failures).toEqual(expect.arrayContaining([
-      expect.objectContaining({ code: "LIVE_REQUIRES_ONE_LEAD" }),
       expect.objectContaining({ code: "LIVE_CONFIRMATION_MISMATCH" })
     ]));
   });
@@ -145,22 +146,24 @@ describe("validateLiveRun", () => {
       actions: [actions[0]],
       leads: [lead]
     })).toEqual(expect.arrayContaining([
-      expect.objectContaining({ code: "LIVE_REQUIRES_ONE_MESSAGE" }),
+      expect.objectContaining({ code: "LIVE_MESSAGES_ONLY" }),
       expect.objectContaining({ code: "LIVE_CONFIRMATION_REQUIRED" })
     ]));
   });
 
-  it("rejects more than one live message", () => {
+  it("accepts multiple confirmed live messages", () => {
+    const secondMessage = { ...messageAction, id: "message-2" };
     expect(validateLiveRun({
       mode: "live",
-      actions: [messageAction, { ...messageAction, id: "message-2" }],
+      actions: [messageAction, secondMessage],
       leads: [lead],
       liveConfirmation: {
         confirmed: true,
-        leadId: lead.id,
+        leadIds: [lead.id],
+        actionIds: [messageAction.id, secondMessage.id],
         firstMessageText: "Hi Example\n\nWelcome"
       }
-    })).toContainEqual(expect.objectContaining({ code: "LIVE_REQUIRES_ONE_MESSAGE" }));
+    })).toEqual([]);
   });
 });
 
