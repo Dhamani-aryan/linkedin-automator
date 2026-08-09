@@ -21,14 +21,16 @@ Version one is a single-profile local Chrome app:
 - Use the same computer IP; no proxy or IP rotation is configured.
 - Build campaign/workflow screens, source selection, message variables, spintax, and safety limits.
 
-Run the local controller and web UI in separate terminals:
+Start the web UI and supervised local Chrome controller together:
 
 ```sh
-npm run server
 npm run dev
 ```
 
 Then open `http://127.0.0.1:5173`.
+
+Use `npm run server` only when running the Chrome controller separately for
+debugging.
 
 More implementation notes are in `docs/ARCHITECTURE.md`.
 

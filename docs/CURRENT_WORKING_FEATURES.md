@@ -21,6 +21,7 @@ Last verified: 2026-08-08
 
 ### Managed Chrome
 
+- Start the Vite UI and local Chrome controller together with `npm run dev`.
 - Start and stop a local Chrome window.
 - Reuse one persistent Chrome data directory so the LinkedIn login survives restarts.
 - Open LinkedIn in the managed Chrome window.
@@ -30,6 +31,8 @@ Last verified: 2026-08-08
 ### Campaign workspace
 
 - Persist one campaign workspace per logical LinkedIn profile.
+- Open lead intake when starting an empty campaign instead of presenting a dead disabled control.
+- Review campaign preflight details, start a persisted campaign lifecycle, and stop it without losing leads or workflow state.
 - Add, select, and remove connection-request and message actions.
 - Automatically attach a wait-for-acceptance guard after connection requests.
 - Automatically attach a reply-check guard after messages.
@@ -64,7 +67,7 @@ Last verified: 2026-08-08
 
 ## Not working yet
 
-- The Start Campaign control does not execute LinkedIn actions yet.
+- Campaign start/stop state works, but the browser executor does not send connection requests or messages yet.
 - Logical LinkedIn profiles are not isolated into separate Chrome data directories yet.
 - Safety settings are not yet enforced by a campaign runner.
 - Reply detection, inbox synchronization, analytics, and campaign history are not implemented.

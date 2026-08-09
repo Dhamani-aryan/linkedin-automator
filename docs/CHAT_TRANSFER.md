@@ -63,7 +63,7 @@ The current repository is a local proof of concept:
 
 ```text
 React + Vite UI at http://127.0.0.1:5173
-  -> Vite proxies /api
+  -> Vite starts and supervises the local controller, then proxies /api
   -> Node controller at http://127.0.0.1:4287
   -> controller launches local Google Chrome
   -> Chrome uses .local/chrome-profile
@@ -97,6 +97,7 @@ in browser `localStorage`.
 
 ### Managed Chrome proof
 
+- `npm run dev` starts both the UI and local controller.
 - Start and stop a Chrome process owned by the controller.
 - Reuse `.local/chrome-profile` for a persistent LinkedIn login.
 - Open LinkedIn or another validated URL in a new managed tab.
@@ -106,6 +107,9 @@ in browser `localStorage`.
 ### Campaign workspace
 
 - Store one campaign workspace per logical LinkedIn profile.
+- Starting an empty campaign opens lead intake.
+- Campaign preflight, confirmation, persisted `Running`, and `Stopped` lifecycle
+  states work without discarding leads or workflow state.
 - Add, select, and remove connection-request and message actions.
 - Keep each automatic acceptance/reply guard attached to its parent action.
 - Edit connection notes and direct-message templates.
@@ -136,7 +140,7 @@ in browser `localStorage`.
 
 ## What Does Not Work Yet
 
-- `Start campaign` does not execute any LinkedIn action.
+- Campaign lifecycle controls work, but no LinkedIn action is executed yet.
 - Connection requests and messages are workflow definitions only.
 - No scheduler, job queue, lead state machine, retry policy, or campaign runner
   exists.
@@ -367,17 +371,13 @@ cd "C:\Projects\linkedin-automator"
 npm install
 ```
 
-Terminal 1:
-
-```powershell
-npm run server
-```
-
-Terminal 2:
+Start the UI and its supervised local controller:
 
 ```powershell
 npm run dev
 ```
+
+Use `npm run server` only when debugging the controller independently.
 
 Open `http://127.0.0.1:5173`.
 

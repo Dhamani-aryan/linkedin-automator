@@ -89,17 +89,14 @@ The runner should stop follow-up automation for a lead once a reply is detected.
 
 ## Local Chrome Endpoint
 
-Start the local controller:
-
-```sh
-npm run server
-```
-
-Start the web UI:
+Start the web UI. In development, Vite also starts and supervises the local
+Chrome controller:
 
 ```sh
 npm run dev
 ```
+
+Use `npm run server` only to run the controller separately for debugging.
 
 Open:
 
