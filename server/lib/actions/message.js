@@ -10,10 +10,18 @@ export async function executeMessage({
   lead,
   action,
   mode,
+  reuseCurrentPage = false,
   shouldStop = async () => false,
   shouldPause = async () => false
 }) {
-  const page = await navigate(session, lead.linkedinUrl, { timeoutMs: 25_000 });
+  const page = reuseCurrentPage
+    ? await evaluate(session, () => ({
+        ok: true,
+        url: location.href,
+        title: document.title,
+        readyState: document.readyState
+      }), [])
+    : await navigate(session, lead.linkedinUrl, { timeoutMs: 25_000 });
   const classification = await readMessageEligibility(session);
 
   if (classification.pageKind !== "profile") {

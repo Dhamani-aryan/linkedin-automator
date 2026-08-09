@@ -82,6 +82,13 @@ export async function resumeCampaignRun(runId: string): Promise<CampaignRun> {
   return result.run;
 }
 
+export async function retryCampaignRun(runId: string): Promise<CampaignRun> {
+  const result = await request<{ ok: true; run: CampaignRun }>(`/api/campaign-runs/${encodeURIComponent(runId)}/retry`, {
+    method: "POST"
+  });
+  return result.run;
+}
+
 async function request<T>(
   path: string,
   init?: RequestInit,

@@ -38,6 +38,7 @@ import {
   getActiveCampaignRun,
   getCampaignRun,
   pauseCampaignRun,
+  retryCampaignRun,
   resumeCampaignRun,
   startCampaignRun,
   stopCampaignRun
@@ -502,6 +503,28 @@ export function AccountWorkspace({
     }
   }
 
+  async function retryCampaignLead() {
+    if (!activeRun) return;
+
+    setIsCampaignBusy(true);
+    try {
+      const run = await retryCampaignRun(activeRun.id);
+      setActiveRun(run);
+      syncCampaignStatus(run);
+      setCampaignNotice({
+        tone: "success",
+        message: "Retrying the same lead from its last safe checkpoint."
+      });
+    } catch (error) {
+      setCampaignNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : "The lead could not be retried safely."
+      });
+    } finally {
+      setIsCampaignBusy(false);
+    }
+  }
+
   function syncCampaignStatus(run: CampaignRun) {
     const status = run.state === "paused"
       ? "paused"
@@ -567,14 +590,21 @@ export function AccountWorkspace({
 
         {hasActiveServerRun && activeRun ? (
           <div className="campaign-run-controls">
-            <button
-              className="ghost-button"
-              onClick={activeRun.state === "paused" ? () => void resumeCampaign() : () => void pauseCampaign()}
-              disabled={isCampaignBusy || ["stopping", "needs_attention"].includes(activeRun.state)}
-            >
-              {activeRun.state === "paused" ? <Play size={17} /> : <Pause size={17} />}
-              {activeRun.state === "paused" ? "Resume" : "Pause"}
-            </button>
+            {activeRun.state === "needs_attention" ? (
+              <button className="ghost-button" onClick={() => void retryCampaignLead()} disabled={isCampaignBusy}>
+                <RefreshCw size={17} />
+                Retry lead
+              </button>
+            ) : (
+              <button
+                className="ghost-button"
+                onClick={activeRun.state === "paused" ? () => void resumeCampaign() : () => void pauseCampaign()}
+                disabled={isCampaignBusy || activeRun.state === "stopping"}
+              >
+                {activeRun.state === "paused" ? <Play size={17} /> : <Pause size={17} />}
+                {activeRun.state === "paused" ? "Resume" : "Pause"}
+              </button>
+            )}
             <button className="danger-button" onClick={() => void stopCampaign()} disabled={isCampaignBusy}>
               <Square size={17} />
               Stop

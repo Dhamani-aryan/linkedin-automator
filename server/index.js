@@ -14,6 +14,7 @@ import {
   getCampaignRun,
   initializeRunner,
   pauseCampaignRun,
+  retryCampaignRun,
   resumeCampaignRun,
   startCampaignRun,
   stopCampaignRun
@@ -117,6 +118,12 @@ const server = createServer(async (request, response) => {
     const resumeMatch = requestUrl.pathname.match(/^\/api\/campaign-runs\/([^/]+)\/resume$/);
     if (request.method === "POST" && resumeMatch) {
       sendJson(response, 200, await resumeCampaignRun(resumeMatch[1]));
+      return;
+    }
+
+    const retryMatch = requestUrl.pathname.match(/^\/api\/campaign-runs\/([^/]+)\/retry$/);
+    if (request.method === "POST" && retryMatch) {
+      sendJson(response, 200, await retryCampaignRun(retryMatch[1]));
       return;
     }
 

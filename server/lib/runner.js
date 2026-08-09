@@ -4,6 +4,7 @@ import {
   checkLinkedInAuth,
   closeTab,
   launch,
+  listTabs,
   openTab
 } from "./browserSession.js";
 import { executeConnectionRequest } from "./actions/connectionRequest.js";
@@ -62,30 +63,7 @@ export async function startCampaignRun(snapshot) {
 
   await saveRun(run);
   await appendAudit(run.id, { event: "run_started", outcome: "ok", detail: { mode } });
-  activeRunId = run.id;
-  void runLoop(run.id).catch(async (error) => {
-    const failedRun = await loadRun(run.id).catch(() => run);
-    if (failedRun.state === runStates.NEEDS_ATTENTION) {
-      await appendAudit(run.id, {
-        event: "run_paused",
-        outcome: "needs_attention",
-        errorCode: error instanceof AppError ? error.code : "RUNNER_NEEDS_ATTENTION",
-        detail: { message: error instanceof Error ? error.message : "Runner paused." }
-      });
-      await saveRun(failedRun);
-      return;
-    }
-    failedRun.state = runStates.FAILED;
-    failedRun.updatedAt = new Date().toISOString();
-    await appendAudit(run.id, {
-      event: "run_failed",
-      outcome: "failed",
-      errorCode: error instanceof AppError ? error.code : "RUNNER_ERROR",
-      detail: { message: error instanceof Error ? error.message : "Runner failed." }
-    });
-    await saveRun(failedRun);
-    if (activeRunId === run.id) activeRunId = null;
-  });
+  scheduleRunLoop(run);
 
   return { ok: true, runId: run.id, run: decorateRun(run) };
 }
@@ -147,6 +125,41 @@ export async function resumeCampaignRun(runId) {
   await appendAudit(run.id, { event: "run_resumed", outcome: "running" });
   await saveRun(run);
   controlWake?.();
+  return { ok: true, run: decorateRun(run) };
+}
+
+export async function retryCampaignRun(runId) {
+  if (activeRunId !== null && activeRunId !== runId) {
+    throw new AppError("ACTIVE_RUN_EXISTS", "Another campaign run is already active.", { activeRunId });
+  }
+
+  const run = await loadRun(runId);
+  if (run.state !== runStates.NEEDS_ATTENTION) {
+    throw new AppError("RUN_NOT_RETRYABLE", "Only a run that needs attention can retry its current lead.");
+  }
+
+  const leadIndex = run.leads.findIndex((lead) => lead.state === leadStates.NEEDS_REVIEW && isSafeToRetry(lead));
+  if (leadIndex < 0) {
+    throw new AppError(
+      "RUN_RETRY_UNSAFE",
+      "This action cannot be retried because Send may already have been clicked or the existing draft is unknown."
+    );
+  }
+
+  const now = new Date().toISOString();
+  const lead = transition(run.leads[leadIndex], { type: "RETRY", now }, run.snapshot.actions);
+  run.leads[leadIndex] = lead;
+  run.retryLeadId = lead.id;
+  run.state = runStates.RUNNING;
+  run.updatedAt = now;
+  await appendAudit(run.id, {
+    event: "retry_requested",
+    leadId: lead.id,
+    actionId: run.snapshot.actions[lead.actionCursor]?.id,
+    outcome: "running"
+  });
+  await saveRun(run);
+  scheduleRunLoop(run);
   return { ok: true, run: decorateRun(run) };
 }
 
@@ -263,7 +276,10 @@ async function executeLeadAction(run, leadIndex, action) {
   });
   await saveRun(run);
 
-  const tab = await openTab("about:blank");
+  const existingTab = run.retryLeadId === lead.id
+    ? await findOpenProfileTab(lead.lead.linkedinUrl)
+    : null;
+  const tab = existingTab ?? await openTab("about:blank");
   const session = await attach(tab.id);
   let keepProfileTabOpen = false;
   try {
@@ -272,6 +288,7 @@ async function executeLeadAction(run, leadIndex, action) {
       lead: lead.lead,
       action,
       mode: run.mode,
+      reuseCurrentPage: existingTab !== null,
       shouldStop: async () => (await loadRun(run.id)).stopRequested,
       shouldPause: async () => (await loadRun(run.id)).pauseRequested
     });
@@ -338,11 +355,61 @@ async function executeLeadAction(run, leadIndex, action) {
     }
 
     run.leads[leadIndex] = lead;
+    delete run.retryLeadId;
     run.updatedAt = new Date().toISOString();
     await saveRun(run);
   } finally {
     session.close();
     if (tab?.id && !keepProfileTabOpen) await closeTab(tab.id).catch(() => false);
+  }
+}
+
+function scheduleRunLoop(run) {
+  activeRunId = run.id;
+  void runLoop(run.id).catch(async (error) => {
+    const failedRun = await loadRun(run.id).catch(() => run);
+    if (failedRun.state === runStates.NEEDS_ATTENTION) {
+      await appendAudit(run.id, {
+        event: "run_paused",
+        outcome: "needs_attention",
+        errorCode: error instanceof AppError ? error.code : "RUNNER_NEEDS_ATTENTION",
+        detail: { message: error instanceof Error ? error.message : "Runner paused." }
+      });
+      await saveRun(failedRun);
+      return;
+    }
+    failedRun.state = runStates.FAILED;
+    failedRun.updatedAt = new Date().toISOString();
+    await appendAudit(run.id, {
+      event: "run_failed",
+      outcome: "failed",
+      errorCode: error instanceof AppError ? error.code : "RUNNER_ERROR",
+      detail: { message: error instanceof Error ? error.message : "Runner failed." }
+    });
+    await saveRun(failedRun);
+    if (activeRunId === run.id) activeRunId = null;
+  });
+}
+
+function isSafeToRetry(lead) {
+  const attempt = lead.attempts.at(-1);
+  if (attempt?.errorCode === ErrorCodes.ELEMENT_NOT_FOUND) return true;
+  return attempt?.errorCode === ErrorCodes.AMBIGUOUS_OUTCOME &&
+    attempt.detail?.reason === "The composer text did not exactly match the resolved template. Send was not clicked.";
+}
+
+async function findOpenProfileTab(linkedinUrl) {
+  const expectedUrl = normalizeProfileUrl(linkedinUrl);
+  const tabs = await listTabs();
+  return tabs.find((tab) => tab.type === "page" && normalizeProfileUrl(tab.url) === expectedUrl) ?? null;
+}
+
+function normalizeProfileUrl(value) {
+  try {
+    const url = new URL(value);
+    return `${url.origin}${url.pathname}`.replace(/\/$/, "");
+  } catch {
+    return value;
   }
 }
 
