@@ -34,7 +34,8 @@ export type CampaignRunSnapshot = {
   mode: "dry_run" | "live";
   liveConfirmation?: {
     confirmed: true;
-    leadId: string;
+    leadIds: string[];
+    actionIds: string[];
     firstMessageText: string;
   };
 };

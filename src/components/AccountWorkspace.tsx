@@ -93,10 +93,6 @@ export function AccountWorkspace({
   const [selectedActionId, setSelectedActionId] = useState(() => workspace.actions[0]?.id ?? "");
   const [isStartConfirmationOpen, setIsStartConfirmationOpen] = useState(false);
   const [startMode, setStartMode] = useState<"dry_run" | "live">("dry_run");
-  const [liveLeadId, setLiveLeadId] = useState(() => workspace.leads[0]?.id ?? "");
-  const [liveMessageActionId, setLiveMessageActionId] = useState(() =>
-    workspace.actions.find((action) => action.type === "message" && !action.automatic)?.id ?? ""
-  );
   const [liveSendConfirmed, setLiveSendConfirmed] = useState(false);
   const [isCampaignBusy, setIsCampaignBusy] = useState(false);
   const [activeRun, setActiveRun] = useState<CampaignRun | null>(null);
@@ -112,19 +108,22 @@ export function AccountWorkspace({
     activeRun !== null && ["running", "sleeping", "stopping", "needs_attention"].includes(activeRun.state);
   const campaignButtonIsStop = hasActiveServerRun || isStartPending;
   const safetyWindowNotice = getSafetyWindowNotice(safetySettings);
-  const liveLead = workspace.leads.find((lead) => lead.id === liveLeadId) ?? workspace.leads[0] ?? null;
+  const liveLeads = workspace.leads.filter((lead) => lead.status !== "excluded");
   const liveMessageActions = workspace.actions.filter(
     (action) => action.type === "message" && !action.automatic
   );
-  const liveMessageAction = liveMessageActions.find((action) => action.id === liveMessageActionId)
-    ?? liveMessageActions[0]
-    ?? null;
-  const resolvedLiveMessage = liveLead && liveMessageAction?.template !== undefined
-    ? renderTemplate(liveMessageAction.template, liveLead)
+  const firstLiveLead = liveLeads[0] ?? null;
+  const firstLiveMessage = liveMessageActions[0] ?? null;
+  const hasUnsupportedLiveAction = workspace.actions.some(
+    (action) => !action.automatic && action.type !== "message"
+  );
+  const resolvedLiveMessage = firstLiveLead && firstLiveMessage?.template !== undefined
+    ? renderTemplate(firstLiveMessage.template, firstLiveLead)
     : "";
   const liveStartReady = Boolean(
-    liveLead &&
-    liveMessageAction &&
+    liveLeads.length > 0 &&
+    liveMessageActions.length > 0 &&
+    !hasUnsupportedLiveAction &&
     resolvedLiveMessage.length > 0 &&
     liveSendConfirmed
   );
@@ -135,10 +134,6 @@ export function AccountWorkspace({
     setSelectedActionId(nextWorkspace.actions[0]?.id ?? "");
     setActiveRun(null);
     setStartMode("dry_run");
-    setLiveLeadId(nextWorkspace.leads[0]?.id ?? "");
-    setLiveMessageActionId(nextWorkspace.actions.find(
-      (action) => action.type === "message" && !action.automatic
-    )?.id ?? "");
     setLiveSendConfirmed(false);
   }, [account.id]);
 
@@ -316,12 +311,6 @@ export function AccountWorkspace({
       });
       return;
     }
-    setLiveLeadId((current) => workspace.leads.some((lead) => lead.id === current)
-      ? current
-      : workspace.leads[0]?.id ?? "");
-    setLiveMessageActionId((current) => workspace.actions.some(
-      (action) => action.id === current && action.type === "message" && !action.automatic
-    ) ? current : liveMessageActions[0]?.id ?? "");
     setLiveSendConfirmed(false);
     setIsStartConfirmationOpen(true);
   }
@@ -345,24 +334,23 @@ export function AccountWorkspace({
     }
 
     try {
-      const runLeads = startMode === "live" && liveLead ? [liveLead] : workspace.leads;
+      const runLeads = workspace.leads;
       const run = await startCampaignRun({
         profileId: account.id,
-        campaign: startMode === "live"
-          ? { ...workspace.campaign, profilesTotal: 1, profilesToProcess: 1 }
-          : workspace.campaign,
-        actions: startMode === "live" && liveMessageAction ? [liveMessageAction] : workspace.actions,
+        campaign: workspace.campaign,
+        actions: workspace.actions,
         leads: runLeads,
         safety: {
           ...safetySettings,
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
         },
         mode: startMode,
-        ...(startMode === "live" && liveLead
+        ...(startMode === "live"
           ? {
               liveConfirmation: {
                 confirmed: true as const,
-                leadId: liveLead.id,
+                leadIds: liveLeads.map((lead) => lead.id),
+                actionIds: liveMessageActions.map((action) => action.id),
                 firstMessageText: resolvedLiveMessage
               }
             }
@@ -374,7 +362,7 @@ export function AccountWorkspace({
       setCampaignNotice({
         tone: "success",
         message: startMode === "live"
-          ? `Live message run started for ${liveLead?.displayName ?? "the selected lead"}.`
+          ? `Live campaign started for ${liveLeads.length} lead${liveLeads.length === 1 ? "" : "s"}. Profiles will run one at a time.`
           : "Dry-run campaign started. The runner will navigate and audit what it would send without clicking Send."
       });
     } catch (error) {
@@ -813,39 +801,18 @@ export function AccountWorkspace({
               </div>
               {startMode === "live" ? (
                 <div className="live-run-fields">
-                  <label>
-                    <span>Send to one lead</span>
-                    <select
-                      value={liveLead?.id ?? ""}
-                      onChange={(event) => {
-                        setLiveLeadId(event.target.value);
-                        setLiveSendConfirmed(false);
-                      }}
-                    >
-                      {workspace.leads.map((lead) => (
-                        <option key={lead.id} value={lead.id}>{lead.displayName}</option>
-                      ))}
-                    </select>
-                  </label>
-                  {liveMessageActions.length > 1 ? (
-                    <label>
-                      <span>Message action</span>
-                      <select
-                        value={liveMessageAction?.id ?? ""}
-                        onChange={(event) => {
-                          setLiveMessageActionId(event.target.value);
-                          setLiveSendConfirmed(false);
-                        }}
-                      >
-                        {liveMessageActions.map((action, index) => (
-                          <option key={action.id} value={action.id}>Message {index + 1}: {action.name}</option>
-                        ))}
-                      </select>
-                    </label>
-                  ) : null}
-                  {liveMessageAction ? (
+                  <div className="live-run-scope">
+                    <span>{liveLeads.length} lead{liveLeads.length === 1 ? "" : "s"}</span>
+                    <span>{liveMessageActions.length} message action{liveMessageActions.length === 1 ? "" : "s"}</span>
+                    <span>One profile at a time</span>
+                  </div>
+                  {hasUnsupportedLiveAction ? (
+                    <p className="live-run-warning">
+                      <AlertTriangle size={16} /> Complete live runs currently support message-only workflows.
+                    </p>
+                  ) : firstLiveMessage ? (
                     <div className="live-message-preview">
-                      <span>Exact message to {liveLead?.displayName}</span>
+                      <span>First resolved message to {firstLiveLead?.displayName}</span>
                       <pre>{resolvedLiveMessage}</pre>
                     </div>
                   ) : (
@@ -858,9 +825,9 @@ export function AccountWorkspace({
                       type="checkbox"
                       checked={liveSendConfirmed}
                       onChange={(event) => setLiveSendConfirmed(event.target.checked)}
-                      disabled={!liveMessageAction || resolvedLiveMessage.length === 0}
+                      disabled={hasUnsupportedLiveAction || !firstLiveMessage || resolvedLiveMessage.length === 0}
                     />
-                    <span>I confirm this exact message will be sent to {liveLead?.displayName ?? "the selected lead"}.</span>
+                    <span>I authorize all {liveMessageActions.length} message action{liveMessageActions.length === 1 ? "" : "s"} for all {liveLeads.length} lead{liveLeads.length === 1 ? "" : "s"} in this frozen campaign run.</span>
                   </label>
                 </div>
               ) : null}
@@ -883,7 +850,7 @@ export function AccountWorkspace({
                 disabled={isCampaignBusy || (startMode === "live" && !liveStartReady)}
               >
                 {isCampaignBusy ? <LoaderCircle className="spin" size={18} /> : <Play size={18} />}
-                {isCampaignBusy ? "Starting" : startMode === "live" ? "Send live message" : "Start dry run"}
+                {isCampaignBusy ? "Starting" : startMode === "live" ? "Start live campaign" : "Start dry run"}
               </button>
             </footer>
           </section>

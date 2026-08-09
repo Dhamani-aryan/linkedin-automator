@@ -2310,6 +2310,23 @@ p {
   width: 100%;
 }
 
+.live-run-scope {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.live-run-scope span {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  color: var(--app-text-secondary);
+  background: var(--app-surface-subtle);
+  padding: 9px;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+}
+
 .live-message-preview {
   display: grid;
   gap: 7px;
@@ -2352,6 +2369,12 @@ p {
   gap: 8px;
   color: var(--app-warning) !important;
   font-size: 11px !important;
+}
+
+@media (max-width: 560px) {
+  .live-run-scope {
+    grid-template-columns: 1fr;
+  }
 }
 
 .campaign-preflight-list {
