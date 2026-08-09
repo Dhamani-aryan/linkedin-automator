@@ -312,7 +312,7 @@ export async function resolveProfileIdentities(profiles) {
   const resolved = [];
 
   for (const profile of profiles) {
-    const tab = await openTab(profile.url);
+    const tab = await openTab("about:blank");
     let session = null;
     try {
       session = await attach(tab.id);

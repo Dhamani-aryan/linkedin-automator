@@ -263,7 +263,7 @@ async function executeLeadAction(run, leadIndex, action) {
   });
   await saveRun(run);
 
-  const tab = await openTab(lead.lead.linkedinUrl);
+  const tab = await openTab("about:blank");
   const session = await attach(tab.id);
   let keepProfileTabOpen = false;
   try {
@@ -392,7 +392,7 @@ async function sleepRunUntilNextLead(run, now) {
 async function ensureAuthenticated(run) {
   if (authCache && Date.now() - authCache.checkedAt < authCacheMs && authCache.ok) return;
 
-  const tab = await openTab("https://www.linkedin.com/feed/");
+  const tab = await openTab("about:blank");
   const session = await attach(tab.id);
   try {
     const auth = await checkLinkedInAuth(session);
