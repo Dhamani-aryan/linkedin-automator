@@ -145,9 +145,22 @@ describe("validateLiveRun", () => {
       actions: [actions[0]],
       leads: [lead]
     })).toEqual(expect.arrayContaining([
-      expect.objectContaining({ code: "LIVE_MESSAGES_ONLY" }),
+      expect.objectContaining({ code: "LIVE_REQUIRES_ONE_MESSAGE" }),
       expect.objectContaining({ code: "LIVE_CONFIRMATION_REQUIRED" })
     ]));
+  });
+
+  it("rejects more than one live message", () => {
+    expect(validateLiveRun({
+      mode: "live",
+      actions: [messageAction, { ...messageAction, id: "message-2" }],
+      leads: [lead],
+      liveConfirmation: {
+        confirmed: true,
+        leadId: lead.id,
+        firstMessageText: "Hi Example\n\nWelcome"
+      }
+    })).toContainEqual(expect.objectContaining({ code: "LIVE_REQUIRES_ONE_MESSAGE" }));
   });
 });
 

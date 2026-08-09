@@ -155,11 +155,11 @@ export function validateLiveRun(snapshot) {
     });
   }
 
-  if (actions.some((action) => action.type !== "message")) {
+  if (actions.length !== 1 || actions[0]?.type !== "message") {
     failures.push({
       field: "actions",
-      code: "LIVE_MESSAGES_ONLY",
-      message: "Only message actions are enabled for controlled live sending."
+      code: "LIVE_REQUIRES_ONE_MESSAGE",
+      message: "Controlled live sending requires exactly one message action."
     });
   }
 
