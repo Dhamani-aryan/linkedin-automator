@@ -32,8 +32,11 @@ function localControllerPlugin(): Plugin {
   };
 }
 
-export default defineConfig({
-  plugins: [react(), localControllerPlugin()],
+export default defineConfig(({ command, mode }) => ({
+  plugins: [
+    react(),
+    ...(command === "serve" && mode !== "test" ? [localControllerPlugin()] : [])
+  ],
   server: {
     host: "127.0.0.1",
     port: 5173,
@@ -41,4 +44,4 @@ export default defineConfig({
       "/api": "http://127.0.0.1:4287"
     }
   }
-});
+}));
