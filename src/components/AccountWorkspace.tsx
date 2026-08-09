@@ -147,10 +147,18 @@ export function AccountWorkspace({
     let cancelled = false;
     void getActiveCampaignRun()
       .then((run) => {
-        if (!cancelled && run?.profileId === account.id) {
+        if (cancelled) return;
+        if (run?.profileId === account.id) {
           setActiveRun(run);
           syncCampaignStatus(run);
+          return;
         }
+        setActiveRun(null);
+        setWorkspace((current) =>
+          ["running", "paused", "sleeping"].includes(current.campaign.status)
+            ? { ...current, campaign: { ...current.campaign, status: "stopped" } }
+            : current
+        );
       })
       .catch(() => undefined);
     return () => {
