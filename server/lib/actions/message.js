@@ -190,27 +190,47 @@ function pausedMessageResult(stage, recipientName) {
 
 async function openMessageComposer(session, recipientName) {
   await evaluate(session, () => window.scrollTo({ top: 0, behavior: "instant" }), []);
-  const profileTarget = await waitForValue(
-    () => readProfileMessageTarget(session),
-    Boolean,
-    15_000
-  );
+  const attempts = [];
 
-  if (!profileTarget) {
-    return {
-      composer: null,
-      stage: "profile_message_button_missing",
-      surface: "profile_main_action"
-    };
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const profileTarget = await waitForValue(
+      () => readProfileMessageTarget(session),
+      Boolean,
+      attempt === 1 ? 15_000 : 5_000
+    );
+
+    if (!profileTarget) {
+      return {
+        composer: null,
+        stage: "profile_message_button_missing",
+        surface: "profile_main_action",
+        attempts
+      };
+    }
+
+    await clickAt(session, profileTarget.point);
+    const composer = await waitForComposer(session, recipientName, attempt === 1 ? 8_000 : 12_000);
+    attempts.push({
+      attempt,
+      target: profileTarget.detail,
+      observation: await readMessagingSurface(session)
+    });
+    if (composer) {
+      return {
+        composer,
+        stage: "profile_composer_opened",
+        surface: "profile_main_action",
+        attempt,
+        attempts
+      };
+    }
   }
 
-  await clickAt(session, profileTarget.point);
-  const composer = await waitForComposer(session, recipientName, 15_000);
   return {
-    composer,
-    stage: composer ? "profile_composer_opened" : "profile_message_click_unresolved",
+    composer: null,
+    stage: "profile_message_click_unresolved",
     surface: "profile_main_action",
-    target: profileTarget.detail
+    attempts
   };
 }
 
@@ -247,6 +267,24 @@ async function readProfileMessageTarget(session) {
       }
     };
   }, [selectors.profileMessageControl]);
+}
+
+async function readMessagingSurface(session) {
+  return await evaluate(session, () => {
+    const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
+    const shadowRoot = document.querySelector("#interop-outlet")?.shadowRoot;
+    const bubbles = shadowRoot ? [...shadowRoot.querySelectorAll(".msg-overlay-conversation-bubble")] : [];
+    return {
+      url: location.href,
+      hasMessagingShadowRoot: Boolean(shadowRoot),
+      conversationTitles: bubbles
+        .map((bubble) => normalize(bubble.querySelector(".msg-overlay-bubble-header__title")?.textContent))
+        .filter(Boolean),
+      editorCount: shadowRoot
+        ? shadowRoot.querySelectorAll('.msg-form__contenteditable[contenteditable="true"][role="textbox"]').length
+        : 0
+    };
+  }, []);
 }
 
 async function readComposer(session, recipientName) {
