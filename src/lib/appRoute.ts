@@ -1,11 +1,11 @@
-export type ManagerPage = "profiles" | "safety" | "settings";
-export type WorkspaceRouteTab = "workflow" | "leads" | "browser";
+export type ManagerPage = "profiles" | "settings";
+export type WorkspaceRouteTab = "workflow" | "leads" | "browser" | "safety";
 
 export type AppRoute =
   | { kind: "manager"; page: ManagerPage }
   | { kind: "workspace"; profileId: string; tab: WorkspaceRouteTab };
 
-const workspaceTabs = new Set<WorkspaceRouteTab>(["workflow", "leads", "browser"]);
+const workspaceTabs = new Set<WorkspaceRouteTab>(["workflow", "leads", "browser", "safety"]);
 
 export function readAppRoute(hash = window.location.hash): AppRoute {
   const segments = hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
@@ -19,7 +19,7 @@ export function readAppRoute(hash = window.location.hash): AppRoute {
     };
   }
 
-  if (segments[0] === "safety" || segments[0] === "settings") {
+  if (segments[0] === "settings") {
     return { kind: "manager", page: segments[0] };
   }
 
@@ -32,4 +32,3 @@ export function routeToHash(route: AppRoute): string {
   }
   return route.page === "profiles" ? "#/profiles" : `#/${route.page}`;
 }
-

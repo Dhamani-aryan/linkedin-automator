@@ -13,7 +13,6 @@ import {
   RefreshCw,
   Search,
   Settings2,
-  ShieldCheck,
   Square,
   Trash2,
   UsersRound,
@@ -22,7 +21,6 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { AddLinkedInAccountModal } from "./components/AddLinkedInAccountModal";
 import { AccountWorkspace } from "./components/AccountWorkspace";
-import { SafetyLimitsPage } from "./components/SafetyLimitsPage";
 import { readAppRoute, routeToHash, type AppRoute } from "./lib/appRoute";
 import { getChromeStatus, openChromeUrl, startChrome, stopChrome } from "./lib/chromeApi";
 import { loadSafetySettings, saveSafetySettings } from "./lib/safetyStorage";
@@ -304,6 +302,7 @@ export function App() {
         chromeError={routeAccount.lastError}
         isBusy={isBusy}
         safetySettings={humanTouchSettings}
+        onSafetySettingsChange={setHumanTouchSettings}
         onBack={() => navigate({ kind: "manager", page: "profiles" })}
         onOpenLinkedIn={() => openLinkedIn(routeAccount.id)}
         onRefreshChrome={() => void refreshStatus(routeAccount.id)}
@@ -331,13 +330,6 @@ export function App() {
               LinkedIn Profiles
             </button>
             <button
-              className={`nav-item ${activePage === "safety" ? "active" : ""}`}
-              onClick={() => navigate({ kind: "manager", page: "safety" })}
-            >
-              <ShieldCheck size={17} />
-              Safety Limits
-            </button>
-            <button
               className={`nav-item ${activePage === "settings" ? "active" : ""}`}
               onClick={() => navigate({ kind: "manager", page: "settings" })}
             >
@@ -359,10 +351,6 @@ export function App() {
       </aside>
 
       <section className="manager-content">
-        {activePage === "safety" ? (
-          <SafetyLimitsPage settings={humanTouchSettings} onChange={setHumanTouchSettings} />
-        ) : null}
-
         {activePage === "settings" ? (
           <section className="placeholder-page">
             <p className="eyebrow">Workspace</p>

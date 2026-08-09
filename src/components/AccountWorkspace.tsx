@@ -27,6 +27,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { collectVisibleProfiles } from "../lib/chromeApi";
 import type { WorkspaceRouteTab } from "../lib/appRoute";
+import { SafetyLimitsPage } from "./SafetyLimitsPage";
 import {
   createLeadFromUrl,
   loadCampaignWorkspace,
@@ -60,6 +61,7 @@ type WorkspaceProps = {
   chromeError?: string;
   chromeStatus: ChromeStatus | null;
   safetySettings: HumanTouchSettings;
+  onSafetySettingsChange: (settings: HumanTouchSettings) => void;
   isBusy: boolean;
   onBack: () => void;
   onTabChange: (tab: WorkspaceRouteTab) => void;
@@ -75,6 +77,7 @@ export function AccountWorkspace({
   chromeError,
   chromeStatus,
   safetySettings,
+  onSafetySettingsChange,
   isBusy,
   onBack,
   onTabChange,
@@ -393,13 +396,20 @@ export function AccountWorkspace({
         </section>
 
         <nav className="campaign-nav">
-          <button className="nav-item active">
+          <button
+            className={`nav-item ${activeTab === "workflow" || activeTab === "leads" ? "active" : ""}`}
+            onClick={() => onTabChange("workflow")}
+          >
             <Layers3 size={17} />
             Workspace
           </button>
-          <button className="nav-item" onClick={() => onTabChange("browser")}>
+          <button className={`nav-item ${activeTab === "browser" ? "active" : ""}`} onClick={() => onTabChange("browser")}>
             <Chrome size={17} />
             LinkedIn browser
+          </button>
+          <button className={`nav-item ${activeTab === "safety" ? "active" : ""}`} onClick={() => onTabChange("safety")}>
+            <ShieldCheck size={17} />
+            Safety limits
           </button>
         </nav>
 
@@ -488,6 +498,10 @@ export function AccountWorkspace({
           <button className={`tab-button ${activeTab === "browser" ? "active" : ""}`} onClick={() => onTabChange("browser")}>
             <Chrome size={17} />
             Browser
+          </button>
+          <button className={`tab-button ${activeTab === "safety" ? "active" : ""}`} onClick={() => onTabChange("safety")}>
+            <ShieldCheck size={17} />
+            Safety
           </button>
         </section>
 
@@ -683,6 +697,10 @@ export function AccountWorkspace({
               {linkedInTab ? <a href={linkedInTab.url} target="_blank" rel="noreferrer">{linkedInTab.url}</a> : null}
             </div>
           </section>
+        ) : null}
+
+        {activeTab === "safety" ? (
+          <SafetyLimitsPage settings={safetySettings} onChange={onSafetySettingsChange} />
         ) : null}
       </section>
 
