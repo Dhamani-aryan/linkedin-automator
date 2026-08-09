@@ -120,6 +120,67 @@ export type CampaignWorkspaceState = {
   sources: LeadSource[];
 };
 
+export type CampaignRunLeadState =
+  | "queued"
+  | "running"
+  | "waiting_acceptance"
+  | "waiting_delay"
+  | "replied"
+  | "completed"
+  | "failed"
+  | "needs_review"
+  | "stopped";
+
+export type CampaignRunState =
+  | "validating"
+  | "running"
+  | "sleeping"
+  | "stopping"
+  | "stopped"
+  | "completed"
+  | "failed"
+  | "needs_attention";
+
+export type CampaignRunLead = {
+  id: string;
+  lead: LeadProfile;
+  state: CampaignRunLeadState;
+  actionCursor: number;
+  nextEligibleAt: string | null;
+  lastErrorCode: string | null;
+};
+
+export type CampaignRun = {
+  ok: true;
+  id: string;
+  profileId: string;
+  mode: "dry_run" | "live";
+  state: CampaignRunState;
+  createdAt: string;
+  updatedAt: string;
+  stopRequested: boolean;
+  sleepingUntil: string | null;
+  sleepingReason: string | null;
+  snapshot: {
+    campaign: CampaignSummary;
+    actions: CampaignWorkflowAction[];
+    leads: LeadProfile[];
+    safety: HumanTouchSettings & { timeZone?: string };
+  };
+  leads: CampaignRunLead[];
+  summary: {
+    total: number;
+    queued: number;
+    running: number;
+    sleeping: number;
+    completed: number;
+    failed: number;
+    needsReview: number;
+    replied: number;
+    stopped: number;
+  };
+};
+
 export type WorkflowCardKind = "source" | "action" | "reply_check";
 
 export type WorkflowCard = {

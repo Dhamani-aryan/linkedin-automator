@@ -32,11 +32,19 @@ import {
   loadCampaignWorkspace,
   saveCampaignWorkspace
 } from "../lib/campaignStorage";
+import {
+  getActiveCampaignRun,
+  getCampaignRun,
+  startCampaignRun,
+  stopCampaignRun
+} from "../lib/runnerApi";
 import { createWorkflowAction, removeWorkflowAction } from "../lib/workflow";
 import type {
+  CampaignRun,
   CampaignWorkflowAction,
   CampaignWorkspaceState,
   ChromeStatus,
+  HumanTouchSettings,
   LeadSource,
   LinkedInAccount,
   WorkflowDelay,
@@ -51,6 +59,7 @@ type WorkspaceProps = {
   activeTab: WorkspaceRouteTab;
   chromeError?: string;
   chromeStatus: ChromeStatus | null;
+  safetySettings: HumanTouchSettings;
   isBusy: boolean;
   onBack: () => void;
   onTabChange: (tab: WorkspaceRouteTab) => void;
@@ -65,6 +74,7 @@ export function AccountWorkspace({
   activeTab,
   chromeError,
   chromeStatus,
+  safetySettings,
   isBusy,
   onBack,
   onTabChange,
@@ -79,6 +89,7 @@ export function AccountWorkspace({
   const [selectedActionId, setSelectedActionId] = useState(() => workspace.actions[0]?.id ?? "");
   const [isStartConfirmationOpen, setIsStartConfirmationOpen] = useState(false);
   const [isCampaignBusy, setIsCampaignBusy] = useState(false);
+  const [activeRun, setActiveRun] = useState<CampaignRun | null>(null);
   const [campaignNotice, setCampaignNotice] = useState<{
     tone: "success" | "error";
     message: string;
@@ -86,16 +97,52 @@ export function AccountWorkspace({
   const linkedInTab = chromeStatus?.tabs.find((tab) => tab.url.includes("linkedin.com")) ?? null;
   const selectedAction = workspace.actions.find((action) => action.id === selectedActionId) ?? null;
   const firstMessageActionId = workspace.actions.find((action) => action.type === "message")?.id ?? null;
+  const hasActiveServerRun =
+    activeRun !== null && ["running", "sleeping", "stopping", "needs_attention"].includes(activeRun.state);
 
   useEffect(() => {
     const nextWorkspace = loadCampaignWorkspace(account);
     setWorkspace(nextWorkspace);
     setSelectedActionId(nextWorkspace.actions[0]?.id ?? "");
+    setActiveRun(null);
   }, [account.id]);
 
   useEffect(() => {
     saveCampaignWorkspace(account.id, workspace);
   }, [account.id, workspace]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getActiveCampaignRun()
+      .then((run) => {
+        if (!cancelled && run?.profileId === account.id) {
+          setActiveRun(run);
+          syncCampaignStatus(run);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [account.id]);
+
+  useEffect(() => {
+    if (!activeRun || ["completed", "failed", "stopped"].includes(activeRun.state)) return;
+    const interval = window.setInterval(() => {
+      void getCampaignRun(activeRun.id)
+        .then((run) => {
+          setActiveRun(run);
+          syncCampaignStatus(run);
+        })
+        .catch((error) => {
+          setCampaignNotice({
+            tone: "error",
+            message: error instanceof Error ? error.message : "Could not refresh campaign run state."
+          });
+        });
+    }, 4000);
+    return () => window.clearInterval(interval);
+  }, [activeRun?.id, activeRun?.state]);
 
   const sourceNames = useMemo(
     () => new Map(workspace.sources.map((source) => [source.id, source.name])),
@@ -108,6 +155,7 @@ export function AccountWorkspace({
   }
 
   function addAction(type: "connection_request" | "message") {
+    if (hasActiveServerRun) return;
     const addedActions = createWorkflowAction(type);
     setWorkspace((current) => ({
       ...current,
@@ -122,6 +170,7 @@ export function AccountWorkspace({
   }
 
   function deleteAction(actionId: string) {
+    if (hasActiveServerRun) return;
     setWorkspace((current) => ({
       ...current,
       actions: removeWorkflowAction(current.actions, actionId)
@@ -130,7 +179,7 @@ export function AccountWorkspace({
   }
 
   function saveTemplate(template: string, delay?: WorkflowDelay) {
-    if (!selectedAction) return;
+    if (!selectedAction || hasActiveServerRun) return;
     setWorkspace((current) => ({
       ...current,
       actions: current.actions.map((action) =>
@@ -143,6 +192,7 @@ export function AccountWorkspace({
   }
 
   function addProfiles(payload: LeadImportPayload) {
+    if (hasActiveServerRun) return { added: 0, duplicates: 0 };
     const existingUrls = new Set(workspace.leads.map((lead) => lead.linkedinUrl.toLowerCase()));
     let duplicates = 0;
     const sourceId = crypto.randomUUID();
@@ -188,6 +238,7 @@ export function AccountWorkspace({
   }
 
   function removeLead(leadId: string) {
+    if (hasActiveServerRun) return;
     setWorkspace((current) => {
       const removedLead = current.leads.find((lead) => lead.id === leadId);
       const leads = current.leads.filter((lead) => lead.id !== leadId);
@@ -236,7 +287,7 @@ export function AccountWorkspace({
   async function confirmCampaignStart() {
     setIsCampaignBusy(true);
     setCampaignNotice(null);
-    const chromeReady = chromeStatus?.connected || await onStartChrome();
+    const chromeReady = chromeStatus?.connected || (await onStartChrome());
     if (!chromeReady) {
       setCampaignNotice({
         tone: "error",
@@ -247,27 +298,75 @@ export function AccountWorkspace({
       return;
     }
 
-    setWorkspace((current) => ({
-      ...current,
-      campaign: { ...current.campaign, status: "running" }
-    }));
-    setCampaignNotice({
-      tone: "success",
-      message: "Campaign is active and Chrome is connected. The browser action executor is the next implementation step; no LinkedIn action has been marked as sent."
-    });
-    setIsCampaignBusy(false);
-    setIsStartConfirmationOpen(false);
+    try {
+      const run = await startCampaignRun({
+        profileId: account.id,
+        campaign: workspace.campaign,
+        actions: workspace.actions,
+        leads: workspace.leads,
+        safety: {
+          ...safetySettings,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        },
+        mode: "dry_run"
+      });
+      setActiveRun(run);
+      syncCampaignStatus(run);
+      setCampaignNotice({
+        tone: "success",
+        message: "Dry-run campaign started. The runner will navigate and audit what it would send without clicking Send."
+      });
+    } catch (error) {
+      setCampaignNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Campaign could not start."
+      });
+    } finally {
+      setIsCampaignBusy(false);
+      setIsStartConfirmationOpen(false);
+    }
   }
 
-  function stopCampaign() {
+  async function stopCampaign() {
+    if (!activeRun) {
+      setWorkspace((current) => ({
+        ...current,
+        campaign: { ...current.campaign, status: "stopped" }
+      }));
+      return;
+    }
+
+    setIsCampaignBusy(true);
+    try {
+      const run = await stopCampaignRun(activeRun.id);
+      setActiveRun(run);
+      syncCampaignStatus(run);
+      setCampaignNotice({
+        tone: "success",
+        message: "Stop requested. The runner will halt at the next safe checkpoint."
+      });
+    } catch (error) {
+      setCampaignNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Campaign could not be stopped."
+      });
+    } finally {
+      setIsCampaignBusy(false);
+    }
+  }
+
+  function syncCampaignStatus(run: CampaignRun) {
+    const status = run.state === "sleeping"
+      ? "sleeping"
+      : ["running", "stopping", "needs_attention"].includes(run.state)
+        ? "running"
+        : run.state === "stopped"
+          ? "stopped"
+          : "ready";
     setWorkspace((current) => ({
       ...current,
-      campaign: { ...current.campaign, status: "stopped" }
+      campaign: { ...current.campaign, status }
     }));
-    setCampaignNotice({
-      tone: "success",
-      message: "Campaign stopped. Leads and workflow progress remain saved."
-    });
   }
 
   return (
@@ -312,11 +411,11 @@ export function AccountWorkspace({
 
         <button
           className={`full-width ${workspace.campaign.status === "running" ? "danger-button" : "primary-button"}`}
-          onClick={workspace.campaign.status === "running" ? stopCampaign : requestCampaignStart}
+          onClick={hasActiveServerRun ? () => void stopCampaign() : requestCampaignStart}
           disabled={isCampaignBusy}
         >
-          {workspace.campaign.status === "running" ? <Square size={17} /> : <Play size={17} />}
-          {workspace.campaign.status === "running"
+          {hasActiveServerRun ? <Square size={17} /> : <Play size={17} />}
+          {hasActiveServerRun
             ? "Stop campaign"
             : workspace.leads.length === 0
               ? "Add leads to start"
@@ -360,6 +459,15 @@ export function AccountWorkspace({
           </div>
         ) : null}
 
+        {activeRun ? (
+          <div className="workspace-feedback success" role="status">
+            <span>
+              Server run {runStateLabel(activeRun.state)}: {activeRun.summary.completed} completed, {activeRun.summary.sleeping} waiting, {activeRun.summary.needsReview} needs review.
+              {activeRun.sleepingUntil ? ` Next check ${formatDate(activeRun.sleepingUntil)}.` : ""}
+            </span>
+          </div>
+        ) : null}
+
         <section className="workspace-tabs basic-workspace-tabs">
           <button className={`tab-button ${activeTab === "workflow" ? "active" : ""}`} onClick={() => onTabChange("workflow")}>
             <Layers3 size={17} />
@@ -383,14 +491,14 @@ export function AccountWorkspace({
                   <span className="section-kicker">Leads to process</span>
                   <strong>{workspace.leads.length}</strong>
                 </div>
-                <button className="primary-button" onClick={() => setActiveModal("source")}>
+                <button className="primary-button" onClick={() => setActiveModal("source")} disabled={hasActiveServerRun}>
                   <Plus size={17} />
                   Add leads
                 </button>
               </header>
 
               <div className="workflow-canvas functional-workflow-canvas">
-                <AddActionButton label="Add first action" onClick={() => openActionPicker(0)} />
+                <AddActionButton label="Add first action" onClick={() => openActionPicker(0)} disabled={hasActiveServerRun} />
                 {workspace.actions.map((action, index) => (
                   <div className="workflow-node-wrap" key={action.id}>
                     <button
@@ -408,7 +516,7 @@ export function AccountWorkspace({
                       {action.automatic ? <ShieldCheck className="auto-guard-icon" size={18} /> : null}
                     </button>
                     {workspace.actions[index + 1]?.automatic ? null : (
-                      <AddActionButton onClick={() => openActionPicker(index + 1)} />
+                      <AddActionButton onClick={() => openActionPicker(index + 1)} disabled={hasActiveServerRun} />
                     )}
                   </div>
                 ))}
@@ -443,12 +551,12 @@ export function AccountWorkspace({
                     <section className="message-summary">
                       <div className="message-summary-heading">
                         <span>Message</span>
-                        <button className="icon-button" title="Edit message" onClick={() => setActiveModal("template")}>
+                        <button className="icon-button" title="Edit message" onClick={() => setActiveModal("template")} disabled={hasActiveServerRun}>
                           <Pencil size={16} />
                         </button>
                       </div>
                       <pre>{selectedAction.template}</pre>
-                      <button className="ghost-button" onClick={() => setActiveModal("template")}>
+                      <button className="ghost-button" onClick={() => setActiveModal("template")} disabled={hasActiveServerRun}>
                         <MessageSquare size={16} />
                         Edit message
                       </button>
@@ -464,7 +572,7 @@ export function AccountWorkspace({
                   )}
 
                   {!selectedAction.automatic ? (
-                    <button className="danger-text-button" onClick={() => deleteAction(selectedAction.id)}>
+                    <button className="danger-text-button" onClick={() => deleteAction(selectedAction.id)} disabled={hasActiveServerRun}>
                       <Trash2 size={16} />
                       Remove action and its guard
                     </button>
@@ -481,7 +589,7 @@ export function AccountWorkspace({
               <section className="source-summary-list">
                 <header>
                   <span>Lead sources</span>
-                  <button className="icon-button" title="Add leads" onClick={() => setActiveModal("source")}>
+                  <button className="icon-button" title="Add leads" onClick={() => setActiveModal("source")} disabled={hasActiveServerRun}>
                     <Plus size={16} />
                   </button>
                 </header>
@@ -505,7 +613,7 @@ export function AccountWorkspace({
                 <p className="section-kicker">Campaign queue</p>
                 <h2>Leads to process</h2>
               </div>
-              <button className="primary-button" onClick={() => setActiveModal("source")}>
+              <button className="primary-button" onClick={() => setActiveModal("source")} disabled={hasActiveServerRun}>
                 <Plus size={17} />
                 Add leads
               </button>
@@ -533,9 +641,9 @@ export function AccountWorkspace({
                       </div>
                     </div>
                     <span>{sourceNames.get(lead.sourceId) ?? "Imported list"}</span>
-                    <span className="queue-status">To process</span>
+                    <span className="queue-status">{leadRunLabel(activeRun, lead.id)}</span>
                     <span>{formatDate(lead.addedAt)}</span>
-                    <button className="icon-button" title="Remove profile" onClick={() => removeLead(lead.id)}>
+                    <button className="icon-button" title="Remove profile" onClick={() => removeLead(lead.id)} disabled={hasActiveServerRun}>
                       <Trash2 size={15} />
                     </button>
                   </div>
@@ -605,7 +713,7 @@ export function AccountWorkspace({
               <div className="campaign-preflight-list">
                 <span><Check size={16} /> Workflow and leads are saved</span>
                 <span><Check size={16} /> Managed Chrome will start if needed</span>
-                <span><AlertTriangle size={16} /> Browser action execution is not enabled yet</span>
+                <span><AlertTriangle size={16} /> Dry run only: no Send buttons are clicked</span>
               </div>
             </div>
             <footer className="modal-actions">
@@ -624,9 +732,9 @@ export function AccountWorkspace({
   );
 }
 
-function AddActionButton({ label, onClick }: { label?: string; onClick: () => void }) {
+function AddActionButton({ label, onClick, disabled = false }: { label?: string; onClick: () => void; disabled?: boolean }) {
   return (
-    <button className={`workflow-plus ${label ? "with-label" : ""}`} title="Add action" onClick={onClick}>
+    <button className={`workflow-plus ${label ? "with-label" : ""}`} title="Add action" onClick={onClick} disabled={disabled}>
       <Plus size={17} />
       {label ? <span>{label}</span> : null}
     </button>
@@ -664,4 +772,18 @@ function campaignStatusLabel(status: CampaignWorkspaceState["campaign"]["status"
   if (status === "sleeping") return "Sleeping";
   if (status === "stopped") return "Stopped";
   return "Ready to start";
+}
+
+function runStateLabel(state: CampaignRun["state"]) {
+  if (state === "needs_attention") return "needs attention";
+  return state.replace("_", " ");
+}
+
+function leadRunLabel(run: CampaignRun | null, leadId: string) {
+  const leadRun = run?.leads.find((candidate) => candidate.id === leadId);
+  if (!leadRun) return "To process";
+  if (leadRun.state === "waiting_acceptance") return "Waiting acceptance";
+  if (leadRun.state === "waiting_delay") return "Waiting delay";
+  if (leadRun.state === "needs_review") return "Needs review";
+  return leadRun.state.replace("_", " ");
 }

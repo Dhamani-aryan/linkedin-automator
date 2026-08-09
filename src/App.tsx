@@ -25,7 +25,7 @@ import { AccountWorkspace } from "./components/AccountWorkspace";
 import { SafetyLimitsPage } from "./components/SafetyLimitsPage";
 import { readAppRoute, routeToHash, type AppRoute } from "./lib/appRoute";
 import { getChromeStatus, openChromeUrl, startChrome, stopChrome } from "./lib/chromeApi";
-import { safetyDefaults } from "./lib/safety";
+import { loadSafetySettings, saveSafetySettings } from "./lib/safetyStorage";
 import {
   clearCompanyUser,
   loadCompanyUser,
@@ -58,7 +58,7 @@ export function App() {
   const [route, setRoute] = useState<AppRoute>(() => readAppRoute());
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
   const [accountPendingDelete, setAccountPendingDelete] = useState<LinkedInAccount | null>(null);
-  const [humanTouchSettings, setHumanTouchSettings] = useState<HumanTouchSettings>(safetyDefaults);
+  const [humanTouchSettings, setHumanTouchSettings] = useState<HumanTouchSettings>(() => loadSafetySettings());
 
   const routeAccount =
     route.kind === "workspace"
@@ -100,6 +100,10 @@ export function App() {
       setSelectedAccountId(accounts[0].id);
     }
   }, [accounts, selectedAccountId]);
+
+  useEffect(() => {
+    saveSafetySettings(humanTouchSettings);
+  }, [humanTouchSettings]);
 
   async function refreshStatus(accountId = selectedAccount?.id) {
     try {
@@ -299,6 +303,7 @@ export function App() {
         chromeStatus={status}
         chromeError={routeAccount.lastError}
         isBusy={isBusy}
+        safetySettings={humanTouchSettings}
         onBack={() => navigate({ kind: "manager", page: "profiles" })}
         onOpenLinkedIn={() => openLinkedIn(routeAccount.id)}
         onRefreshChrome={() => void refreshStatus(routeAccount.id)}

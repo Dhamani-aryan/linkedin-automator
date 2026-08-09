@@ -1,0 +1,92 @@
+import type {
+  CampaignRun,
+  CampaignSummary,
+  CampaignWorkflowAction,
+  HumanTouchSettings,
+  LeadProfile
+} from "../types";
+
+type ApiFailure = {
+  ok: false;
+  error?: {
+    code: string;
+    message: string;
+    detail?: unknown;
+  };
+  validationFailures?: Array<{
+    field: string;
+    code: string;
+    message: string;
+    detail?: unknown;
+  }>;
+};
+
+const defaultHeaders = {
+  "content-type": "application/json"
+};
+
+export type CampaignRunSnapshot = {
+  profileId: string;
+  campaign: CampaignSummary;
+  actions: CampaignWorkflowAction[];
+  leads: LeadProfile[];
+  safety: HumanTouchSettings & { timeZone?: string };
+  mode: "dry_run" | "live";
+};
+
+export async function startCampaignRun(snapshot: CampaignRunSnapshot): Promise<CampaignRun> {
+  const result = await request<{ ok: true; runId: string; run: CampaignRun } | ApiFailure>("/api/campaign-runs", {
+    method: "POST",
+    headers: defaultHeaders,
+    body: JSON.stringify(snapshot)
+  });
+  if (!result.ok) throw failureToError(result);
+  return result.run;
+}
+
+export async function getCampaignRun(runId: string): Promise<CampaignRun> {
+  return request<CampaignRun>(`/api/campaign-runs/${encodeURIComponent(runId)}`);
+}
+
+export async function getActiveCampaignRun(): Promise<CampaignRun | null> {
+  const result = await request<{ ok: true; run: CampaignRun | null }>("/api/campaign-runs/active");
+  return result.run;
+}
+
+export async function stopCampaignRun(runId: string): Promise<CampaignRun> {
+  const result = await request<{ ok: true; run: CampaignRun }>(`/api/campaign-runs/${encodeURIComponent(runId)}/stop`, {
+    method: "POST"
+  });
+  return result.run;
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(path, init);
+  } catch {
+    throw new Error("The local campaign runner is unavailable. Restart the app and try again.");
+  }
+
+  const body = await response.json() as T | ApiFailure;
+  if (!response.ok || isFailure(body)) {
+    throw failureToError(body as ApiFailure);
+  }
+  return body as T;
+}
+
+function failureToError(failure: ApiFailure) {
+  if (failure.validationFailures?.length) {
+    return new Error(failure.validationFailures.map((item) => item.message).join(" "));
+  }
+  return new Error(failure.error?.message ?? "Campaign runner request failed.");
+}
+
+function isFailure(value: unknown): value is ApiFailure {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "ok" in value &&
+    (value as { ok?: unknown }).ok === false
+  );
+}
