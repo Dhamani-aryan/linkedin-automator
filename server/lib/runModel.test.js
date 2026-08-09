@@ -251,4 +251,40 @@ describe("transition", () => {
       detail: { stage: "before_send" }
     });
   });
+
+  it("returns a safely paused attempt to the same action", () => {
+    const messageActions = [actions[2]];
+    const run = createCampaignRun({
+      runId: "run-pause",
+      snapshot: {
+        profileId: "profile-1",
+        campaign: { id: "campaign-1" },
+        actions: messageActions,
+        leads: [lead],
+        safety
+      },
+      mode: "live"
+    });
+    const runningLead = transition(run.leads[0], {
+      type: "ACTION_STARTED",
+      actionId: messageActions[0].id,
+      now: "2026-08-09T10:00:01.000Z"
+    }, messageActions);
+    const pausedLead = transition(runningLead, {
+      type: "PAUSED",
+      detail: { stage: "before_send" },
+      now: "2026-08-09T10:00:02.000Z"
+    }, messageActions);
+
+    expect(pausedLead).toMatchObject({
+      state: leadStates.QUEUED,
+      actionCursor: 0,
+      nextEligibleAt: "2026-08-09T10:00:02.000Z"
+    });
+    expect(pausedLead.attempts[0]).toMatchObject({
+      outcome: "paused",
+      errorCode: null,
+      detail: { stage: "before_send" }
+    });
+  });
 });

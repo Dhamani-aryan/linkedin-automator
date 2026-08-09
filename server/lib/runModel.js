@@ -16,6 +16,7 @@ export const runStates = Object.freeze({
   VALIDATING: "validating",
   RUNNING: "running",
   SLEEPING: "sleeping",
+  PAUSED: "paused",
   STOPPING: "stopping",
   STOPPED: "stopped",
   COMPLETED: "completed",
@@ -213,6 +214,7 @@ export function createCampaignRun({ runId, snapshot, mode, now = new Date() }) {
     createdAt,
     updatedAt: createdAt,
     stopRequested: false,
+    pauseRequested: false,
     sleepingUntil: null,
     sleepingReason: null,
     validationFailures: [],
@@ -339,6 +341,21 @@ export function transition(leadRun, event, actions = []) {
       lead.state = leadStates.STOPPED;
       lead.lastErrorCode = event.errorCode ?? "RUN_STOPPED";
       lead.nextEligibleAt = null;
+      return touch(lead, now);
+
+    case "PAUSED":
+      if (terminalLeadStates.has(lead.state)) return touch(lead, now);
+      if (lead.state === leadStates.RUNNING) {
+        completeLatestAttempt(
+          lead,
+          event.outcome ?? "paused",
+          null,
+          event.detail ?? null,
+          now
+        );
+        lead.state = leadStates.QUEUED;
+        lead.nextEligibleAt = now;
+      }
       return touch(lead, now);
 
     default:
