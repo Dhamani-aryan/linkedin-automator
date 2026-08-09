@@ -484,6 +484,7 @@ export function AccountWorkspace({
   async function resumeCampaign() {
     if (!activeRun) return;
 
+    const restarting = activeRun.state === "stopped";
     setIsCampaignBusy(true);
     try {
       const run = await resumeCampaignRun(activeRun.id);
@@ -491,7 +492,9 @@ export function AccountWorkspace({
       syncCampaignStatus(run);
       setCampaignNotice({
         tone: "success",
-        message: "Campaign resumed from its paused action."
+        message: restarting
+          ? "Campaign restarted from its saved action and original follow-up due times."
+          : "Campaign resumed from its paused action and original follow-up due times."
       });
     } catch (error) {
       setCampaignNotice({
@@ -613,7 +616,7 @@ export function AccountWorkspace({
         ) : (
           <button
             className="full-width primary-button"
-            onClick={() => void requestCampaignStart()}
+            onClick={activeRun?.state === "stopped" ? () => void resumeCampaign() : () => void requestCampaignStart()}
             disabled={isCampaignBusy || isStartPending}
           >
             {isCampaignBusy || isStartPending ? <LoaderCircle className="spin" size={17} /> : <Play size={17} />}
@@ -623,6 +626,8 @@ export function AccountWorkspace({
                 ? "Reading profiles"
               : workspace.leads.length === 0
                 ? "Add leads to start"
+                : activeRun?.state === "stopped"
+                  ? "Restart campaign"
                 : "Start campaign"}
           </button>
         )}

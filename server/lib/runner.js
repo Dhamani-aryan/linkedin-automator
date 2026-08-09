@@ -21,7 +21,14 @@ import {
   validateLiveRun,
   validateRun
 } from "./runModel.js";
-import { appendAudit, loadRun, readAudit, recoverInterruptedRuns, saveRun } from "./runStore.js";
+import {
+  appendAudit,
+  findLatestResumableRun,
+  loadRun,
+  readAudit,
+  recoverInterruptedRuns,
+  saveRun
+} from "./runStore.js";
 import { checkSafetyGate, randomizedDelayMs } from "./safetyPolicy.js";
 
 const authCacheMs = 10 * 60_000;
@@ -33,12 +40,13 @@ let authCache = null;
 
 export async function initializeRunner() {
   const recovered = await recoverInterruptedRuns();
-  const run = recovered
+  const recoveredRun = recovered
     .filter((candidate) => [runStates.RUNNING, runStates.PAUSED, runStates.NEEDS_ATTENTION].includes(candidate.state))
     .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))[0];
+  const run = recoveredRun ?? await findLatestResumableRun();
   if (!run) return;
 
-  if (run.state === runStates.NEEDS_ATTENTION) {
+  if ([runStates.NEEDS_ATTENTION, runStates.STOPPED].includes(run.state)) {
     activeRunId = run.id;
     return;
   }
@@ -93,6 +101,10 @@ export async function stopCampaignRun(runId) {
   if ([runStates.COMPLETED, runStates.FAILED, runStates.STOPPED].includes(run.state)) {
     return { ok: true, run: decorateRun(run) };
   }
+  if (run.state === runStates.NEEDS_ATTENTION) {
+    run.stopRequested = true;
+    return await finalizeStopped(run);
+  }
   run.stopRequested = true;
   run.state = runStates.STOPPING;
   run.updatedAt = new Date().toISOString();
@@ -126,15 +138,30 @@ export async function pauseCampaignRun(runId) {
 
 export async function resumeCampaignRun(runId) {
   const run = await loadRun(runId);
-  if (run.state !== runStates.PAUSED || !run.pauseRequested) {
+  if (![runStates.PAUSED, runStates.STOPPED].includes(run.state)) {
+    return { ok: true, run: decorateRun(run) };
+  }
+  const restarting = run.state === runStates.STOPPED;
+  if (restarting && run.leads.some((lead) => lead.state === leadStates.NEEDS_REVIEW)) {
+    run.stopRequested = false;
+    run.state = runStates.NEEDS_ATTENTION;
+    run.updatedAt = new Date().toISOString();
+    await saveRun(run);
+    activeRunId = run.id;
     return { ok: true, run: decorateRun(run) };
   }
   run.pauseRequested = false;
+  run.stopRequested = false;
+  run.stopReason = null;
   run.state = runStates.RUNNING;
   run.updatedAt = new Date().toISOString();
-  await appendAudit(run.id, { event: "run_resumed", outcome: "running" });
+  await appendAudit(run.id, { event: restarting ? "run_restarted" : "run_resumed", outcome: "running" });
   await saveRun(run);
-  controlWake?.();
+  if (restarting || activeRunId !== run.id) {
+    scheduleRunLoop(run);
+  } else {
+    controlWake?.();
+  }
   return { ok: true, run: decorateRun(run) };
 }
 
@@ -298,9 +325,8 @@ async function executeLeadAction(run, leadIndex, action) {
 
     if (result.stopped) {
       lead = transition(lead, {
-        type: "STOPPED",
+        type: "PAUSED",
         outcome: result.outcome,
-        errorCode: result.errorCode,
         detail: result.detail,
         now: new Date().toISOString()
       }, run.snapshot.actions);
@@ -519,15 +545,15 @@ async function ensureAuthenticated(run) {
 async function finalizeStopped(run) {
   const now = new Date().toISOString();
   run.state = runStates.STOPPED;
+  run.pauseRequested = false;
   run.sleepingUntil = null;
   run.sleepingReason = null;
+  run.stoppedAt = now;
   run.updatedAt = now;
-  run.leads = run.leads.map((lead) =>
-    transition(lead, { type: "STOPPED", now }, run.snapshot.actions)
-  );
   await appendAudit(run.id, { event: "run_stopped", outcome: "stopped" });
   await saveRun(run);
   if (activeRunId === run.id) activeRunId = null;
+  return { ok: true, run: decorateRun(run) };
 }
 
 async function waitWhilePaused(runId) {
