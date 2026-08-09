@@ -23,6 +23,17 @@ export async function executeMessage({ session, lead, action, mode }) {
     };
   }
 
+  if (classification.messageState !== "message_available") {
+    return {
+      outcome: "needs_review",
+      errorCode: ErrorCodes.ELEMENT_NOT_FOUND,
+      detail: {
+        ...classification,
+        reason: "No visible Message button was found on the profile. The runner cannot message this lead."
+      }
+    };
+  }
+
   const resolved = renderTemplate(action.template ?? "", lead, { missingVariable: "empty" });
   return {
     outcome: "dry_run_ok",
