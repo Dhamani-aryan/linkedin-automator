@@ -235,6 +235,8 @@ async function runLoop(runId) {
     }
 
     await executeLeadAction(run, selected.index, action);
+    const actionRun = await loadRun(run.id);
+    if (actionRun.state === runStates.NEEDS_ATTENTION) return;
     await interruptibleSleep(run.id, randomizedDelayMs(run.snapshot.safety));
   }
 }
