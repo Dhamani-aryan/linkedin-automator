@@ -75,6 +75,7 @@ export function AccountWorkspace({
   const [selectedActionId, setSelectedActionId] = useState(() => workspace.actions[0]?.id ?? "");
   const linkedInTab = chromeStatus?.tabs.find((tab) => tab.url.includes("linkedin.com")) ?? null;
   const selectedAction = workspace.actions.find((action) => action.id === selectedActionId) ?? null;
+  const firstMessageActionId = workspace.actions.find((action) => action.type === "message")?.id ?? null;
 
   useEffect(() => {
     const nextWorkspace = loadCampaignWorkspace(account);
@@ -493,6 +494,7 @@ export function AccountWorkspace({
       {activeModal === "template" && selectedAction?.template !== undefined ? (
         <MessageTemplateEditor
           actionLabel={selectedAction.name}
+          allowSendNow={selectedAction.id === firstMessageActionId}
           initialDelay={selectedAction.type === "message" ? selectedAction.delay : undefined}
           initialTemplate={selectedAction.template}
           maxLength={selectedAction.type === "connection_request" ? 300 : 8000}
@@ -534,7 +536,7 @@ function formatDate(value: string) {
 }
 
 function formatDelay(delay: WorkflowDelay) {
-  if (delay.amount === 0) return "Send immediately";
+  if (delay.amount === 0) return "Send now";
   const unit = delay.amount === 1 ? delay.unit.replace(/s$/, "") : delay.unit;
   return `Wait ${delay.amount} ${unit}`;
 }

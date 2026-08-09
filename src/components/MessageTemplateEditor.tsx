@@ -1,4 +1,4 @@
-import { Clock3, RefreshCw, Save, X } from "lucide-react";
+import { Clock3, RefreshCw, Save, Send, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { seedLeads } from "../data/seed";
 import { insertVariable, renderTemplate, templateVariables } from "../lib/templateEngine";
@@ -6,6 +6,7 @@ import type { WorkflowDelay, WorkflowDelayUnit } from "../types";
 
 type MessageTemplateEditorProps = {
   actionLabel: string;
+  allowSendNow?: boolean;
   initialDelay?: WorkflowDelay;
   initialTemplate: string;
   maxLength: number;
@@ -15,6 +16,7 @@ type MessageTemplateEditorProps = {
 
 export function MessageTemplateEditor({
   actionLabel,
+  allowSendNow = false,
   initialDelay,
   initialTemplate,
   maxLength,
@@ -22,7 +24,12 @@ export function MessageTemplateEditor({
   onSave
 }: MessageTemplateEditorProps) {
   const [template, setTemplate] = useState(initialTemplate);
-  const [delayAmount, setDelayAmount] = useState(initialDelay?.amount ?? 1);
+  const [deliveryMode, setDeliveryMode] = useState<"now" | "delay">(
+    allowSendNow && initialDelay?.amount === 0 ? "now" : "delay"
+  );
+  const [delayAmount, setDelayAmount] = useState(
+    initialDelay && initialDelay.amount > 0 ? initialDelay.amount : 1
+  );
   const [delayUnit, setDelayUnit] = useState<WorkflowDelayUnit>(initialDelay?.unit ?? "days");
   const [previewIndex, setPreviewIndex] = useState(0);
   const previewLead = seedLeads[previewIndex % seedLeads.length];
@@ -71,33 +78,59 @@ export function MessageTemplateEditor({
 
             {initialDelay ? (
               <section className="message-delay-editor">
-                <div className="editor-section-label">Delivery delay</div>
-                <div className="delay-control-row">
-                  <label className="input-with-icon delay-amount-field">
-                    <Clock3 size={18} />
-                    <input
-                      aria-label="Delay amount"
-                      min="0"
-                      max="365"
-                      type="number"
-                      value={delayAmount}
-                      onChange={(event) =>
-                        setDelayAmount(Math.max(0, Math.min(365, Number(event.target.value) || 0)))
-                      }
-                    />
-                  </label>
-                  <select
-                    aria-label="Delay unit"
-                    className="delay-unit-select"
-                    value={delayUnit}
-                    onChange={(event) => setDelayUnit(event.target.value as WorkflowDelayUnit)}
-                  >
-                    <option value="minutes">Minutes</option>
-                    <option value="hours">Hours</option>
-                    <option value="days">Days</option>
-                  </select>
-                </div>
-                <p>Wait after the previous workflow step. Set the amount to 0 to send immediately.</p>
+                <div className="editor-section-label">Delivery timing</div>
+                {allowSendNow ? (
+                  <div className="delivery-mode-control" aria-label="Message delivery timing">
+                    <button
+                      className={deliveryMode === "now" ? "active" : ""}
+                      type="button"
+                      onClick={() => setDeliveryMode("now")}
+                    >
+                      <Send size={16} />
+                      Send now
+                    </button>
+                    <button
+                      className={deliveryMode === "delay" ? "active" : ""}
+                      type="button"
+                      onClick={() => setDeliveryMode("delay")}
+                    >
+                      <Clock3 size={16} />
+                      Add delay
+                    </button>
+                  </div>
+                ) : null}
+                {deliveryMode === "delay" ? (
+                  <div className="delay-control-row">
+                    <label className="input-with-icon delay-amount-field">
+                      <Clock3 size={18} />
+                      <input
+                        aria-label="Delay amount"
+                        min="1"
+                        max="365"
+                        type="number"
+                        value={delayAmount}
+                        onChange={(event) =>
+                          setDelayAmount(Math.max(1, Math.min(365, Number(event.target.value) || 1)))
+                        }
+                      />
+                    </label>
+                    <select
+                      aria-label="Delay unit"
+                      className="delay-unit-select"
+                      value={delayUnit}
+                      onChange={(event) => setDelayUnit(event.target.value as WorkflowDelayUnit)}
+                    >
+                      <option value="minutes">Minutes</option>
+                      <option value="hours">Hours</option>
+                      <option value="days">Days</option>
+                    </select>
+                  </div>
+                ) : null}
+                <p>
+                  {deliveryMode === "now"
+                    ? "No workflow delay. Global safety pacing still applies."
+                    : "Wait after the previous workflow step before this message is eligible to send."}
+                </p>
               </section>
             ) : null}
           </section>
@@ -137,7 +170,11 @@ export function MessageTemplateEditor({
             onClick={() =>
               onSave(
                 template.trim(),
-                initialDelay ? { amount: delayAmount, unit: delayUnit } : undefined
+                initialDelay
+                  ? deliveryMode === "now"
+                    ? { amount: 0, unit: "minutes" }
+                    : { amount: delayAmount, unit: delayUnit }
+                  : undefined
               )
             }
           >

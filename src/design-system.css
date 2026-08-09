@@ -1605,6 +1605,42 @@ p {
   padding-top: 14px;
 }
 
+.delivery-mode-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 9px;
+  padding: 4px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  background: var(--app-surface-subtle);
+}
+
+.delivery-mode-control button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  border-radius: var(--app-radius-md);
+  color: var(--app-text-muted);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.delivery-mode-control button:hover {
+  color: var(--app-text-primary);
+  background: var(--app-surface-hover);
+}
+
+.delivery-mode-control button.active {
+  color: var(--app-text-primary);
+  background: var(--app-surface-raised);
+  box-shadow: var(--app-shadow-sm);
+}
+
 .delay-control-row {
   grid-template-columns: minmax(110px, 0.6fr) minmax(130px, 1fr);
   gap: 8px;
