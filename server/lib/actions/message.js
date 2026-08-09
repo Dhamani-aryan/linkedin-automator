@@ -3,7 +3,7 @@ import { ErrorCodes } from "../errors.js";
 import { renderTemplate } from "../template.js";
 import { selectors } from "./selectors.js";
 
-export async function executeMessage({ session, lead, action, mode }) {
+export async function executeMessage({ session, lead, action, mode, shouldStop = async () => false }) {
   const page = await navigate(session, lead.linkedinUrl, { timeoutMs: 25_000 });
   const classification = await readMessageEligibility(session);
 
@@ -28,7 +28,7 @@ export async function executeMessage({ session, lead, action, mode }) {
 
   const resolved = renderTemplate(action.template ?? "", lead, { missingVariable: "empty" });
   if (mode === "live") {
-    return await sendLiveMessage({ session, page, classification, resolved });
+    return await sendLiveMessage({ session, page, classification, resolved, shouldStop });
   }
 
   return {
@@ -46,8 +46,10 @@ export async function executeMessage({ session, lead, action, mode }) {
   };
 }
 
-async function sendLiveMessage({ session, page, classification, resolved }) {
+async function sendLiveMessage({ session, page, classification, resolved, shouldStop }) {
   const recipientName = page.title.replace(/\s*\|\s*LinkedIn\s*$/i, "").trim();
+  if (await shouldStop()) return stoppedMessageResult("before_composer", recipientName);
+
   const opened = await openMessageComposer(session, recipientName);
   if (!opened) {
     return {
@@ -127,6 +129,7 @@ async function sendLiveMessage({ session, page, classification, resolved }) {
     };
   }
 
+  if (await shouldStop()) return stoppedMessageResult("before_send", recipientName);
   await clickAt(session, sendPoint);
   const confirmation = await waitForSentMessage(session, recipientName, resolved.text, beforeCount, 12_000);
   if (!confirmation?.confirmed) {
@@ -152,6 +155,21 @@ async function sendLiveMessage({ session, page, classification, resolved }) {
       missingVariables: resolved.missing,
       confirmation: confirmation.indicator,
       sentAt: confirmation.sentAt
+    }
+  };
+}
+
+function stoppedMessageResult(stage, recipientName) {
+  return {
+    stopped: true,
+    outcome: "stopped",
+    errorCode: ErrorCodes.RUN_STOPPED,
+    event: "message_stopped",
+    detail: {
+      actionType: "message",
+      stage,
+      recipientName,
+      reason: "Stop was requested before Send was clicked."
     }
   };
 }

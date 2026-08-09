@@ -223,7 +223,13 @@ async function executeLeadAction(run, leadIndex, action) {
   const tab = await openTab(lead.lead.linkedinUrl);
   const session = await attach(tab.id);
   try {
-    const result = await executeAction({ session, lead: lead.lead, action, mode: run.mode });
+    const result = await executeAction({
+      session,
+      lead: lead.lead,
+      action,
+      mode: run.mode,
+      shouldStop: async () => (await loadRun(run.id)).stopRequested
+    });
     await appendAudit(run.id, {
       leadId: lead.id,
       actionId: action.id,
@@ -234,7 +240,17 @@ async function executeLeadAction(run, leadIndex, action) {
       detail: result.detail
     });
 
-    if (result.errorCode) {
+    if (result.stopped) {
+      lead = transition(lead, {
+        type: "STOPPED",
+        outcome: result.outcome,
+        errorCode: result.errorCode,
+        detail: result.detail,
+        now: new Date().toISOString()
+      }, run.snapshot.actions);
+      run.stopRequested = true;
+      run.state = runStates.STOPPING;
+    } else if (result.errorCode) {
       lead = transition(lead, {
         type: "NEEDS_REVIEW",
         outcome: result.outcome,
