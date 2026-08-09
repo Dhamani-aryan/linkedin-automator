@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   appendAudit,
   createRunStore,
+  findLatestResumableRun,
   loadRun,
   readAudit,
   recoverInterruptedRuns,
@@ -121,5 +122,29 @@ describe("runStore", () => {
       pauseRequested: true,
       leads: [{ nextEligibleAt: "2026-08-09T12:00:00.000Z" }]
     });
+  });
+
+  it("finds the latest stopped run that still has pending work", async () => {
+    const store = await tempStore();
+    await saveRun({
+      id: "older",
+      state: runStates.STOPPED,
+      updatedAt: "2026-08-09T10:00:00.000Z",
+      leads: [{ state: leadStates.WAITING_DELAY }]
+    }, store);
+    await saveRun({
+      id: "finished",
+      state: runStates.STOPPED,
+      updatedAt: "2026-08-09T12:00:00.000Z",
+      leads: [{ state: leadStates.STOPPED }]
+    }, store);
+    await saveRun({
+      id: "newer",
+      state: runStates.STOPPED,
+      updatedAt: "2026-08-09T11:00:00.000Z",
+      leads: [{ state: leadStates.QUEUED }]
+    }, store);
+
+    await expect(findLatestResumableRun(store)).resolves.toMatchObject({ id: "newer" });
   });
 });

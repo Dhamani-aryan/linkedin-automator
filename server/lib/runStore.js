@@ -135,6 +135,21 @@ function recoverLead(lead, nowIso) {
   };
 }
 
+export async function findLatestResumableRun(store = createRunStore()) {
+  const runs = await Promise.all((await listRunIds(store)).map((runId) => loadRun(runId, store)));
+  return runs
+    .filter((run) =>
+      run.state === runStates.STOPPED &&
+      run.leads.some((lead) => [
+        leadStates.QUEUED,
+        leadStates.WAITING_ACCEPTANCE,
+        leadStates.WAITING_DELAY,
+        leadStates.NEEDS_REVIEW
+      ].includes(lead.state))
+    )
+    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))[0] ?? null;
+}
+
 async function exists(path) {
   try {
     await access(path, constants.F_OK);
