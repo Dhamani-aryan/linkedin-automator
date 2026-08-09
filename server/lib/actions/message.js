@@ -348,7 +348,7 @@ async function readComposer(session, recipientName) {
       .trim();
     const container = shadowBubble ?? (pageRecipient === expectedRecipient ? pageThread : null);
     const editor = container?.querySelector('.msg-form__contenteditable[contenteditable="true"][role="textbox"]');
-    if (!container || !(editor instanceof HTMLElement)) return null;
+    if (!container || !editor) return null;
     return {
       recipientName: shadowBubble
         ? normalize(shadowBubble.querySelector(".msg-overlay-bubble-header__title")?.textContent)
@@ -377,7 +377,7 @@ async function focusComposer(session, recipientName) {
       .trim();
     const container = shadowBubble ?? (pageRecipient === expectedRecipient ? pageThread : null);
     const editor = container?.querySelector('.msg-form__contenteditable[contenteditable="true"][role="textbox"]');
-    if (!(editor instanceof HTMLElement)) return false;
+    if (!editor || typeof editor.focus !== "function") return false;
     editor.focus();
     return document.activeElement === editor || shadowRoot?.activeElement === editor;
   }, [recipientName], { userGesture: true });
@@ -398,7 +398,7 @@ async function readComposerText(session, recipientName, expectedText) {
       .trim();
     const container = shadowBubble ?? (pageRecipient === expectedRecipient ? pageThread : null);
     const editor = container?.querySelector('.msg-form__contenteditable[contenteditable="true"][role="textbox"]');
-    if (!(editor instanceof HTMLElement)) return null;
+    if (!editor) return null;
     const text = normalizeText(editor.innerText);
     const matchingMessageCount = [...container.querySelectorAll(".msg-s-event-listitem__body")]
       .filter((element) => normalizeText(element.innerText) === normalizeText(expected))
@@ -421,7 +421,7 @@ async function readSendPoint(session, recipientName) {
       .trim();
     const container = shadowBubble ?? (pageRecipient === expectedRecipient ? pageThread : null);
     const button = container?.querySelector('button.msg-form__send-button[type="submit"]:not([disabled])');
-    if (!(button instanceof HTMLElement)) return null;
+    if (!button) return null;
     const rect = button.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return null;
     return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
