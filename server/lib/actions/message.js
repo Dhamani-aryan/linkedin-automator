@@ -22,7 +22,7 @@ export async function executeMessage({
     };
   }
 
-  if (!["message_available", "message_available_under_more"].includes(classification.messageState)) {
+  if (classification.messageState !== "message_available") {
     return {
       outcome: "needs_review",
       errorCode: ErrorCodes.ELEMENT_NOT_FOUND,
@@ -58,8 +58,8 @@ async function sendLiveMessage({ session, page, classification, resolved, should
   if (await shouldStop()) return stoppedMessageResult("before_composer", recipientName);
   if (await shouldPause()) return pausedMessageResult("before_composer", recipientName);
 
-  const opened = await openMessageComposer(session, recipientName);
-  if (!opened) {
+  const opening = await openMessageComposer(session, recipientName);
+  if (!opening.composer) {
     return {
       outcome: "needs_review",
       errorCode: ErrorCodes.ELEMENT_NOT_FOUND,
@@ -67,23 +67,13 @@ async function sendLiveMessage({ session, page, classification, resolved, should
         actionType: "message",
         reason: "The profile Message control did not open a composer.",
         recipientName,
+        composerOpening: opening,
         ...classification
       }
     };
   }
 
-  const composer = await waitForComposer(session, recipientName, 10_000);
-  if (!composer) {
-    return {
-      outcome: "needs_review",
-      errorCode: ErrorCodes.ELEMENT_NOT_FOUND,
-      detail: {
-        actionType: "message",
-        reason: "LinkedIn opened messaging, but the message editor was not found.",
-        recipientName
-      }
-    };
-  }
+  const composer = opening.composer;
 
   if (composer.text.length > 0) {
     return {
@@ -199,46 +189,29 @@ function pausedMessageResult(stage, recipientName) {
 }
 
 async function openMessageComposer(session, recipientName) {
-  const existing = await readComposer(session, recipientName);
-  if (existing) return true;
-
   await evaluate(session, () => window.scrollTo({ top: 0, behavior: "instant" }), []);
-  const directTarget = await waitForValue(
+  const profileTarget = await waitForValue(
     () => readProfileMessageTarget(session),
     Boolean,
     15_000
   );
 
-  if (directTarget) {
-    await clickAt(session, directTarget.point);
-    if (await waitForComposer(session, recipientName, 4_000)) return true;
-    if (directTarget.href) {
-      await navigate(session, directTarget.href, { timeoutMs: 25_000 });
-      if (await waitForComposer(session, recipientName, 8_000)) return true;
-    }
+  if (!profileTarget) {
+    return {
+      composer: null,
+      stage: "profile_message_button_missing",
+      surface: "profile_main_action"
+    };
   }
 
-  let menuPoint = await readOverflowMessagePoint(session);
-  if (!menuPoint) {
-    const morePoint = await evaluate(session, (selector) => {
-      const candidates = [...document.querySelectorAll(selector)]
-        .filter((element) => {
-          const rect = element.getBoundingClientRect();
-          return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < innerHeight;
-        })
-        .map((element) => element.getBoundingClientRect())
-        .sort((left, right) => right.y - left.y);
-      const rect = candidates[0];
-      return rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : null;
-    }, [selectors.profileOverflowControl]);
-    if (!morePoint) return false;
-    await clickAt(session, morePoint);
-    menuPoint = await waitForValue(() => readOverflowMessagePoint(session), Boolean, 3_000);
-  }
-
-  if (!menuPoint) return false;
-  await clickAt(session, menuPoint);
-  return Boolean(await waitForComposer(session, recipientName, 8_000));
+  await clickAt(session, profileTarget.point);
+  const composer = await waitForComposer(session, recipientName, 15_000);
+  return {
+    composer,
+    stage: composer ? "profile_composer_opened" : "profile_message_click_unresolved",
+    surface: "profile_main_action",
+    target: profileTarget.detail
+  };
 }
 
 async function readProfileMessageTarget(session) {
@@ -247,15 +220,16 @@ async function readProfileMessageTarget(session) {
       .filter((element) => {
         const rect = element.getBoundingClientRect();
         const style = getComputedStyle(element);
+        const label = `${element.textContent ?? ""} ${element.getAttribute("aria-label") ?? ""}`
+          .replace(/\s+/g, " ")
+          .trim()
+          .toLowerCase();
         return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < innerHeight &&
+          rect.top >= 80 && rect.height >= 40 && label.startsWith("message") &&
           style.visibility !== "hidden" && style.display !== "none";
       })
       .map((element) => ({ element, rect: element.getBoundingClientRect() }))
-      .sort((left, right) => {
-        const leftInProfile = left.rect.y >= 80 ? 1 : 0;
-        const rightInProfile = right.rect.y >= 80 ? 1 : 0;
-        return rightInProfile - leftInProfile || right.rect.y - left.rect.y;
-      });
+      .sort((left, right) => left.rect.top - right.rect.top);
     const candidate = candidates[0];
     if (!candidate) return null;
     return {
@@ -263,24 +237,16 @@ async function readProfileMessageTarget(session) {
         x: candidate.rect.left + candidate.rect.width / 2,
         y: candidate.rect.top + candidate.rect.height / 2
       },
-      href: candidate.element instanceof HTMLAnchorElement ? candidate.element.href : null
+      detail: {
+        tag: candidate.element.tagName.toLowerCase(),
+        label: (candidate.element.textContent ?? candidate.element.getAttribute("aria-label") ?? "")
+          .replace(/\s+/g, " ")
+          .trim(),
+        top: Math.round(candidate.rect.top),
+        height: Math.round(candidate.rect.height)
+      }
     };
   }, [selectors.profileMessageControl]);
-}
-
-async function readOverflowMessagePoint(session) {
-  return await evaluate(session, (messageText) => {
-    const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
-    const controls = [...document.querySelectorAll('[role="menuitem"], [role="menu"] button, [role="menu"] a')];
-    const element = controls.find((control) => {
-      const rect = control.getBoundingClientRect();
-      const label = `${normalize(control.textContent)} ${normalize(control.getAttribute("aria-label"))}`;
-      return rect.width > 0 && rect.height > 0 && label.includes(messageText);
-    });
-    if (!element) return null;
-    const rect = element.getBoundingClientRect();
-    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-  }, [selectors.messageButtonText]);
 }
 
 async function readComposer(session, recipientName) {
@@ -445,26 +411,19 @@ async function readMessageEligibility(session) {
     const startedAt = Date.now();
     const hydrationTimeoutMs = 15_000;
     const text = document.body?.innerText?.toLowerCase() ?? "";
-    const readControls = () => [...document.querySelectorAll('button, a, [role="button"], [role="menuitem"]')].map((control) => ({
-      text: (control.textContent ?? "").replace(/\s+/g, " ").trim().toLowerCase(),
-      aria: (control.getAttribute("aria-label") ?? "").toLowerCase(),
-      href: (control.getAttribute("href") ?? "").toLowerCase(),
-      element: control
-    }));
     const isMessageControl = (control) =>
       control.text === selectorsInput.messageButtonText ||
-      control.aria.startsWith(selectorsInput.messageButtonText) ||
-      control.href.includes("/messaging/compose/");
+      control.aria.startsWith(selectorsInput.messageButtonText);
     const findPrimaryMessageControl = () => {
-      const preferred = [...document.querySelectorAll(selectorsInput.profileMessageControl)]
+      return [...document.querySelectorAll(selectorsInput.profileMessageControl)]
         .filter(isVisible)
         .map((element) => readControl(element))
-        .find(isMessageControl);
-      if (preferred) return preferred;
-
-      return readControls()
-        .filter((control) => control.element.matches('button, a[role="button"]') && isVisible(control.element))
-        .find(isMessageControl);
+        .filter((control) =>
+          isMessageControl(control) &&
+          control.rect.top >= 80 &&
+          control.rect.height >= 40
+        )
+        .sort((left, right) => left.rect.top - right.rect.top)[0] ?? null;
     };
     const isVisible = (element) => {
       const rect = element.getBoundingClientRect();
@@ -476,7 +435,8 @@ async function readMessageEligibility(session) {
       text: (control.textContent ?? "").replace(/\s+/g, " ").trim().toLowerCase(),
       aria: (control.getAttribute("aria-label") ?? "").toLowerCase(),
       href: (control.getAttribute("href") ?? "").toLowerCase(),
-      element: control
+      element: control,
+      rect: control.getBoundingClientRect()
     });
 
     if (document.querySelector(selectorsInput.loginForm) || /\/login|authwall/i.test(location.href)) {
@@ -497,27 +457,8 @@ async function readMessageEligibility(session) {
       messageControl = findPrimaryMessageControl();
     }
 
-    let messageState = messageControl ? "message_available" : "message_unavailable";
-    let matchedControl = messageControl?.href.includes("/messaging/compose/") ? "compose_link" :
-      messageControl ? "labeled_control" : null;
-    if (!messageControl) {
-      const preferredMore = document.querySelector(selectorsInput.profileOverflowControl);
-      const moreButton = preferredMore ?? readControls().find((control) =>
-        control.text === selectorsInput.moreButtonText ||
-        control.aria === selectorsInput.moreButtonText
-      )?.element;
-      if (moreButton instanceof HTMLElement) {
-        moreButton.click();
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        const menuHasMessage = readControls()
-          .filter((control) => control.element.matches('[role="menuitem"], [role="button"], button, a'))
-          .some(isMessageControl);
-        if (menuHasMessage) {
-          messageState = "message_available_under_more";
-          matchedControl = "overflow_menu";
-        }
-      }
-    }
+    const messageState = messageControl ? "message_available" : "message_unavailable";
+    const matchedControl = messageControl ? "profile_main_action" : null;
 
     return {
       pageKind: "profile",
