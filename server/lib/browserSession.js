@@ -182,20 +182,29 @@ export async function clickAt(session, point) {
   await session.send("Input.dispatchMouseEvent", {
     type: "mouseMoved",
     x: point.x,
-    y: point.y
+    y: point.y,
+    button: "none",
+    buttons: 0,
+    pointerType: "mouse"
   });
+  await sleep(250);
   await session.send("Input.dispatchMouseEvent", {
     type: "mousePressed",
     x: point.x,
     y: point.y,
     button: "left",
+    buttons: 1,
+    pointerType: "mouse",
     clickCount: 1
   });
+  await sleep(120);
   await session.send("Input.dispatchMouseEvent", {
     type: "mouseReleased",
     x: point.x,
     y: point.y,
     button: "left",
+    buttons: 0,
+    pointerType: "mouse",
     clickCount: 1
   });
 }
