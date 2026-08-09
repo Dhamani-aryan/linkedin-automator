@@ -2293,12 +2293,12 @@ p {
   margin-top: 14px;
 }
 
-.live-run-fields > label:first-child {
+.live-run-fields > label:not(.live-send-confirmation) {
   display: grid;
   gap: 6px;
 }
 
-.live-run-fields > label:first-child > span,
+.live-run-fields > label:not(.live-send-confirmation) > span,
 .live-message-preview > span {
   color: var(--app-text-secondary);
   font-size: 10px;

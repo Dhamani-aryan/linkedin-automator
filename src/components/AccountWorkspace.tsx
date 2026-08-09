@@ -94,6 +94,9 @@ export function AccountWorkspace({
   const [isStartConfirmationOpen, setIsStartConfirmationOpen] = useState(false);
   const [startMode, setStartMode] = useState<"dry_run" | "live">("dry_run");
   const [liveLeadId, setLiveLeadId] = useState(() => workspace.leads[0]?.id ?? "");
+  const [liveMessageActionId, setLiveMessageActionId] = useState(() =>
+    workspace.actions.find((action) => action.type === "message" && !action.automatic)?.id ?? ""
+  );
   const [liveSendConfirmed, setLiveSendConfirmed] = useState(false);
   const [isCampaignBusy, setIsCampaignBusy] = useState(false);
   const [activeRun, setActiveRun] = useState<CampaignRun | null>(null);
@@ -110,20 +113,19 @@ export function AccountWorkspace({
   const campaignButtonIsStop = hasActiveServerRun || isStartPending;
   const safetyWindowNotice = getSafetyWindowNotice(safetySettings);
   const liveLead = workspace.leads.find((lead) => lead.id === liveLeadId) ?? workspace.leads[0] ?? null;
-  const firstLiveMessage = workspace.actions.find(
+  const liveMessageActions = workspace.actions.filter(
     (action) => action.type === "message" && !action.automatic
-  ) ?? null;
-  const hasUnsupportedLiveAction = workspace.actions.some(
-    (action) => !action.automatic && action.type !== "message"
   );
-  const resolvedLiveMessage = liveLead && firstLiveMessage?.template !== undefined
-    ? renderTemplate(firstLiveMessage.template, liveLead)
+  const liveMessageAction = liveMessageActions.find((action) => action.id === liveMessageActionId)
+    ?? liveMessageActions[0]
+    ?? null;
+  const resolvedLiveMessage = liveLead && liveMessageAction?.template !== undefined
+    ? renderTemplate(liveMessageAction.template, liveLead)
     : "";
   const liveStartReady = Boolean(
     liveLead &&
-    firstLiveMessage &&
+    liveMessageAction &&
     resolvedLiveMessage.length > 0 &&
-    !hasUnsupportedLiveAction &&
     liveSendConfirmed
   );
 
@@ -134,6 +136,9 @@ export function AccountWorkspace({
     setActiveRun(null);
     setStartMode("dry_run");
     setLiveLeadId(nextWorkspace.leads[0]?.id ?? "");
+    setLiveMessageActionId(nextWorkspace.actions.find(
+      (action) => action.type === "message" && !action.automatic
+    )?.id ?? "");
     setLiveSendConfirmed(false);
   }, [account.id]);
 
@@ -314,6 +319,9 @@ export function AccountWorkspace({
     setLiveLeadId((current) => workspace.leads.some((lead) => lead.id === current)
       ? current
       : workspace.leads[0]?.id ?? "");
+    setLiveMessageActionId((current) => workspace.actions.some(
+      (action) => action.id === current && action.type === "message" && !action.automatic
+    ) ? current : liveMessageActions[0]?.id ?? "");
     setLiveSendConfirmed(false);
     setIsStartConfirmationOpen(true);
   }
@@ -343,7 +351,7 @@ export function AccountWorkspace({
         campaign: startMode === "live"
           ? { ...workspace.campaign, profilesTotal: 1, profilesToProcess: 1 }
           : workspace.campaign,
-        actions: workspace.actions,
+        actions: startMode === "live" && liveMessageAction ? [liveMessageAction] : workspace.actions,
         leads: runLeads,
         safety: {
           ...safetySettings,
@@ -819,13 +827,25 @@ export function AccountWorkspace({
                       ))}
                     </select>
                   </label>
-                  {hasUnsupportedLiveAction ? (
-                    <p className="live-run-warning">
-                      <AlertTriangle size={16} /> Live verification currently supports message-only workflows.
-                    </p>
-                  ) : firstLiveMessage ? (
+                  {liveMessageActions.length > 1 ? (
+                    <label>
+                      <span>Message action</span>
+                      <select
+                        value={liveMessageAction?.id ?? ""}
+                        onChange={(event) => {
+                          setLiveMessageActionId(event.target.value);
+                          setLiveSendConfirmed(false);
+                        }}
+                      >
+                        {liveMessageActions.map((action, index) => (
+                          <option key={action.id} value={action.id}>Message {index + 1}: {action.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                  {liveMessageAction ? (
                     <div className="live-message-preview">
-                      <span>First message to {liveLead?.displayName}</span>
+                      <span>Exact message to {liveLead?.displayName}</span>
                       <pre>{resolvedLiveMessage}</pre>
                     </div>
                   ) : (
@@ -838,7 +858,7 @@ export function AccountWorkspace({
                       type="checkbox"
                       checked={liveSendConfirmed}
                       onChange={(event) => setLiveSendConfirmed(event.target.checked)}
-                      disabled={hasUnsupportedLiveAction || !firstLiveMessage || resolvedLiveMessage.length === 0}
+                      disabled={!liveMessageAction || resolvedLiveMessage.length === 0}
                     />
                     <span>I confirm this exact message will be sent to {liveLead?.displayName ?? "the selected lead"}.</span>
                   </label>
