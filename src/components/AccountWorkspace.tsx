@@ -245,10 +245,9 @@ export function AccountWorkspace({
       existingUrls.add(key);
       return true;
     });
-    const newLeads = uniqueProfiles.map((profile) => {
-      const lead = createLeadFromUrl(profile.url, sourceId);
-      return profile.name.trim() ? { ...lead, displayName: profile.name.trim() } : lead;
-    });
+    const newLeads = uniqueProfiles.map((profile) =>
+      createLeadFromUrl(profile.url, sourceId, profile.name)
+    );
 
     if (newLeads.length > 0) {
       const source: LeadSource = {

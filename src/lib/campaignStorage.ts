@@ -14,20 +14,16 @@ export function saveCampaignWorkspace(accountId: string, state: CampaignWorkspac
   window.localStorage.setItem(CAMPAIGN_WORKSPACE_KEY, JSON.stringify(stored));
 }
 
-export function createLeadFromUrl(url: string, sourceId: string): LeadProfile {
-  const publicId = extractPublicId(url);
-  const displayName = publicId
-    .split(/[-_]/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+export function createLeadFromUrl(url: string, sourceId: string, profileName = ""): LeadProfile {
+  const displayName = normalizeProfileName(profileName);
+  const nameParts = displayName.split(" ").filter(Boolean);
 
   return {
     id: crypto.randomUUID(),
     linkedinUrl: url,
     displayName: displayName || "LinkedIn profile",
-    firstName: displayName.split(" ")[0] ?? "",
-    lastName: displayName.split(" ").slice(1).join(" "),
+    firstName: nameParts[0] ?? "",
+    lastName: nameParts.slice(1).join(" "),
     company: "",
     position: "",
     location: "",
@@ -35,6 +31,10 @@ export function createLeadFromUrl(url: string, sourceId: string): LeadProfile {
     status: "to_process",
     addedAt: new Date().toISOString()
   };
+}
+
+function normalizeProfileName(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
 }
 
 function createInitialCampaignWorkspace(accountId: string): CampaignWorkspaceState {
@@ -91,16 +91,4 @@ function normalizeWorkspace(state: CampaignWorkspaceState): CampaignWorkspaceSta
     }),
     sources
   };
-}
-
-function extractPublicId(url: string): string {
-  try {
-    const parsed = new URL(url);
-    const segments = parsed.pathname.split("/").filter(Boolean);
-    const markerIndex = segments.findIndex((segment) => segment === "in" || segment === "lead");
-    const candidate = markerIndex >= 0 ? segments[markerIndex + 1] : segments[segments.length - 1];
-    return decodeURIComponent(candidate ?? "").split(",")[0];
-  } catch {
-    return "";
-  }
 }
