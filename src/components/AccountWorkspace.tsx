@@ -110,6 +110,10 @@ export function AccountWorkspace({
   const firstMessageActionId = workspace.actions.find((action) => action.type === "message")?.id ?? null;
   const hasActiveServerRun =
     activeRun !== null && ["running", "paused", "sleeping", "stopping", "needs_attention"].includes(activeRun.state);
+  const nextFollowUpDueAt = activeRun?.leads
+    .filter((lead) => lead.state === "waiting_delay" && lead.nextEligibleAt)
+    .map((lead) => lead.nextEligibleAt as string)
+    .sort((left, right) => Date.parse(left) - Date.parse(right))[0] ?? null;
   const safetyWindowNotice = getSafetyWindowNotice(safetySettings);
   const liveLeads = workspace.leads.filter((lead) => lead.status !== "excluded");
   const liveMessageActions = workspace.actions.filter(
@@ -675,6 +679,7 @@ export function AccountWorkspace({
               {activeRun.mode === "live" ? "Live" : "Dry"} run {runStateLabel(activeRun.state)}: {activeRun.summary.completed} completed, {activeRun.summary.sleeping} waiting, {activeRun.summary.needsReview} needs review.
               {activeRun.sleepingReason ? ` Paused by safety limits: ${sleepingReasonLabel(activeRun.sleepingReason)}.` : ""}
               {activeRun.sleepingUntil ? ` Next check ${formatDate(activeRun.sleepingUntil)}.` : ""}
+              {nextFollowUpDueAt ? ` Next follow-up due ${formatDate(nextFollowUpDueAt)}.` : ""}
             </span>
           </div>
         ) : null}
