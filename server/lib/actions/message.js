@@ -3,7 +3,14 @@ import { ErrorCodes } from "../errors.js";
 import { renderTemplate } from "../template.js";
 import { selectors } from "./selectors.js";
 
-export async function executeMessage({ session, lead, action, mode, shouldStop = async () => false }) {
+export async function executeMessage({
+  session,
+  lead,
+  action,
+  mode,
+  shouldStop = async () => false,
+  shouldPause = async () => false
+}) {
   const page = await navigate(session, lead.linkedinUrl, { timeoutMs: 25_000 });
   const classification = await readMessageEligibility(session);
 
@@ -28,7 +35,7 @@ export async function executeMessage({ session, lead, action, mode, shouldStop =
 
   const resolved = renderTemplate(action.template ?? "", lead, { missingVariable: "empty" });
   if (mode === "live") {
-    return await sendLiveMessage({ session, page, classification, resolved, shouldStop });
+    return await sendLiveMessage({ session, page, classification, resolved, shouldStop, shouldPause });
   }
 
   return {
@@ -46,9 +53,10 @@ export async function executeMessage({ session, lead, action, mode, shouldStop =
   };
 }
 
-async function sendLiveMessage({ session, page, classification, resolved, shouldStop }) {
+async function sendLiveMessage({ session, page, classification, resolved, shouldStop, shouldPause }) {
   const recipientName = page.title.replace(/\s*\|\s*LinkedIn\s*$/i, "").trim();
   if (await shouldStop()) return stoppedMessageResult("before_composer", recipientName);
+  if (await shouldPause()) return pausedMessageResult("before_composer", recipientName);
 
   const opened = await openMessageComposer(session, recipientName);
   if (!opened) {
@@ -130,6 +138,7 @@ async function sendLiveMessage({ session, page, classification, resolved, should
   }
 
   if (await shouldStop()) return stoppedMessageResult("before_send", recipientName);
+  if (await shouldPause()) return pausedMessageResult("before_send", recipientName);
   await clickAt(session, sendPoint);
   const confirmation = await waitForSentMessage(session, recipientName, resolved.text, beforeCount, 12_000);
   if (!confirmation?.confirmed) {
@@ -170,6 +179,21 @@ function stoppedMessageResult(stage, recipientName) {
       stage,
       recipientName,
       reason: "Stop was requested before Send was clicked."
+    }
+  };
+}
+
+function pausedMessageResult(stage, recipientName) {
+  return {
+    paused: true,
+    outcome: "paused",
+    errorCode: null,
+    event: "message_paused",
+    detail: {
+      actionType: "message",
+      stage,
+      recipientName,
+      reason: "Pause was requested before Send was clicked."
     }
   };
 }
