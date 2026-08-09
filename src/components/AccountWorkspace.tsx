@@ -101,6 +101,7 @@ export function AccountWorkspace({
   const hasActiveServerRun =
     activeRun !== null && ["running", "sleeping", "stopping", "needs_attention"].includes(activeRun.state);
   const campaignButtonIsStop = hasActiveServerRun || isStartPending;
+  const safetyWindowNotice = getSafetyWindowNotice(safetySettings);
 
   useEffect(() => {
     const nextWorkspace = loadCampaignWorkspace(account);
@@ -466,9 +467,10 @@ export function AccountWorkspace({
         ) : null}
 
         {activeRun ? (
-          <div className="workspace-feedback success" role="status">
+          <div className={`workspace-feedback ${activeRun.state === "sleeping" ? "error" : "success"}`} role="status">
             <span>
               Server run {runStateLabel(activeRun.state)}: {activeRun.summary.completed} completed, {activeRun.summary.sleeping} waiting, {activeRun.summary.needsReview} needs review.
+              {activeRun.sleepingReason ? ` Paused by safety limits: ${sleepingReasonLabel(activeRun.sleepingReason)}.` : ""}
               {activeRun.sleepingUntil ? ` Next check ${formatDate(activeRun.sleepingUntil)}.` : ""}
             </span>
           </div>
@@ -719,6 +721,7 @@ export function AccountWorkspace({
               <div className="campaign-preflight-list">
                 <span><Check size={16} /> Workflow and leads are saved</span>
                 <span><Check size={16} /> Managed Chrome will start if needed</span>
+                {safetyWindowNotice ? <span><Clock3 size={16} /> {safetyWindowNotice}</span> : null}
                 <span><AlertTriangle size={16} /> Dry run only: no Send buttons are clicked</span>
               </div>
             </div>
@@ -792,4 +795,28 @@ function leadRunLabel(run: CampaignRun | null, leadId: string) {
   if (leadRun.state === "waiting_delay") return "Waiting delay";
   if (leadRun.state === "needs_review") return "Needs review";
   return leadRun.state.replace("_", " ");
+}
+
+function sleepingReasonLabel(reason: string) {
+  if (reason === "outside_working_hours") return "outside working hours";
+  if (reason === "daily_action_limit_reached") return "daily action limit reached";
+  if (reason === "daily_invite_limit_reached") return "daily invite limit reached";
+  if (reason === "batch_cooldown") return "batch cooldown";
+  if (reason === "waiting_for_next_eligible_lead") return "waiting for the next eligible lead";
+  return reason.replace(/_/g, " ");
+}
+
+function getSafetyWindowNotice(settings: HumanTouchSettings) {
+  const now = new Date();
+  const [startHour, startMinute] = settings.workingHoursStart.split(":").map(Number);
+  const [endHour, endMinute] = settings.workingHoursEnd.split(":").map(Number);
+  const start = startHour * 60 + startMinute;
+  const end = endHour * 60 + endMinute;
+  const current = now.getHours() * 60 + now.getMinutes();
+  const insideWindow = start < end
+    ? current >= start && current < end
+    : current >= start || current < end;
+
+  if (insideWindow) return null;
+  return `Outside safety hours (${settings.workingHoursStart}-${settings.workingHoursEnd}); the run will sleep until the next window.`;
 }
