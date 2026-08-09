@@ -3,6 +3,8 @@ import { ErrorCodes } from "../errors.js";
 import { renderTemplate } from "../template.js";
 import { selectors } from "./selectors.js";
 
+const PROFILE_MESSAGE_SETTLE_MS = 6_000;
+
 export async function executeMessage({
   session,
   lead,
@@ -210,6 +212,7 @@ function pausedMessageResult(stage, recipientName) {
 
 async function openMessageComposer(session, recipientName) {
   await evaluate(session, () => window.scrollTo({ top: 0, behavior: "instant" }), []);
+  await new Promise((resolve) => setTimeout(resolve, PROFILE_MESSAGE_SETTLE_MS));
   const attempts = [];
 
   for (let attempt = 1; attempt <= 2; attempt += 1) {
@@ -224,6 +227,7 @@ async function openMessageComposer(session, recipientName) {
         composer: null,
         stage: "profile_message_button_missing",
         surface: "profile_main_action",
+        settledForMs: PROFILE_MESSAGE_SETTLE_MS,
         attempts
       };
     }
@@ -240,6 +244,7 @@ async function openMessageComposer(session, recipientName) {
         composer,
         stage: "profile_composer_opened",
         surface: "profile_main_action",
+        settledForMs: PROFILE_MESSAGE_SETTLE_MS,
         attempt,
         attempts
       };
@@ -250,6 +255,7 @@ async function openMessageComposer(session, recipientName) {
     composer: null,
     stage: "profile_message_click_unresolved",
     surface: "profile_main_action",
+    settledForMs: PROFILE_MESSAGE_SETTLE_MS,
     attempts
   };
 }
