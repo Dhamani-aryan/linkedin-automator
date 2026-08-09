@@ -90,6 +90,7 @@ export function AccountWorkspace({
   const [isStartConfirmationOpen, setIsStartConfirmationOpen] = useState(false);
   const [isCampaignBusy, setIsCampaignBusy] = useState(false);
   const [activeRun, setActiveRun] = useState<CampaignRun | null>(null);
+  const [isStartPending, setIsStartPending] = useState(false);
   const [campaignNotice, setCampaignNotice] = useState<{
     tone: "success" | "error";
     message: string;
@@ -99,6 +100,7 @@ export function AccountWorkspace({
   const firstMessageActionId = workspace.actions.find((action) => action.type === "message")?.id ?? null;
   const hasActiveServerRun =
     activeRun !== null && ["running", "sleeping", "stopping", "needs_attention"].includes(activeRun.state);
+  const campaignButtonIsStop = hasActiveServerRun || isStartPending;
 
   useEffect(() => {
     const nextWorkspace = loadCampaignWorkspace(account);
@@ -286,6 +288,7 @@ export function AccountWorkspace({
 
   async function confirmCampaignStart() {
     setIsCampaignBusy(true);
+    setIsStartPending(true);
     setCampaignNotice(null);
     const chromeReady = chromeStatus?.connected || (await onStartChrome());
     if (!chromeReady) {
@@ -294,6 +297,7 @@ export function AccountWorkspace({
         message: "Campaign could not start because managed Chrome is not connected."
       });
       setIsCampaignBusy(false);
+      setIsStartPending(false);
       setIsStartConfirmationOpen(false);
       return;
     }
@@ -311,12 +315,14 @@ export function AccountWorkspace({
         mode: "dry_run"
       });
       setActiveRun(run);
+      setIsStartPending(false);
       syncCampaignStatus(run);
       setCampaignNotice({
         tone: "success",
         message: "Dry-run campaign started. The runner will navigate and audit what it would send without clicking Send."
       });
     } catch (error) {
+      setIsStartPending(false);
       setCampaignNotice({
         tone: "error",
         message: error instanceof Error ? error.message : "Campaign could not start."
@@ -410,12 +416,12 @@ export function AccountWorkspace({
         </section>
 
         <button
-          className={`full-width ${workspace.campaign.status === "running" ? "danger-button" : "primary-button"}`}
-          onClick={hasActiveServerRun ? () => void stopCampaign() : requestCampaignStart}
+          className={`full-width ${campaignButtonIsStop ? "danger-button" : "primary-button"}`}
+          onClick={campaignButtonIsStop ? () => void stopCampaign() : requestCampaignStart}
           disabled={isCampaignBusy}
         >
-          {hasActiveServerRun ? <Square size={17} /> : <Play size={17} />}
-          {hasActiveServerRun
+          {campaignButtonIsStop ? <Square size={17} /> : <Play size={17} />}
+          {campaignButtonIsStop
             ? "Stop campaign"
             : workspace.leads.length === 0
               ? "Add leads to start"

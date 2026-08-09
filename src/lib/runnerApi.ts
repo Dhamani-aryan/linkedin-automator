@@ -49,7 +49,9 @@ export async function getCampaignRun(runId: string): Promise<CampaignRun> {
 }
 
 export async function getActiveCampaignRun(): Promise<CampaignRun | null> {
-  const result = await request<{ ok: true; run: CampaignRun | null }>("/api/campaign-runs/active");
+  const result = await request<{ ok: true; run: CampaignRun | null }>("/api/campaign-runs/active", undefined, {
+    ignoreMissingEndpoint: true
+  });
   return result.run;
 }
 
@@ -60,7 +62,11 @@ export async function stopCampaignRun(runId: string): Promise<CampaignRun> {
   return result.run;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  options: { ignoreMissingEndpoint?: boolean } = {}
+): Promise<T> {
   let response: Response;
   try {
     response = await fetch(path, init);
@@ -69,6 +75,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   const body = await response.json() as T | ApiFailure;
+  if (!response.ok && options.ignoreMissingEndpoint && isMissingEndpoint(body)) {
+    return { ok: true, run: null } as T;
+  }
   if (!response.ok || isFailure(body)) {
     throw failureToError(body as ApiFailure);
   }
@@ -76,10 +85,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 function failureToError(failure: ApiFailure) {
+  if (isMissingEndpoint(failure)) {
+    return new Error("The campaign runner endpoint is not available yet. Restart the local controller or dev server and try again.");
+  }
   if (failure.validationFailures?.length) {
-    return new Error(failure.validationFailures.map((item) => item.message).join(" "));
+    return new Error(failure.validationFailures.map((item: { message: string }) => item.message).join(" "));
   }
   return new Error(failure.error?.message ?? "Campaign runner request failed.");
+}
+
+function isMissingEndpoint(value: unknown): boolean {
+  return (
+    isFailure(value) &&
+    value.error?.code === "NOT_FOUND" &&
+    value.error.message === "Endpoint not found."
+  );
 }
 
 function isFailure(value: unknown): value is ApiFailure {
