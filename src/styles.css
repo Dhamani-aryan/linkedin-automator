@@ -446,6 +446,11 @@ input {
   background: #2a2d36;
 }
 
+.state-badge.paused {
+  color: #f4cf67;
+  background: #3e3314;
+}
+
 .state-badge.starting {
   color: #f4cf67;
   background: #3e3314;
@@ -1040,6 +1045,16 @@ input {
 
 .full-width {
   width: 100%;
+}
+
+.campaign-run-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.campaign-run-controls button {
+  min-width: 0;
 }
 
 .workspace-main {

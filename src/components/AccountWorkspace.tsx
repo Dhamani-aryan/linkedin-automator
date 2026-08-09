@@ -13,6 +13,7 @@ import {
   MessageSquare,
   MessageSquareReply,
   Navigation,
+  Pause,
   Pencil,
   Play,
   Plus,
@@ -36,6 +37,8 @@ import {
 import {
   getActiveCampaignRun,
   getCampaignRun,
+  pauseCampaignRun,
+  resumeCampaignRun,
   startCampaignRun,
   stopCampaignRun
 } from "../lib/runnerApi";
@@ -105,8 +108,7 @@ export function AccountWorkspace({
   const selectedAction = workspace.actions.find((action) => action.id === selectedActionId) ?? null;
   const firstMessageActionId = workspace.actions.find((action) => action.type === "message")?.id ?? null;
   const hasActiveServerRun =
-    activeRun !== null && ["running", "sleeping", "stopping", "needs_attention"].includes(activeRun.state);
-  const campaignButtonIsStop = hasActiveServerRun || isStartPending;
+    activeRun !== null && ["running", "paused", "sleeping", "stopping", "needs_attention"].includes(activeRun.state);
   const safetyWindowNotice = getSafetyWindowNotice(safetySettings);
   const liveLeads = workspace.leads.filter((lead) => lead.status !== "excluded");
   const liveMessageActions = workspace.actions.filter(
@@ -406,8 +408,54 @@ export function AccountWorkspace({
     }
   }
 
+  async function pauseCampaign() {
+    if (!activeRun) return;
+
+    setIsCampaignBusy(true);
+    try {
+      const run = await pauseCampaignRun(activeRun.id);
+      setActiveRun(run);
+      syncCampaignStatus(run);
+      setCampaignNotice({
+        tone: "success",
+        message: "Campaign paused. The current action is preserved and no message will be sent while paused."
+      });
+    } catch (error) {
+      setCampaignNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Campaign could not be paused."
+      });
+    } finally {
+      setIsCampaignBusy(false);
+    }
+  }
+
+  async function resumeCampaign() {
+    if (!activeRun) return;
+
+    setIsCampaignBusy(true);
+    try {
+      const run = await resumeCampaignRun(activeRun.id);
+      setActiveRun(run);
+      syncCampaignStatus(run);
+      setCampaignNotice({
+        tone: "success",
+        message: "Campaign resumed from its paused action."
+      });
+    } catch (error) {
+      setCampaignNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Campaign could not be resumed."
+      });
+    } finally {
+      setIsCampaignBusy(false);
+    }
+  }
+
   function syncCampaignStatus(run: CampaignRun) {
-    const status = run.state === "sleeping"
+    const status = run.state === "paused"
+      ? "paused"
+      : run.state === "sleeping"
       ? "sleeping"
       : ["running", "stopping", "needs_attention"].includes(run.state)
         ? "running"
@@ -467,18 +515,35 @@ export function AccountWorkspace({
           <Metric label="Actions" value={workspace.actions.filter((action) => !action.automatic).length} />
         </section>
 
-        <button
-          className={`full-width ${campaignButtonIsStop ? "danger-button" : "primary-button"}`}
-          onClick={campaignButtonIsStop ? () => void stopCampaign() : requestCampaignStart}
-          disabled={isCampaignBusy}
-        >
-          {campaignButtonIsStop ? <Square size={17} /> : <Play size={17} />}
-          {campaignButtonIsStop
-            ? "Stop campaign"
-            : workspace.leads.length === 0
-              ? "Add leads to start"
-              : "Start campaign"}
-        </button>
+        {hasActiveServerRun && activeRun ? (
+          <div className="campaign-run-controls">
+            <button
+              className="ghost-button"
+              onClick={activeRun.state === "paused" ? () => void resumeCampaign() : () => void pauseCampaign()}
+              disabled={isCampaignBusy || ["stopping", "needs_attention"].includes(activeRun.state)}
+            >
+              {activeRun.state === "paused" ? <Play size={17} /> : <Pause size={17} />}
+              {activeRun.state === "paused" ? "Resume" : "Pause"}
+            </button>
+            <button className="danger-button" onClick={() => void stopCampaign()} disabled={isCampaignBusy}>
+              <Square size={17} />
+              Stop
+            </button>
+          </div>
+        ) : (
+          <button
+            className="full-width primary-button"
+            onClick={requestCampaignStart}
+            disabled={isCampaignBusy || isStartPending}
+          >
+            {isStartPending ? <LoaderCircle className="spin" size={17} /> : <Play size={17} />}
+            {isStartPending
+              ? "Starting campaign"
+              : workspace.leads.length === 0
+                ? "Add leads to start"
+                : "Start campaign"}
+          </button>
+        )}
       </aside>
 
       <section className="workspace-main workflow-workspace-main">
@@ -836,7 +901,7 @@ export function AccountWorkspace({
                 <span><Check size={16} /> Managed Chrome will start if needed</span>
                 {safetyWindowNotice ? <span><Clock3 size={16} /> {safetyWindowNotice}</span> : null}
                 <span><AlertTriangle size={16} /> {startMode === "live"
-                  ? "The controller will click Send once and require a sent confirmation"
+                  ? "Each message is verified before Send and confirmed afterward"
                   : "Dry run only: no Send buttons are clicked"}</span>
               </div>
             </div>
@@ -897,6 +962,7 @@ function formatDelay(delay: WorkflowDelay) {
 
 function campaignStatusLabel(status: CampaignWorkspaceState["campaign"]["status"]) {
   if (status === "running") return "Running";
+  if (status === "paused") return "Paused";
   if (status === "sleeping") return "Sleeping";
   if (status === "stopped") return "Stopped";
   return "Ready to start";

@@ -68,6 +68,20 @@ export async function stopCampaignRun(runId: string): Promise<CampaignRun> {
   return result.run;
 }
 
+export async function pauseCampaignRun(runId: string): Promise<CampaignRun> {
+  const result = await request<{ ok: true; run: CampaignRun }>(`/api/campaign-runs/${encodeURIComponent(runId)}/pause`, {
+    method: "POST"
+  });
+  return result.run;
+}
+
+export async function resumeCampaignRun(runId: string): Promise<CampaignRun> {
+  const result = await request<{ ok: true; run: CampaignRun }>(`/api/campaign-runs/${encodeURIComponent(runId)}/resume`, {
+    method: "POST"
+  });
+  return result.run;
+}
+
 async function request<T>(
   path: string,
   init?: RequestInit,

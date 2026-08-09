@@ -48,7 +48,7 @@ export type HumanTouchSettings = {
   pauseOnReply: boolean;
 };
 
-export type CampaignStatus = "ready" | "running" | "sleeping" | "stopped";
+export type CampaignStatus = "ready" | "running" | "paused" | "sleeping" | "stopped";
 
 export type CampaignSummary = {
   id: string;
@@ -134,6 +134,7 @@ export type CampaignRunLeadState =
 export type CampaignRunState =
   | "validating"
   | "running"
+  | "paused"
   | "sleeping"
   | "stopping"
   | "stopped"
@@ -159,6 +160,7 @@ export type CampaignRun = {
   createdAt: string;
   updatedAt: string;
   stopRequested: boolean;
+  pauseRequested: boolean;
   sleepingUntil: string | null;
   sleepingReason: string | null;
   snapshot: {
