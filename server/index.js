@@ -12,6 +12,8 @@ import {
   getActiveCampaignRun,
   getCampaignRun,
   initializeRunner,
+  pauseCampaignRun,
+  resumeCampaignRun,
   startCampaignRun,
   stopCampaignRun
 } from "./lib/runner.js";
@@ -96,6 +98,18 @@ const server = createServer(async (request, response) => {
     const stopMatch = requestUrl.pathname.match(/^\/api\/campaign-runs\/([^/]+)\/stop$/);
     if (request.method === "POST" && stopMatch) {
       sendJson(response, 200, await stopCampaignRun(stopMatch[1]));
+      return;
+    }
+
+    const pauseMatch = requestUrl.pathname.match(/^\/api\/campaign-runs\/([^/]+)\/pause$/);
+    if (request.method === "POST" && pauseMatch) {
+      sendJson(response, 200, await pauseCampaignRun(pauseMatch[1]));
+      return;
+    }
+
+    const resumeMatch = requestUrl.pathname.match(/^\/api\/campaign-runs\/([^/]+)\/resume$/);
+    if (request.method === "POST" && resumeMatch) {
+      sendJson(response, 200, await resumeCampaignRun(resumeMatch[1]));
       return;
     }
 

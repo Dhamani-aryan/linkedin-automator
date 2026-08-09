@@ -67,7 +67,7 @@ export async function recoverInterruptedRuns(store = createRunStore(), now = new
   const recovered = [];
   for (const runId of await listRunIds(store)) {
     const run = await loadRun(runId, store);
-    if (![runStates.RUNNING, runStates.SLEEPING, runStates.STOPPING].includes(run.state)) {
+    if (![runStates.RUNNING, runStates.SLEEPING, runStates.PAUSED, runStates.STOPPING].includes(run.state)) {
       continue;
     }
 

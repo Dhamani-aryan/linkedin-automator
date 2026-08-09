@@ -27,7 +27,7 @@ const authCacheMs = 10 * 60_000;
 const acceptanceRecheckMs = 4 * 60 * 60_000;
 
 let activeRunId = null;
-let stopWake = null;
+let controlWake = null;
 let authCache = null;
 
 export async function initializeRunner() {
@@ -110,7 +110,43 @@ export async function stopCampaignRun(runId) {
   run.updatedAt = new Date().toISOString();
   await appendAudit(run.id, { event: "stop_requested", outcome: "ok" });
   await saveRun(run);
-  stopWake?.();
+  controlWake?.();
+  return { ok: true, run: decorateRun(run) };
+}
+
+export async function pauseCampaignRun(runId) {
+  const run = await loadRun(runId);
+  if ([runStates.COMPLETED, runStates.FAILED, runStates.STOPPED].includes(run.state)) {
+    return { ok: true, run: decorateRun(run) };
+  }
+  if (run.state === runStates.NEEDS_ATTENTION) {
+    throw new AppError("RUN_NEEDS_ATTENTION", "Resolve the run issue before pausing or resuming it.");
+  }
+  if (run.pauseRequested && run.state === runStates.PAUSED) {
+    return { ok: true, run: decorateRun(run) };
+  }
+  run.pauseRequested = true;
+  run.state = runStates.PAUSED;
+  run.sleepingUntil = null;
+  run.sleepingReason = null;
+  run.updatedAt = new Date().toISOString();
+  await appendAudit(run.id, { event: "pause_requested", outcome: "paused" });
+  await saveRun(run);
+  controlWake?.();
+  return { ok: true, run: decorateRun(run) };
+}
+
+export async function resumeCampaignRun(runId) {
+  const run = await loadRun(runId);
+  if (run.state !== runStates.PAUSED || !run.pauseRequested) {
+    return { ok: true, run: decorateRun(run) };
+  }
+  run.pauseRequested = false;
+  run.state = runStates.RUNNING;
+  run.updatedAt = new Date().toISOString();
+  await appendAudit(run.id, { event: "run_resumed", outcome: "running" });
+  await saveRun(run);
+  controlWake?.();
   return { ok: true, run: decorateRun(run) };
 }
 
@@ -122,6 +158,11 @@ async function runLoop(runId) {
     if (run.stopRequested) {
       await finalizeStopped(run);
       return;
+    }
+
+    if (run.pauseRequested) {
+      await waitWhilePaused(run.id);
+      continue;
     }
 
     if (isRunFinished(run)) {
@@ -228,7 +269,8 @@ async function executeLeadAction(run, leadIndex, action) {
       lead: lead.lead,
       action,
       mode: run.mode,
-      shouldStop: async () => (await loadRun(run.id)).stopRequested
+      shouldStop: async () => (await loadRun(run.id)).stopRequested,
+      shouldPause: async () => (await loadRun(run.id)).pauseRequested
     });
     await appendAudit(run.id, {
       leadId: lead.id,
@@ -250,6 +292,15 @@ async function executeLeadAction(run, leadIndex, action) {
       }, run.snapshot.actions);
       run.stopRequested = true;
       run.state = runStates.STOPPING;
+    } else if (result.paused) {
+      lead = transition(lead, {
+        type: "PAUSED",
+        outcome: result.outcome,
+        detail: result.detail,
+        now: new Date().toISOString()
+      }, run.snapshot.actions);
+      run.pauseRequested = true;
+      run.state = runStates.PAUSED;
     } else if (result.errorCode) {
       lead = transition(lead, {
         type: "NEEDS_REVIEW",
@@ -369,6 +420,21 @@ async function finalizeStopped(run) {
   if (activeRunId === run.id) activeRunId = null;
 }
 
+async function waitWhilePaused(runId) {
+  while (true) {
+    const run = await loadRun(runId);
+    if (run.stopRequested || !run.pauseRequested) return;
+    if (run.state !== runStates.PAUSED) {
+      run.state = runStates.PAUSED;
+      run.sleepingUntil = null;
+      run.sleepingReason = null;
+      run.updatedAt = new Date().toISOString();
+      await saveRun(run);
+    }
+    await waitForControl(5_000);
+  }
+}
+
 async function interruptibleSleepUntil(runId, iso) {
   await interruptibleSleep(runId, Math.max(0, Date.parse(iso) - Date.now()));
 }
@@ -377,16 +443,20 @@ async function interruptibleSleep(runId, ms) {
   const end = Date.now() + ms;
   while (Date.now() < end) {
     const run = await loadRun(runId);
-    if (run.stopRequested) return;
-    await new Promise((resolve) => {
-      const timeout = setTimeout(resolve, Math.min(5_000, end - Date.now()));
-      stopWake = () => {
-        clearTimeout(timeout);
-        stopWake = null;
-        resolve();
-      };
-    });
+    if (run.stopRequested || run.pauseRequested) return;
+    await waitForControl(Math.min(5_000, end - Date.now()));
   }
+}
+
+function waitForControl(timeoutMs) {
+  return new Promise((resolve) => {
+    const timeout = setTimeout(resolve, timeoutMs);
+    controlWake = () => {
+      clearTimeout(timeout);
+      controlWake = null;
+      resolve();
+    };
+  });
 }
 
 function decorateRun(run) {
