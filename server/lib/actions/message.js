@@ -337,6 +337,24 @@ async function readMessagingSurface(session) {
 async function readComposer(session, recipientName) {
   return await evaluate(session, (expectedRecipient) => {
     const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
+    const readStructuredText = (element) => {
+      let output = "";
+      const visit = (node) => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          output += node.textContent ?? "";
+          return;
+        }
+        if (!node || typeof node.nodeType !== "number") return;
+        if (node.nodeName === "BR") {
+          output += "\n";
+          return;
+        }
+        for (const child of node.childNodes) visit(child);
+        if (["DIV", "P", "LI"].includes(node.nodeName) && !output.endsWith("\n")) output += "\n";
+      };
+      visit(element);
+      return output.replace(/\r\n/g, "\n").replace(/\n$/, "");
+    };
     const shadowRoot = document.querySelector("#interop-outlet")?.shadowRoot;
     const shadowBubble = shadowRoot && [...shadowRoot.querySelectorAll(".msg-overlay-conversation-bubble")].find((candidate) =>
       normalize(candidate.querySelector(".msg-overlay-bubble-header__title")?.textContent) === expectedRecipient
@@ -353,13 +371,9 @@ async function readComposer(session, recipientName) {
       recipientName: shadowBubble
         ? normalize(shadowBubble.querySelector(".msg-overlay-bubble-header__title")?.textContent)
         : pageRecipient,
-      text: normalizeEditorText(editor.innerText),
+      text: readStructuredText(editor),
       matchingMessageCount: 0
     };
-
-    function normalizeEditorText(value) {
-      return String(value ?? "").replace(/\r\n/g, "\n").replace(/\n$/, "");
-    }
   }, [recipientName]);
 }
 
@@ -386,7 +400,24 @@ async function focusComposer(session, recipientName) {
 async function readComposerText(session, recipientName, expectedText) {
   return await evaluate(session, (expectedRecipient, expected) => {
     const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
-    const normalizeText = (value) => String(value ?? "").replace(/\r\n/g, "\n").replace(/\n$/, "");
+    const readStructuredText = (element) => {
+      let output = "";
+      const visit = (node) => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          output += node.textContent ?? "";
+          return;
+        }
+        if (!node || typeof node.nodeType !== "number") return;
+        if (node.nodeName === "BR") {
+          output += "\n";
+          return;
+        }
+        for (const child of node.childNodes) visit(child);
+        if (["DIV", "P", "LI"].includes(node.nodeName) && !output.endsWith("\n")) output += "\n";
+      };
+      visit(element);
+      return output.replace(/\r\n/g, "\n").replace(/\n$/, "");
+    };
     const shadowRoot = document.querySelector("#interop-outlet")?.shadowRoot;
     const shadowBubble = shadowRoot && [...shadowRoot.querySelectorAll(".msg-overlay-conversation-bubble")].find((candidate) =>
       normalize(candidate.querySelector(".msg-overlay-bubble-header__title")?.textContent) === expectedRecipient
@@ -399,11 +430,11 @@ async function readComposerText(session, recipientName, expectedText) {
     const container = shadowBubble ?? (pageRecipient === expectedRecipient ? pageThread : null);
     const editor = container?.querySelector('.msg-form__contenteditable[contenteditable="true"][role="textbox"]');
     if (!editor) return null;
-    const text = normalizeText(editor.innerText);
+    const text = readStructuredText(editor);
     const matchingMessageCount = [...container.querySelectorAll(".msg-s-event-listitem__body")]
-      .filter((element) => normalizeText(element.innerText) === normalizeText(expected))
+      .filter((element) => readStructuredText(element) === expected)
       .length;
-    return { text, matches: text === normalizeText(expected), matchingMessageCount };
+    return { text, matches: text === expected, matchingMessageCount };
   }, [recipientName, expectedText]);
 }
 
@@ -431,7 +462,24 @@ async function readSendPoint(session, recipientName) {
 async function readSentConfirmation(session, recipientName, expectedText, beforeCount) {
   return await evaluate(session, (expectedRecipient, expected, priorCount) => {
     const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
-    const normalizeText = (value) => String(value ?? "").replace(/\r\n/g, "\n").replace(/\n$/, "");
+    const readStructuredText = (element) => {
+      let output = "";
+      const visit = (node) => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          output += node.textContent ?? "";
+          return;
+        }
+        if (!node || typeof node.nodeType !== "number") return;
+        if (node.nodeName === "BR") {
+          output += "\n";
+          return;
+        }
+        for (const child of node.childNodes) visit(child);
+        if (["DIV", "P", "LI"].includes(node.nodeName) && !output.endsWith("\n")) output += "\n";
+      };
+      visit(element);
+      return output.replace(/\r\n/g, "\n").replace(/\n$/, "");
+    };
     const shadowRoot = document.querySelector("#interop-outlet")?.shadowRoot;
     const shadowBubble = shadowRoot && [...shadowRoot.querySelectorAll(".msg-overlay-conversation-bubble")].find((candidate) =>
       normalize(candidate.querySelector(".msg-overlay-bubble-header__title")?.textContent) === expectedRecipient
@@ -444,7 +492,7 @@ async function readSentConfirmation(session, recipientName, expectedText, before
     const container = shadowBubble ?? (pageRecipient === expectedRecipient ? pageThread : null);
     if (!container) return null;
     const matching = [...container.querySelectorAll(".msg-s-event-listitem__body")]
-      .filter((element) => normalizeText(element.innerText) === normalizeText(expected));
+      .filter((element) => readStructuredText(element) === expected);
     if (matching.length <= priorCount) return { confirmed: false };
     const event = matching.at(-1)?.closest(".msg-s-event-with-indicator");
     const indicator = event?.querySelector(".msg-s-event-with-indicator__sending-indicator--sent");
