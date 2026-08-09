@@ -1,3 +1,5 @@
+import { renderTemplate } from "./template.js";
+
 export const leadStates = Object.freeze({
   QUEUED: "queued",
   RUNNING: "running",
@@ -458,4 +460,3 @@ function touch(lead, now) {
   lead.updatedAt = now;
   return lead;
 }
-import { renderTemplate } from "./template.js";
