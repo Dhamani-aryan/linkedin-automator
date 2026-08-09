@@ -133,6 +133,67 @@ export function validateRun(snapshot) {
   return failures;
 }
 
+export function validateLiveRun(snapshot) {
+  if (snapshot?.mode !== "live") return [];
+
+  const failures = [];
+  const leads = Array.isArray(snapshot.leads)
+    ? snapshot.leads.filter((lead) => lead?.status !== "excluded")
+    : [];
+  const actions = Array.isArray(snapshot.actions)
+    ? snapshot.actions.filter((action) => action?.automatic !== true && executableActionTypes.has(action?.type))
+    : [];
+  const confirmation = snapshot.liveConfirmation;
+
+  if (leads.length !== 1) {
+    failures.push({
+      field: "leads",
+      code: "LIVE_REQUIRES_ONE_LEAD",
+      message: "Controlled live sending requires exactly one selected lead."
+    });
+  }
+
+  if (actions.some((action) => action.type !== "message")) {
+    failures.push({
+      field: "actions",
+      code: "LIVE_MESSAGES_ONLY",
+      message: "Only message actions are enabled for controlled live sending."
+    });
+  }
+
+  const firstAction = actions[0];
+  const firstLead = leads[0];
+  const firstMessage = firstAction?.type === "message" && firstLead
+    ? renderTemplate(firstAction.template ?? "", firstLead, { missingVariable: "empty" }).text
+    : "";
+  if (firstMessage.length === 0) {
+    failures.push({
+      field: "actions",
+      code: "EMPTY_LIVE_MESSAGE",
+      message: "The first live message must contain text."
+    });
+  }
+
+  if (confirmation?.confirmed !== true) {
+    failures.push({
+      field: "liveConfirmation",
+      code: "LIVE_CONFIRMATION_REQUIRED",
+      message: "Confirm the exact lead and first message before starting a live run."
+    });
+  } else if (
+    confirmation.leadId !== firstLead?.id ||
+    confirmation.firstMessageText !== firstMessage
+  ) {
+    failures.push({
+      field: "liveConfirmation",
+      code: "LIVE_CONFIRMATION_MISMATCH",
+      message: "The live-send confirmation does not match the selected lead and resolved message."
+    });
+  }
+
+  return failures;
+}
+
 export function createCampaignRun({ runId, snapshot, mode, now = new Date() }) {
   const createdAt = now.toISOString();
   return {
@@ -397,3 +458,4 @@ function touch(lead, now) {
   lead.updatedAt = now;
   return lead;
 }
+import { renderTemplate } from "./template.js";

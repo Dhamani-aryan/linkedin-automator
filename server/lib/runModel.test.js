@@ -4,6 +4,7 @@ import {
   leadStates,
   runStates,
   transition,
+  validateLiveRun,
   validateRun
 } from "./runModel.js";
 
@@ -95,6 +96,58 @@ describe("validateRun", () => {
     });
 
     expect(failures).toContainEqual(expect.objectContaining({ code: "MISSING_SAFETY" }));
+  });
+});
+
+describe("validateLiveRun", () => {
+  const messageAction = {
+    id: "message",
+    type: "message",
+    automatic: false,
+    template: "Hi {firstName}\n\nWelcome",
+    delay: { amount: 0, unit: "minutes" }
+  };
+
+  it("accepts one explicitly confirmed message lead", () => {
+    expect(validateLiveRun({
+      mode: "live",
+      actions: [messageAction],
+      leads: [lead],
+      liveConfirmation: {
+        confirmed: true,
+        leadId: lead.id,
+        firstMessageText: "Hi Example\n\nWelcome"
+      }
+    })).toEqual([]);
+  });
+
+  it("rejects multiple leads and stale confirmation text", () => {
+    const failures = validateLiveRun({
+      mode: "live",
+      actions: [messageAction],
+      leads: [lead, { ...lead, id: "lead-2" }],
+      liveConfirmation: {
+        confirmed: true,
+        leadId: lead.id,
+        firstMessageText: "Old preview"
+      }
+    });
+
+    expect(failures).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "LIVE_REQUIRES_ONE_LEAD" }),
+      expect.objectContaining({ code: "LIVE_CONFIRMATION_MISMATCH" })
+    ]));
+  });
+
+  it("rejects unverified live connection requests", () => {
+    expect(validateLiveRun({
+      mode: "live",
+      actions: [actions[0]],
+      leads: [lead]
+    })).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "LIVE_MESSAGES_ONLY" }),
+      expect.objectContaining({ code: "LIVE_CONFIRMATION_REQUIRED" })
+    ]));
   });
 });
 
