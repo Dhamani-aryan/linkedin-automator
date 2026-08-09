@@ -422,6 +422,12 @@ export function followUpSchedule(lead, actions) {
   };
 }
 
+export function remainingDelayMs(nextEligibleAt, now = new Date()) {
+  const dueMs = Date.parse(nextEligibleAt);
+  if (!Number.isFinite(dueMs)) return 0;
+  return Math.max(0, dueMs - now.getTime());
+}
+
 function firstExecutableCursor(actions) {
   return nextExecutableCursor(actions, 0);
 }

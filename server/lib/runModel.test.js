@@ -3,6 +3,7 @@ import {
   createCampaignRun,
   followUpSchedule,
   leadStates,
+  remainingDelayMs,
   runStates,
   transition,
   validateLiveRun,
@@ -371,5 +372,19 @@ describe("followUpSchedule", () => {
       { id: "first-message", type: "message" },
       { id: "follow-up", type: "message", delay: { amount: 1, unit: "hours" } }
     ])).toBeNull();
+  });
+
+  it("returns only the remaining time when a campaign resumes early", () => {
+    expect(remainingDelayMs(
+      "2026-08-09T11:00:00.000Z",
+      new Date("2026-08-09T10:30:00.000Z")
+    )).toBe(30 * 60_000);
+  });
+
+  it("returns zero when a follow-up is already overdue", () => {
+    expect(remainingDelayMs(
+      "2026-08-09T11:00:00.000Z",
+      new Date("2026-08-09T13:00:00.000Z")
+    )).toBe(0);
   });
 });

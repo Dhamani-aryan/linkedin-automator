@@ -15,6 +15,7 @@ import {
   followUpSchedule,
   isRunFinished,
   leadStates,
+  remainingDelayMs,
   runStates,
   summarizeRun,
   transition,
@@ -486,7 +487,7 @@ function pickNextLead(run, now) {
   const eligibleStates = new Set([leadStates.QUEUED, leadStates.WAITING_DELAY]);
   for (const [index, lead] of run.leads.entries()) {
     if (!eligibleStates.has(lead.state)) continue;
-    if (lead.nextEligibleAt && Date.parse(lead.nextEligibleAt) > now.getTime()) continue;
+    if (lead.nextEligibleAt && remainingDelayMs(lead.nextEligibleAt, now) > 0) continue;
     if (lead.actionCursor >= run.snapshot.actions.length) continue;
     return { index, lead };
   }
@@ -572,7 +573,7 @@ async function waitWhilePaused(runId) {
 }
 
 async function interruptibleSleepUntil(runId, iso) {
-  await interruptibleSleep(runId, Math.max(0, Date.parse(iso) - Date.now()));
+  await interruptibleSleep(runId, remainingDelayMs(iso));
 }
 
 async function interruptibleSleep(runId, ms) {
