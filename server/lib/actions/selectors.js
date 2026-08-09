@@ -2,6 +2,7 @@ export const selectors = Object.freeze({
   loginForm: 'input[name="session_key"], input[name="session_password"], form[action*="login"]',
   profileRoot: "main, body",
   connectButtonText: "connect",
+  moreButtonText: "more",
   pendingButtonText: "pending",
   messageButtonText: "message",
   firstDegreeText: "1st"

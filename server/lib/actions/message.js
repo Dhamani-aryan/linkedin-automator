@@ -23,7 +23,7 @@ export async function executeMessage({ session, lead, action, mode }) {
     };
   }
 
-  if (classification.messageState !== "message_available") {
+  if (!["message_available", "message_available_under_more"].includes(classification.messageState)) {
     return {
       outcome: "needs_review",
       errorCode: ErrorCodes.ELEMENT_NOT_FOUND,
@@ -49,12 +49,14 @@ export async function executeMessage({ session, lead, action, mode }) {
 }
 
 async function readMessageEligibility(session) {
-  return await evaluate(session, (selectorsInput) => {
+  return await evaluate(session, async (selectorsInput) => {
     const text = document.body?.innerText?.toLowerCase() ?? "";
-    const buttons = [...document.querySelectorAll('button, a[role="button"]')].map((button) => ({
+    const readButtons = () => [...document.querySelectorAll('button, a[role="button"]')].map((button) => ({
       text: (button.textContent ?? "").replace(/\s+/g, " ").trim().toLowerCase(),
-      aria: (button.getAttribute("aria-label") ?? "").toLowerCase()
+      aria: (button.getAttribute("aria-label") ?? "").toLowerCase(),
+      element: button
     }));
+    const buttons = readButtons();
     const hasMessage = buttons.some((button) =>
       button.text.includes(selectorsInput.messageButtonText) || button.aria.includes(selectorsInput.messageButtonText)
     );
@@ -71,9 +73,27 @@ async function readMessageEligibility(session) {
       return { pageKind: "unknown", errorCode: "LAYOUT_MISMATCH", url: location.href, title: document.title };
     }
 
+    let messageState = hasMessage ? "message_available" : "message_unavailable";
+    if (!hasMessage) {
+      const moreButton = buttons.find((button) =>
+        button.text === selectorsInput.moreButtonText ||
+        button.aria.includes(selectorsInput.moreButtonText)
+      )?.element;
+      if (moreButton instanceof HTMLElement) {
+        moreButton.click();
+        await new Promise((resolve) => setTimeout(resolve, 350));
+        const menuHasMessage = readButtons().some((button) =>
+          button.text.includes(selectorsInput.messageButtonText) || button.aria.includes(selectorsInput.messageButtonText)
+        );
+        if (menuHasMessage) {
+          messageState = "message_available_under_more";
+        }
+      }
+    }
+
     return {
       pageKind: "profile",
-      messageState: hasMessage ? "message_available" : "message_unavailable",
+      messageState,
       url: location.href,
       title: document.title
     };
