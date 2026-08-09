@@ -65,6 +65,16 @@ export async function startCampaignRun(snapshot) {
   activeRunId = run.id;
   void runLoop(run.id).catch(async (error) => {
     const failedRun = await loadRun(run.id).catch(() => run);
+    if (failedRun.state === runStates.NEEDS_ATTENTION) {
+      await appendAudit(run.id, {
+        event: "run_paused",
+        outcome: "needs_attention",
+        errorCode: error instanceof AppError ? error.code : "RUNNER_NEEDS_ATTENTION",
+        detail: { message: error instanceof Error ? error.message : "Runner paused." }
+      });
+      await saveRun(failedRun);
+      return;
+    }
     failedRun.state = runStates.FAILED;
     failedRun.updatedAt = new Date().toISOString();
     await appendAudit(run.id, {
