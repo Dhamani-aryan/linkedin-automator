@@ -59,8 +59,28 @@ export async function stopChrome(): Promise<{ ok: true; stopped: boolean; messag
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, init);
-  const body = (await response.json()) as T | ChromeApiFailure;
+  let response: Response;
+  try {
+    response = await fetch(path, init);
+  } catch {
+    throw new Error("The local Chrome controller is unavailable. Restart the app and try again.");
+  }
+
+  const responseText = await response.text();
+  if (!responseText.trim()) {
+    throw new Error(
+      response.ok
+        ? "The local Chrome controller returned an empty response."
+        : "The local Chrome controller is unavailable. Restart the app and try again."
+    );
+  }
+
+  let body: T | ChromeApiFailure;
+  try {
+    body = JSON.parse(responseText) as T | ChromeApiFailure;
+  } catch {
+    throw new Error("The local Chrome controller returned an invalid response.");
+  }
 
   if (!response.ok || (isFailure(body))) {
     throw new Error(isFailure(body) ? body.error.message : `Request failed: ${response.status}`);
