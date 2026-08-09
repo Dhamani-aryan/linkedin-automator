@@ -150,6 +150,42 @@ export async function findLatestResumableRun(store = createRunStore()) {
     .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))[0] ?? null;
 }
 
+export async function findSentActionMatches(snapshot, store = createRunStore()) {
+  const selectedActions = new Set(
+    (snapshot.actions ?? [])
+      .filter((action) => action?.type === "message" && action.automatic !== true)
+      .map((action) => action.id)
+  );
+  const selectedLeads = new Map(
+    (snapshot.leads ?? [])
+      .filter((lead) => lead?.status !== "excluded")
+      .map((lead) => [normalizeLinkedInUrl(lead.linkedinUrl), lead])
+  );
+  const matches = [];
+
+  for (const runId of await listRunIds(store)) {
+    const run = await loadRun(runId, store);
+    if (run.snapshot?.campaign?.id !== snapshot.campaign?.id) continue;
+    for (const lead of run.leads ?? []) {
+      const linkedinUrl = normalizeLinkedInUrl(lead.lead?.linkedinUrl);
+      const selectedLead = selectedLeads.get(linkedinUrl);
+      if (!selectedLead) continue;
+      for (const attempt of lead.attempts ?? []) {
+        if (attempt.outcome !== "sent" || attempt.errorCode !== null || !selectedActions.has(attempt.actionId)) continue;
+        matches.push({
+          priorRunId: run.id,
+          leadId: selectedLead.id,
+          linkedinUrl,
+          actionId: attempt.actionId,
+          sentAt: attempt.completedAt
+        });
+      }
+    }
+  }
+
+  return matches;
+}
+
 async function exists(path) {
   try {
     await access(path, constants.F_OK);
@@ -164,4 +200,13 @@ function safeRunId(runId) {
     throw new Error("Invalid run id.");
   }
   return runId;
+}
+
+function normalizeLinkedInUrl(value) {
+  try {
+    const url = new URL(value);
+    return `${url.origin}${url.pathname}`.replace(/\/$/, "").toLowerCase();
+  } catch {
+    return String(value ?? "").replace(/\/$/, "").toLowerCase();
+  }
 }

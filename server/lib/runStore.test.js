@@ -6,6 +6,7 @@ import {
   appendAudit,
   createRunStore,
   findLatestResumableRun,
+  findSentActionMatches,
   loadRun,
   readAudit,
   recoverInterruptedRuns,
@@ -146,5 +147,34 @@ describe("runStore", () => {
     }, store);
 
     await expect(findLatestResumableRun(store)).resolves.toMatchObject({ id: "newer" });
+  });
+
+  it("finds successful deliveries for the same campaign, lead, and action", async () => {
+    const store = await tempStore();
+    await saveRun({
+      id: "completed-run",
+      snapshot: { campaign: { id: "campaign-1" } },
+      leads: [{
+        lead: { linkedinUrl: "https://www.linkedin.com/in/example/" },
+        attempts: [{
+          actionId: "message-1",
+          outcome: "sent",
+          errorCode: null,
+          completedAt: "2026-08-10T00:00:00.000Z"
+        }]
+      }]
+    }, store);
+
+    await expect(findSentActionMatches({
+      campaign: { id: "campaign-1" },
+      actions: [{ id: "message-1", type: "message", automatic: false }],
+      leads: [{ id: "lead-1", linkedinUrl: "https://www.linkedin.com/in/example", status: "to_process" }]
+    }, store)).resolves.toEqual([{
+      priorRunId: "completed-run",
+      leadId: "lead-1",
+      linkedinUrl: "https://www.linkedin.com/in/example",
+      actionId: "message-1",
+      sentAt: "2026-08-10T00:00:00.000Z"
+    }]);
   });
 });
