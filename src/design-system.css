@@ -2251,6 +2251,11 @@ p {
   color: var(--app-danger);
 }
 
+.workspace-feedback.success {
+  border-color: color-mix(in srgb, var(--app-success) 40%, var(--app-border));
+  color: var(--app-success);
+}
+
 .workspace-feedback button {
   flex: 0 0 auto;
   border: 0;
@@ -2258,6 +2263,33 @@ p {
   background: transparent;
   font: inherit;
   font-weight: 700;
+}
+
+.campaign-start-modal {
+  width: min(520px, calc(100vw - 32px));
+}
+
+.campaign-start-icon {
+  color: var(--app-accent);
+  background: color-mix(in srgb, var(--app-accent) 12%, transparent);
+}
+
+.campaign-preflight-list {
+  display: grid;
+  gap: 9px;
+  margin-top: 18px;
+}
+
+.campaign-preflight-list span {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--app-text-secondary);
+  font-size: 11px;
+}
+
+.campaign-preflight-list span:last-child {
+  color: var(--app-warning);
 }
 
 .message-summary {

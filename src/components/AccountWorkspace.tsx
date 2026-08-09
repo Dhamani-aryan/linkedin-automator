@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   ArrowLeft,
   Check,
   Chrome,
@@ -76,6 +77,12 @@ export function AccountWorkspace({
   const [activeModal, setActiveModal] = useState<"source" | "action" | "template" | null>(null);
   const [insertAt, setInsertAt] = useState(0);
   const [selectedActionId, setSelectedActionId] = useState(() => workspace.actions[0]?.id ?? "");
+  const [isStartConfirmationOpen, setIsStartConfirmationOpen] = useState(false);
+  const [isCampaignBusy, setIsCampaignBusy] = useState(false);
+  const [campaignNotice, setCampaignNotice] = useState<{
+    tone: "success" | "error";
+    message: string;
+  } | null>(null);
   const linkedInTab = chromeStatus?.tabs.find((tab) => tab.url.includes("linkedin.com")) ?? null;
   const selectedAction = workspace.actions.find((action) => action.id === selectedActionId) ?? null;
   const firstMessageActionId = workspace.actions.find((action) => action.type === "message")?.id ?? null;
@@ -210,6 +217,59 @@ export function AccountWorkspace({
     return result.profiles;
   }
 
+  function requestCampaignStart() {
+    setCampaignNotice(null);
+    if (workspace.leads.length === 0) {
+      setActiveModal("source");
+      return;
+    }
+    if (!workspace.actions.some((action) => !action.automatic)) {
+      setCampaignNotice({
+        tone: "error",
+        message: "Add at least one connection request or message action before starting."
+      });
+      return;
+    }
+    setIsStartConfirmationOpen(true);
+  }
+
+  async function confirmCampaignStart() {
+    setIsCampaignBusy(true);
+    setCampaignNotice(null);
+    const chromeReady = chromeStatus?.connected || await onStartChrome();
+    if (!chromeReady) {
+      setCampaignNotice({
+        tone: "error",
+        message: "Campaign could not start because managed Chrome is not connected."
+      });
+      setIsCampaignBusy(false);
+      setIsStartConfirmationOpen(false);
+      return;
+    }
+
+    setWorkspace((current) => ({
+      ...current,
+      campaign: { ...current.campaign, status: "running" }
+    }));
+    setCampaignNotice({
+      tone: "success",
+      message: "Campaign is active and Chrome is connected. The browser action executor is the next implementation step; no LinkedIn action has been marked as sent."
+    });
+    setIsCampaignBusy(false);
+    setIsStartConfirmationOpen(false);
+  }
+
+  function stopCampaign() {
+    setWorkspace((current) => ({
+      ...current,
+      campaign: { ...current.campaign, status: "stopped" }
+    }));
+    setCampaignNotice({
+      tone: "success",
+      message: "Campaign stopped. Leads and workflow progress remain saved."
+    });
+  }
+
   return (
     <main className="workspace-layout">
       <aside className="workspace-sidebar">
@@ -240,7 +300,9 @@ export function AccountWorkspace({
         <section className="campaign-mini-card">
           <div className="campaign-title-row">
             <strong>{workspace.campaign.name}</strong>
-            <span className="state-badge ready">Ready to start</span>
+            <span className={`state-badge ${workspace.campaign.status}`}>
+              {campaignStatusLabel(workspace.campaign.status)}
+            </span>
           </div>
           <Metric label="Total leads" value={workspace.campaign.profilesTotal} />
           <Metric label="To process" value={workspace.campaign.profilesToProcess} />
@@ -248,9 +310,17 @@ export function AccountWorkspace({
           <Metric label="Actions" value={workspace.actions.filter((action) => !action.automatic).length} />
         </section>
 
-        <button className="primary-button full-width" disabled={workspace.leads.length === 0}>
-          <Play size={17} />
-          Start campaign
+        <button
+          className={`full-width ${workspace.campaign.status === "running" ? "danger-button" : "primary-button"}`}
+          onClick={workspace.campaign.status === "running" ? stopCampaign : requestCampaignStart}
+          disabled={isCampaignBusy}
+        >
+          {workspace.campaign.status === "running" ? <Square size={17} /> : <Play size={17} />}
+          {workspace.campaign.status === "running"
+            ? "Stop campaign"
+            : workspace.leads.length === 0
+              ? "Add leads to start"
+              : "Start campaign"}
         </button>
       </aside>
 
@@ -261,7 +331,9 @@ export function AccountWorkspace({
               <ArrowLeft size={18} />
             </button>
             <h1>{workspace.campaign.name}</h1>
-            <p className="status-line">Draft workflow <span>|</span> {workspace.leads.length} leads <span>|</span> same-IP local Chrome</p>
+            <p className="status-line">
+              {campaignStatusLabel(workspace.campaign.status)} workflow <span>|</span> {workspace.leads.length} leads <span>|</span> same-IP local Chrome
+            </p>
           </div>
           <div className="header-actions">
             <button className="ghost-button" onClick={onStartChrome} disabled={isBusy}>
@@ -278,6 +350,13 @@ export function AccountWorkspace({
           <div className="workspace-feedback error" role="alert">
             <span>{chromeError}</span>
             <button type="button" onClick={onStartChrome} disabled={isBusy}>Try again</button>
+          </div>
+        ) : null}
+
+        {campaignNotice ? (
+          <div className={`workspace-feedback ${campaignNotice.tone}`} role="status">
+            <span>{campaignNotice.message}</span>
+            <button type="button" onClick={() => setCampaignNotice(null)}>Dismiss</button>
           </div>
         ) : null}
 
@@ -512,6 +591,35 @@ export function AccountWorkspace({
           onSave={saveTemplate}
         />
       ) : null}
+      {isStartConfirmationOpen ? (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="start-campaign-title">
+          <section className="confirm-modal campaign-start-modal">
+            <div className="confirm-icon campaign-start-icon">
+              <Play size={22} />
+            </div>
+            <div>
+              <h2 id="start-campaign-title">Start this campaign?</h2>
+              <p>
+                This activates <strong>{workspace.campaign.name}</strong> with {workspace.leads.length} lead{workspace.leads.length === 1 ? "" : "s"} and {workspace.actions.filter((action) => !action.automatic).length} workflow action{workspace.actions.filter((action) => !action.automatic).length === 1 ? "" : "s"}.
+              </p>
+              <div className="campaign-preflight-list">
+                <span><Check size={16} /> Workflow and leads are saved</span>
+                <span><Check size={16} /> Managed Chrome will start if needed</span>
+                <span><AlertTriangle size={16} /> Browser action execution is not enabled yet</span>
+              </div>
+            </div>
+            <footer className="modal-actions">
+              <button className="ghost-button" onClick={() => setIsStartConfirmationOpen(false)} disabled={isCampaignBusy}>
+                Cancel
+              </button>
+              <button className="primary-button" onClick={() => void confirmCampaignStart()} disabled={isCampaignBusy}>
+                {isCampaignBusy ? <LoaderCircle className="spin" size={18} /> : <Play size={18} />}
+                {isCampaignBusy ? "Starting" : "Start campaign"}
+              </button>
+            </footer>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }
@@ -549,4 +657,11 @@ function formatDelay(delay: WorkflowDelay) {
   if (delay.amount === 0) return "Send now";
   const unit = delay.amount === 1 ? delay.unit.replace(/s$/, "") : delay.unit;
   return `Wait ${delay.amount} ${unit}`;
+}
+
+function campaignStatusLabel(status: CampaignWorkspaceState["campaign"]["status"]) {
+  if (status === "running") return "Running";
+  if (status === "sleeping") return "Sleeping";
+  if (status === "stopped") return "Stopped";
+  return "Ready to start";
 }
