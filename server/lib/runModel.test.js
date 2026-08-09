@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createCampaignRun,
+  followUpSchedule,
   leadStates,
   runStates,
   transition,
@@ -323,5 +324,52 @@ describe("transition", () => {
       nextEligibleAt: "2026-08-09T10:00:03.000Z"
     });
     expect(retriedLead.attempts).toHaveLength(1);
+  });
+});
+
+describe("followUpSchedule", () => {
+  it.each([
+    [30, "minutes", "2026-08-09T10:30:00.000Z"],
+    [5, "hours", "2026-08-09T15:00:00.000Z"],
+    [5, "days", "2026-08-14T10:00:00.000Z"]
+  ])("anchors %i %s to the previous successful send", (amount, unit, dueAt) => {
+    const followUp = {
+      id: `follow-up-${unit}`,
+      type: "message",
+      delay: { amount, unit }
+    };
+    const leadRun = {
+      actionCursor: 1,
+      delaysSatisfiedActionIds: [],
+      attempts: [{
+        actionId: "first-message",
+        completedAt: "2026-08-09T10:00:00.000Z",
+        outcome: "sent",
+        errorCode: null
+      }]
+    };
+
+    expect(followUpSchedule(leadRun, [{ id: "first-message", type: "message" }, followUp])).toEqual({
+      actionId: followUp.id,
+      anchorAt: "2026-08-09T10:00:00.000Z",
+      delayMs: amount * (unit === "minutes" ? 60_000 : unit === "hours" ? 3_600_000 : 86_400_000),
+      dueAt
+    });
+  });
+
+  it("does not reschedule a delay that has already elapsed", () => {
+    expect(followUpSchedule({
+      actionCursor: 1,
+      delaysSatisfiedActionIds: ["follow-up"],
+      attempts: [{
+        actionId: "first-message",
+        completedAt: "2026-08-09T10:00:00.000Z",
+        outcome: "sent",
+        errorCode: null
+      }]
+    }, [
+      { id: "first-message", type: "message" },
+      { id: "follow-up", type: "message", delay: { amount: 1, unit: "hours" } }
+    ])).toBeNull();
   });
 });

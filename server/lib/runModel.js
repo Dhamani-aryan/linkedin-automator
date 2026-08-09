@@ -399,6 +399,29 @@ export function delayToMs(delay) {
   return delay.amount * multipliers[delay.unit];
 }
 
+export function followUpSchedule(lead, actions) {
+  const action = actions[lead.actionCursor];
+  const delayMs = action?.type === "message" ? delayToMs(action.delay) : 0;
+  if (delayMs <= 0 || lead.delaysSatisfiedActionIds?.includes(action.id)) return null;
+
+  const previousAttempt = [...lead.attempts]
+    .reverse()
+    .find((attempt) =>
+      attempt.completedAt &&
+      attempt.errorCode === null &&
+      ["sent", "dry_run_ok"].includes(attempt.outcome)
+    );
+  const anchorMs = Date.parse(previousAttempt?.completedAt);
+  if (!Number.isFinite(anchorMs)) return null;
+
+  return {
+    actionId: action.id,
+    anchorAt: previousAttempt.completedAt,
+    delayMs,
+    dueAt: new Date(anchorMs + delayMs).toISOString()
+  };
+}
+
 function firstExecutableCursor(actions) {
   return nextExecutableCursor(actions, 0);
 }
