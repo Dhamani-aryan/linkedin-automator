@@ -52,6 +52,27 @@ export async function collectVisibleProfiles(sourceUrl?: string): Promise<Profil
   });
 }
 
+export type ResolvedProfileIdentity = {
+  id: string;
+  requestedUrl: string;
+  resolved: boolean;
+  displayName?: string;
+  firstName?: string;
+  lastName?: string;
+  url?: string;
+  error?: string;
+};
+
+export async function resolveProfileIdentities(
+  profiles: Array<{ id: string; url: string }>
+): Promise<{ ok: true; profiles: ResolvedProfileIdentity[] }> {
+  return request<{ ok: true; profiles: ResolvedProfileIdentity[] }>("/api/chrome/resolve-profile-identities", {
+    method: "POST",
+    headers: defaultHeaders,
+    body: JSON.stringify({ profiles })
+  });
+}
+
 export async function stopChrome(): Promise<{ ok: true; stopped: boolean; message?: string }> {
   return request<{ ok: true; stopped: boolean; message?: string }>("/api/chrome/stop", {
     method: "POST"

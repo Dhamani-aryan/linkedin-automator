@@ -308,6 +308,59 @@ export async function collectVisibleProfiles(sourceUrl = "") {
   }
 }
 
+export async function resolveProfileIdentities(profiles) {
+  const resolved = [];
+
+  for (const profile of profiles) {
+    const tab = await openTab(profile.url);
+    let session = null;
+    try {
+      session = await attach(tab.id);
+      await navigate(session, profile.url, { timeoutMs: 25_000 });
+      const identity = await evaluate(session, () => {
+        const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
+        const visibleHeadings = [...document.querySelectorAll("main h1, h1")]
+          .filter((element) => {
+            const rect = element.getBoundingClientRect();
+            const style = getComputedStyle(element);
+            return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+          })
+          .map((element) => normalize(element.textContent))
+          .filter(Boolean);
+        const titleName = normalize(document.title.replace(/\s*\|\s*LinkedIn\s*$/i, ""));
+        const displayName = visibleHeadings[0] || titleName;
+        const parts = displayName.split(" ").filter(Boolean);
+        return {
+          pageKind: /linkedin\.com\/(in|sales\/lead)\//i.test(location.href) ? "profile" : "unknown",
+          displayName,
+          firstName: parts[0] ?? "",
+          lastName: parts.slice(1).join(" "),
+          url: location.href
+        };
+      }, []);
+
+      resolved.push({
+        id: profile.id,
+        requestedUrl: profile.url,
+        ...identity,
+        resolved: identity.pageKind === "profile" && identity.firstName.length > 0
+      });
+    } catch (error) {
+      resolved.push({
+        id: profile.id,
+        requestedUrl: profile.url,
+        resolved: false,
+        error: error instanceof Error ? error.message : "Profile identity could not be resolved."
+      });
+    } finally {
+      session?.close();
+      await closeTab(tab.id).catch(() => false);
+    }
+  }
+
+  return { ok: true, profiles: resolved };
+}
+
 class CdpSession extends EventEmitter {
   static async connect(webSocketUrl) {
     const session = new CdpSession(webSocketUrl);

@@ -4,6 +4,7 @@ import {
   launch,
   listTabs,
   openChromeUrl,
+  resolveProfileIdentities,
   status,
   stop
 } from "./lib/browserSession.js";
@@ -69,6 +70,12 @@ const server = createServer(async (request, response) => {
     if (request.method === "POST" && requestUrl.pathname === "/api/chrome/collect-profiles") {
       const body = await readJsonBody(request);
       sendJson(response, 200, await collectVisibleProfiles(readOptionalUrl(body, "")));
+      return;
+    }
+
+    if (request.method === "POST" && requestUrl.pathname === "/api/chrome/resolve-profile-identities") {
+      const body = await readJsonBody(request);
+      sendJson(response, 200, await resolveProfileIdentities(readProfileIdentityRequests(body)));
       return;
     }
 
@@ -161,6 +168,32 @@ function readRequiredUrl(value) {
   }
 
   return normalizeUrl(raw);
+}
+
+function readProfileIdentityRequests(value) {
+  if (typeof value !== "object" || value === null || !Array.isArray(value.profiles)) {
+    throw new Error("profiles must be an array.");
+  }
+  if (value.profiles.length === 0 || value.profiles.length > 100) {
+    throw new Error("profiles must contain between 1 and 100 LinkedIn profiles.");
+  }
+
+  return value.profiles.map((profile) => {
+    if (
+      typeof profile !== "object" ||
+      profile === null ||
+      typeof profile.id !== "string" ||
+      typeof profile.url !== "string"
+    ) {
+      throw new Error("Each profile requires an id and LinkedIn URL.");
+    }
+    const url = normalizeUrl(profile.url);
+    const parsed = new URL(url);
+    if (!parsed.hostname.endsWith("linkedin.com") || !/^\/(in|sales\/lead)\//i.test(parsed.pathname)) {
+      throw new Error("Each profile must use a LinkedIn profile or Sales Navigator lead URL.");
+    }
+    return { id: profile.id, url };
+  });
 }
 
 function normalizeUrl(value) {
