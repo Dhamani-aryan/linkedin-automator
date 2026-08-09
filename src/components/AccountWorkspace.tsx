@@ -39,6 +39,7 @@ import {
   startCampaignRun,
   stopCampaignRun
 } from "../lib/runnerApi";
+import { renderTemplate } from "../lib/templateEngine";
 import { createWorkflowAction, removeWorkflowAction } from "../lib/workflow";
 import type {
   CampaignRun,
@@ -91,6 +92,9 @@ export function AccountWorkspace({
   const [insertAt, setInsertAt] = useState(0);
   const [selectedActionId, setSelectedActionId] = useState(() => workspace.actions[0]?.id ?? "");
   const [isStartConfirmationOpen, setIsStartConfirmationOpen] = useState(false);
+  const [startMode, setStartMode] = useState<"dry_run" | "live">("dry_run");
+  const [liveLeadId, setLiveLeadId] = useState(() => workspace.leads[0]?.id ?? "");
+  const [liveSendConfirmed, setLiveSendConfirmed] = useState(false);
   const [isCampaignBusy, setIsCampaignBusy] = useState(false);
   const [activeRun, setActiveRun] = useState<CampaignRun | null>(null);
   const [isStartPending, setIsStartPending] = useState(false);
@@ -105,12 +109,32 @@ export function AccountWorkspace({
     activeRun !== null && ["running", "sleeping", "stopping", "needs_attention"].includes(activeRun.state);
   const campaignButtonIsStop = hasActiveServerRun || isStartPending;
   const safetyWindowNotice = getSafetyWindowNotice(safetySettings);
+  const liveLead = workspace.leads.find((lead) => lead.id === liveLeadId) ?? workspace.leads[0] ?? null;
+  const firstLiveMessage = workspace.actions.find(
+    (action) => action.type === "message" && !action.automatic
+  ) ?? null;
+  const hasUnsupportedLiveAction = workspace.actions.some(
+    (action) => !action.automatic && action.type !== "message"
+  );
+  const resolvedLiveMessage = liveLead && firstLiveMessage?.template !== undefined
+    ? renderTemplate(firstLiveMessage.template, liveLead)
+    : "";
+  const liveStartReady = Boolean(
+    liveLead &&
+    firstLiveMessage &&
+    resolvedLiveMessage.length > 0 &&
+    !hasUnsupportedLiveAction &&
+    liveSendConfirmed
+  );
 
   useEffect(() => {
     const nextWorkspace = loadCampaignWorkspace(account);
     setWorkspace(nextWorkspace);
     setSelectedActionId(nextWorkspace.actions[0]?.id ?? "");
     setActiveRun(null);
+    setStartMode("dry_run");
+    setLiveLeadId(nextWorkspace.leads[0]?.id ?? "");
+    setLiveSendConfirmed(false);
   }, [account.id]);
 
   useEffect(() => {
@@ -287,10 +311,16 @@ export function AccountWorkspace({
       });
       return;
     }
+    setLiveLeadId((current) => workspace.leads.some((lead) => lead.id === current)
+      ? current
+      : workspace.leads[0]?.id ?? "");
+    setLiveSendConfirmed(false);
     setIsStartConfirmationOpen(true);
   }
 
   async function confirmCampaignStart() {
+    if (startMode === "live" && !liveStartReady) return;
+
     setIsCampaignBusy(true);
     setIsStartPending(true);
     setCampaignNotice(null);
@@ -307,23 +337,37 @@ export function AccountWorkspace({
     }
 
     try {
+      const runLeads = startMode === "live" && liveLead ? [liveLead] : workspace.leads;
       const run = await startCampaignRun({
         profileId: account.id,
-        campaign: workspace.campaign,
+        campaign: startMode === "live"
+          ? { ...workspace.campaign, profilesTotal: 1, profilesToProcess: 1 }
+          : workspace.campaign,
         actions: workspace.actions,
-        leads: workspace.leads,
+        leads: runLeads,
         safety: {
           ...safetySettings,
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
         },
-        mode: "dry_run"
+        mode: startMode,
+        ...(startMode === "live" && liveLead
+          ? {
+              liveConfirmation: {
+                confirmed: true as const,
+                leadId: liveLead.id,
+                firstMessageText: resolvedLiveMessage
+              }
+            }
+          : {})
       });
       setActiveRun(run);
       setIsStartPending(false);
       syncCampaignStatus(run);
       setCampaignNotice({
         tone: "success",
-        message: "Dry-run campaign started. The runner will navigate and audit what it would send without clicking Send."
+        message: startMode === "live"
+          ? `Live message run started for ${liveLead?.displayName ?? "the selected lead"}.`
+          : "Dry-run campaign started. The runner will navigate and audit what it would send without clicking Send."
       });
     } catch (error) {
       setIsStartPending(false);
@@ -334,6 +378,7 @@ export function AccountWorkspace({
     } finally {
       setIsCampaignBusy(false);
       setIsStartConfirmationOpen(false);
+      setLiveSendConfirmed(false);
     }
   }
 
@@ -479,7 +524,7 @@ export function AccountWorkspace({
         {activeRun ? (
           <div className={`workspace-feedback ${activeRun.state === "sleeping" ? "error" : "success"}`} role="status">
             <span>
-              Server run {runStateLabel(activeRun.state)}: {activeRun.summary.completed} completed, {activeRun.summary.sleeping} waiting, {activeRun.summary.needsReview} needs review.
+              {activeRun.mode === "live" ? "Live" : "Dry"} run {runStateLabel(activeRun.state)}: {activeRun.summary.completed} completed, {activeRun.summary.sleeping} waiting, {activeRun.summary.needsReview} needs review.
               {activeRun.sleepingReason ? ` Paused by safety limits: ${sleepingReasonLabel(activeRun.sleepingReason)}.` : ""}
               {activeRun.sleepingUntil ? ` Next check ${formatDate(activeRun.sleepingUntil)}.` : ""}
             </span>
@@ -736,20 +781,89 @@ export function AccountWorkspace({
               <p>
                 This activates <strong>{workspace.campaign.name}</strong> with {workspace.leads.length} lead{workspace.leads.length === 1 ? "" : "s"} and {workspace.actions.filter((action) => !action.automatic).length} workflow action{workspace.actions.filter((action) => !action.automatic).length === 1 ? "" : "s"}.
               </p>
+              <div className="segmented-control campaign-run-mode" aria-label="Campaign execution mode">
+                <button
+                  type="button"
+                  className={startMode === "dry_run" ? "active" : ""}
+                  onClick={() => {
+                    setStartMode("dry_run");
+                    setLiveSendConfirmed(false);
+                  }}
+                >
+                  <ShieldCheck size={16} /> Dry run
+                </button>
+                <button
+                  type="button"
+                  className={startMode === "live" ? "active" : ""}
+                  onClick={() => {
+                    setStartMode("live");
+                    setLiveSendConfirmed(false);
+                  }}
+                >
+                  <MessageSquare size={16} /> Live send
+                </button>
+              </div>
+              {startMode === "live" ? (
+                <div className="live-run-fields">
+                  <label>
+                    <span>Send to one lead</span>
+                    <select
+                      value={liveLead?.id ?? ""}
+                      onChange={(event) => {
+                        setLiveLeadId(event.target.value);
+                        setLiveSendConfirmed(false);
+                      }}
+                    >
+                      {workspace.leads.map((lead) => (
+                        <option key={lead.id} value={lead.id}>{lead.displayName}</option>
+                      ))}
+                    </select>
+                  </label>
+                  {hasUnsupportedLiveAction ? (
+                    <p className="live-run-warning">
+                      <AlertTriangle size={16} /> Live verification currently supports message-only workflows.
+                    </p>
+                  ) : firstLiveMessage ? (
+                    <div className="live-message-preview">
+                      <span>First message to {liveLead?.displayName}</span>
+                      <pre>{resolvedLiveMessage}</pre>
+                    </div>
+                  ) : (
+                    <p className="live-run-warning">
+                      <AlertTriangle size={16} /> Add a message action before starting a live run.
+                    </p>
+                  )}
+                  <label className="live-send-confirmation">
+                    <input
+                      type="checkbox"
+                      checked={liveSendConfirmed}
+                      onChange={(event) => setLiveSendConfirmed(event.target.checked)}
+                      disabled={hasUnsupportedLiveAction || !firstLiveMessage || resolvedLiveMessage.length === 0}
+                    />
+                    <span>I confirm this exact message will be sent to {liveLead?.displayName ?? "the selected lead"}.</span>
+                  </label>
+                </div>
+              ) : null}
               <div className="campaign-preflight-list">
                 <span><Check size={16} /> Workflow and leads are saved</span>
                 <span><Check size={16} /> Managed Chrome will start if needed</span>
                 {safetyWindowNotice ? <span><Clock3 size={16} /> {safetyWindowNotice}</span> : null}
-                <span><AlertTriangle size={16} /> Dry run only: no Send buttons are clicked</span>
+                <span><AlertTriangle size={16} /> {startMode === "live"
+                  ? "The controller will click Send once and require a sent confirmation"
+                  : "Dry run only: no Send buttons are clicked"}</span>
               </div>
             </div>
             <footer className="modal-actions">
               <button className="ghost-button" onClick={() => setIsStartConfirmationOpen(false)} disabled={isCampaignBusy}>
                 Cancel
               </button>
-              <button className="primary-button" onClick={() => void confirmCampaignStart()} disabled={isCampaignBusy}>
+              <button
+                className="primary-button"
+                onClick={() => void confirmCampaignStart()}
+                disabled={isCampaignBusy || (startMode === "live" && !liveStartReady)}
+              >
                 {isCampaignBusy ? <LoaderCircle className="spin" size={18} /> : <Play size={18} />}
-                {isCampaignBusy ? "Starting" : "Start campaign"}
+                {isCampaignBusy ? "Starting" : startMode === "live" ? "Send live message" : "Start dry run"}
               </button>
             </footer>
           </section>

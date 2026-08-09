@@ -2274,6 +2274,86 @@ p {
   background: color-mix(in srgb, var(--app-accent) 12%, transparent);
 }
 
+.campaign-run-mode {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 16px;
+}
+
+.campaign-run-mode button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.live-run-fields {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.live-run-fields > label:first-child {
+  display: grid;
+  gap: 6px;
+}
+
+.live-run-fields > label:first-child > span,
+.live-message-preview > span {
+  color: var(--app-text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.live-run-fields select {
+  width: 100%;
+}
+
+.live-message-preview {
+  display: grid;
+  gap: 7px;
+}
+
+.live-message-preview pre {
+  max-height: 180px;
+  overflow: auto;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  color: var(--app-text);
+  background: var(--app-surface-subtle);
+  padding: 11px;
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.live-send-confirmation {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  gap: 9px;
+  color: var(--app-text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.live-send-confirmation input {
+  width: 16px;
+  height: 16px;
+  margin: 1px 0 0;
+}
+
+.live-run-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--app-warning) !important;
+  font-size: 11px !important;
+}
+
 .campaign-preflight-list {
   display: grid;
   gap: 9px;
