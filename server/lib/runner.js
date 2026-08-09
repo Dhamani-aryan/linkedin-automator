@@ -19,6 +19,7 @@ import {
   runStates,
   summarizeRun,
   transition,
+  updatePendingActionDelays,
   validateLiveRun,
   validateRun
 } from "./runModel.js";
@@ -93,7 +94,11 @@ export async function getCampaignRun(runId) {
 }
 
 export async function getActiveCampaignRun() {
-  if (activeRunId === null) return { ok: true, run: null };
+  if (activeRunId === null) {
+    const resumable = await findLatestResumableRun();
+    if (!resumable) return { ok: true, run: null };
+    activeRunId = resumable.id;
+  }
   return { ok: true, run: await getCampaignRun(activeRunId) };
 }
 
@@ -137,8 +142,8 @@ export async function pauseCampaignRun(runId) {
   return { ok: true, run: decorateRun(run) };
 }
 
-export async function resumeCampaignRun(runId) {
-  const run = await loadRun(runId);
+export async function resumeCampaignRun(runId, proposedActions = []) {
+  let run = await loadRun(runId);
   if (![runStates.PAUSED, runStates.STOPPED].includes(run.state)) {
     return { ok: true, run: decorateRun(run) };
   }
@@ -150,6 +155,16 @@ export async function resumeCampaignRun(runId) {
     await saveRun(run);
     activeRunId = run.id;
     return { ok: true, run: decorateRun(run) };
+  }
+  const delayUpdate = updatePendingActionDelays(run, proposedActions);
+  run = delayUpdate.run;
+  for (const update of delayUpdate.updates) {
+    await appendAudit(run.id, {
+      event: "workflow_delay_updated",
+      actionId: update.actionId,
+      outcome: "ok",
+      detail: update
+    });
   }
   run.pauseRequested = false;
   run.stopRequested = false;

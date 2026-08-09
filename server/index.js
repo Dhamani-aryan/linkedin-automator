@@ -117,7 +117,8 @@ const server = createServer(async (request, response) => {
 
     const resumeMatch = requestUrl.pathname.match(/^\/api\/campaign-runs\/([^/]+)\/resume$/);
     if (request.method === "POST" && resumeMatch) {
-      sendJson(response, 200, await resumeCampaignRun(resumeMatch[1]));
+      const body = await readJsonBody(request);
+      sendJson(response, 200, await resumeCampaignRun(resumeMatch[1], body.actions));
       return;
     }
 

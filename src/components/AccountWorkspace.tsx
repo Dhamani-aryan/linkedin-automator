@@ -491,14 +491,14 @@ export function AccountWorkspace({
     const restarting = activeRun.state === "stopped";
     setIsCampaignBusy(true);
     try {
-      const run = await resumeCampaignRun(activeRun.id);
+      const run = await resumeCampaignRun(activeRun.id, workspace.actions);
       setActiveRun(run);
       syncCampaignStatus(run);
       setCampaignNotice({
         tone: "success",
         message: restarting
-          ? "Campaign restarted from its saved action and original follow-up due times."
-          : "Campaign resumed from its paused action and original follow-up due times."
+          ? "Campaign restarted from its saved action with pending follow-up times recalculated."
+          : "Campaign resumed with pending follow-up times recalculated."
       });
     } catch (error) {
       setCampaignNotice({
