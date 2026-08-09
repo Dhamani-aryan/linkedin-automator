@@ -25,6 +25,7 @@ Thumbs.db
 
 # Dependencies/build outputs
 node_modules/
+.vite/
 dist/
 build/
 coverage/
