@@ -101,7 +101,7 @@ export function App() {
     }
   }, [accounts, selectedAccountId]);
 
-  async function refreshStatus() {
+  async function refreshStatus(accountId = selectedAccount?.id) {
     try {
       const nextStatus = await getChromeStatus();
       setStatus(nextStatus);
@@ -109,18 +109,18 @@ export function App() {
         currentAccounts.map((currentAccount) => ({
           ...currentAccount,
           state:
-            currentAccount.id === selectedAccount?.id
+            currentAccount.id === accountId
               ? nextStatus.connected
                 ? "running"
                 : "stopped"
               : currentAccount.state,
-          lastError: currentAccount.id === selectedAccount?.id ? undefined : currentAccount.lastError
+          lastError: currentAccount.id === accountId ? undefined : currentAccount.lastError
         }))
       );
     } catch (error) {
       setAccounts((currentAccounts) =>
         currentAccounts.map((currentAccount) =>
-          currentAccount.id === selectedAccount?.id
+          currentAccount.id === accountId
             ? {
                 ...currentAccount,
                 state: "error",
@@ -132,30 +132,45 @@ export function App() {
     }
   }
 
-  async function runChromeAction(action: () => Promise<unknown>) {
+  async function runChromeAction(
+    action: () => Promise<unknown>,
+    accountId = selectedAccount?.id,
+    markStarting = false
+  ) {
     setIsBusy(true);
+    if (markStarting) {
+      setAccounts((currentAccounts) =>
+        currentAccounts.map((currentAccount) =>
+          currentAccount.id === accountId
+            ? { ...currentAccount, state: "starting", lastError: undefined }
+            : currentAccount
+        )
+      );
+    }
     try {
       await action();
-      await refreshStatus();
+      await refreshStatus(accountId);
+      return true;
     } catch (error) {
       setAccounts((currentAccounts) =>
         currentAccounts.map((currentAccount) =>
-          currentAccount.id === selectedAccount?.id
+          currentAccount.id === accountId
             ? {
                 ...currentAccount,
                 state: "error",
                 lastError: error instanceof Error ? error.message : "Chrome action failed."
               }
-            : currentAccount
+          : currentAccount
         )
       );
+      return false;
     } finally {
       setIsBusy(false);
     }
   }
 
-  function openLinkedIn() {
-    void runChromeAction(() => openChromeUrl("https://www.linkedin.com/"));
+  function openLinkedIn(accountId = selectedAccount?.id) {
+    return runChromeAction(() => openChromeUrl("https://www.linkedin.com/"), accountId, true);
   }
 
   function navigate(nextRoute: AppRoute, replace = false) {
@@ -282,12 +297,13 @@ export function App() {
         account={routeAccount}
         activeTab={route.tab}
         chromeStatus={status}
+        chromeError={routeAccount.lastError}
         isBusy={isBusy}
         onBack={() => navigate({ kind: "manager", page: "profiles" })}
-        onOpenLinkedIn={openLinkedIn}
-        onRefreshChrome={() => void refreshStatus()}
-        onStartChrome={() => void runChromeAction(() => startChrome())}
-        onStopChrome={() => void runChromeAction(() => stopChrome())}
+        onOpenLinkedIn={() => openLinkedIn(routeAccount.id)}
+        onRefreshChrome={() => void refreshStatus(routeAccount.id)}
+        onStartChrome={() => runChromeAction(() => startChrome(), routeAccount.id, true)}
+        onStopChrome={() => runChromeAction(() => stopChrome(), routeAccount.id)}
         onTabChange={(tab) => navigate({ kind: "workspace", profileId: routeAccount.id, tab })}
       />
     );
@@ -406,7 +422,11 @@ export function App() {
                       className="text-link"
                       onClick={() => {
                         setSelectedAccountId(account.id);
-                        void runChromeAction(() => openChromeUrl("https://www.linkedin.com/"));
+                        void runChromeAction(
+                          () => openChromeUrl("https://www.linkedin.com/"),
+                          account.id,
+                          true
+                        );
                       }}
                     >
                       Open LinkedIn
@@ -446,9 +466,9 @@ export function App() {
                   <button
                     className="icon-button run"
                     title="Start Chrome"
-                    onClick={() => {
-                      setSelectedAccountId(account.id);
-                      void runChromeAction(() => startChrome());
+                      onClick={() => {
+                        setSelectedAccountId(account.id);
+                        void runChromeAction(() => startChrome(), account.id, true);
                     }}
                     disabled={isBusy}
                   >
@@ -457,9 +477,9 @@ export function App() {
                   <button
                     className="icon-button stop"
                     title="Stop Chrome"
-                    onClick={() => {
-                      setSelectedAccountId(account.id);
-                      void runChromeAction(() => stopChrome());
+                      onClick={() => {
+                        setSelectedAccountId(account.id);
+                        void runChromeAction(() => stopChrome(), account.id);
                     }}
                     disabled={isBusy}
                   >

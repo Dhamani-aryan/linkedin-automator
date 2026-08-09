@@ -8,6 +8,7 @@ import {
   Layers3,
   Link,
   List,
+  LoaderCircle,
   MessageSquare,
   MessageSquareReply,
   Navigation,
@@ -47,19 +48,21 @@ import { WorkflowActionPicker } from "./WorkflowActionPicker";
 type WorkspaceProps = {
   account: LinkedInAccount;
   activeTab: WorkspaceRouteTab;
+  chromeError?: string;
   chromeStatus: ChromeStatus | null;
   isBusy: boolean;
   onBack: () => void;
   onTabChange: (tab: WorkspaceRouteTab) => void;
-  onOpenLinkedIn: () => void;
+  onOpenLinkedIn: () => Promise<boolean>;
   onRefreshChrome: () => void;
-  onStartChrome: () => void;
-  onStopChrome: () => void;
+  onStartChrome: () => Promise<boolean>;
+  onStopChrome: () => Promise<boolean>;
 };
 
 export function AccountWorkspace({
   account,
   activeTab,
+  chromeError,
   chromeStatus,
   isBusy,
   onBack,
@@ -262,14 +265,21 @@ export function AccountWorkspace({
           </div>
           <div className="header-actions">
             <button className="ghost-button" onClick={onStartChrome} disabled={isBusy}>
-              <Play size={18} />
-              Start Chrome
+              {isBusy ? <LoaderCircle className="spin" size={18} /> : <Play size={18} />}
+              {isBusy ? "Starting Chrome" : chromeStatus?.connected ? "Chrome running" : "Start Chrome"}
             </button>
             <button className="icon-button stop" title="Stop Chrome" onClick={onStopChrome} disabled={isBusy}>
               <Square size={17} />
             </button>
           </div>
         </header>
+
+        {chromeError ? (
+          <div className="workspace-feedback error" role="alert">
+            <span>{chromeError}</span>
+            <button type="button" onClick={onStartChrome} disabled={isBusy}>Try again</button>
+          </div>
+        ) : null}
 
         <section className="workspace-tabs basic-workspace-tabs">
           <button className={`tab-button ${activeTab === "workflow" ? "active" : ""}`} onClick={() => onTabChange("workflow")}>

@@ -2231,6 +2231,35 @@ p {
   font-size: 12px;
 }
 
+.workspace-feedback {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 18px 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  color: var(--app-text-secondary);
+  background: var(--app-surface-subtle);
+  font-size: 11px;
+}
+
+.workspace-feedback.error {
+  border-color: color-mix(in srgb, var(--app-danger) 45%, var(--app-border));
+  color: var(--app-danger);
+}
+
+.workspace-feedback button {
+  flex: 0 0 auto;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+}
+
 .message-summary {
   padding: 14px 0 16px;
 }
