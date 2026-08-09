@@ -160,6 +160,7 @@ export function createLeadRun(lead, actions, nowIso) {
     state: leadStates.QUEUED,
     actionCursor: firstExecutableCursor(actions),
     attempts: [],
+    delaysSatisfiedActionIds: [],
     nextEligibleAt: nowIso,
     lastErrorCode: null,
     conversationSeenAt: null
@@ -222,6 +223,9 @@ export function transition(leadRun, event, actions = []) {
       assertState(lead, [leadStates.WAITING_DELAY]);
       lead.state = leadStates.QUEUED;
       lead.nextEligibleAt = now;
+      if (event.actionId && !lead.delaysSatisfiedActionIds.includes(event.actionId)) {
+        lead.delaysSatisfiedActionIds.push(event.actionId);
+      }
       return touch(lead, now);
 
     case "REPLIED":
