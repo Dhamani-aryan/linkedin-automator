@@ -2,7 +2,7 @@ export const selectors = Object.freeze({
   loginForm: 'input[name="session_key"], input[name="session_password"], form[action*="login"]',
   profileRoot: "main, body",
   profileMessageControl:
-    '[data-view-name="profile-primary-message"] a[href*="/messaging/compose/"], [data-view-name="profile-primary-message"] button',
+    'a[href*="/messaging/compose/"][href*="NON_SELF_PROFILE_VIEW"], [data-view-name="profile-primary-message"] button',
   profileOverflowControl: '[data-view-name="profile-overflow-button"] button',
   connectButtonText: "connect",
   moreButtonText: "more",

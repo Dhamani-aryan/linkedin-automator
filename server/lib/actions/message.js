@@ -178,27 +178,20 @@ async function openMessageComposer(session, recipientName) {
   const existing = await readComposer(session, recipientName);
   if (existing) return true;
 
-  const directPoint = await evaluate(session, (selector) => {
-    const candidates = [...document.querySelectorAll(selector)]
-      .filter((element) => isVisible(element))
-      .map((element) => ({ element, rect: element.getBoundingClientRect() }))
-      .sort((left, right) => right.rect.y - left.rect.y);
-    return candidates[0] ? center(candidates[0].rect) : null;
+  await evaluate(session, () => window.scrollTo({ top: 0, behavior: "instant" }), []);
+  const directTarget = await waitForValue(
+    () => readProfileMessageTarget(session),
+    Boolean,
+    15_000
+  );
 
-    function isVisible(element) {
-      const rect = element.getBoundingClientRect();
-      const style = getComputedStyle(element);
-      return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < innerHeight &&
-        style.visibility !== "hidden" && style.display !== "none";
+  if (directTarget) {
+    await clickAt(session, directTarget.point);
+    if (await waitForComposer(session, recipientName, 4_000)) return true;
+    if (directTarget.href) {
+      await navigate(session, directTarget.href, { timeoutMs: 25_000 });
+      if (await waitForComposer(session, recipientName, 8_000)) return true;
     }
-    function center(rect) {
-      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-    }
-  }, [selectors.profileMessageControl]);
-
-  if (directPoint) {
-    await clickAt(session, directPoint);
-    if (await waitForComposer(session, recipientName, 5_000)) return true;
   }
 
   let menuPoint = await readOverflowMessagePoint(session);
@@ -224,6 +217,33 @@ async function openMessageComposer(session, recipientName) {
   return Boolean(await waitForComposer(session, recipientName, 8_000));
 }
 
+async function readProfileMessageTarget(session) {
+  return await evaluate(session, (selector) => {
+    const candidates = [...document.querySelectorAll(selector)]
+      .filter((element) => {
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < innerHeight &&
+          style.visibility !== "hidden" && style.display !== "none";
+      })
+      .map((element) => ({ element, rect: element.getBoundingClientRect() }))
+      .sort((left, right) => {
+        const leftInProfile = left.rect.y >= 80 ? 1 : 0;
+        const rightInProfile = right.rect.y >= 80 ? 1 : 0;
+        return rightInProfile - leftInProfile || right.rect.y - left.rect.y;
+      });
+    const candidate = candidates[0];
+    if (!candidate) return null;
+    return {
+      point: {
+        x: candidate.rect.left + candidate.rect.width / 2,
+        y: candidate.rect.top + candidate.rect.height / 2
+      },
+      href: candidate.element instanceof HTMLAnchorElement ? candidate.element.href : null
+    };
+  }, [selectors.profileMessageControl]);
+}
+
 async function readOverflowMessagePoint(session) {
   return await evaluate(session, (messageText) => {
     const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
@@ -241,16 +261,23 @@ async function readOverflowMessagePoint(session) {
 
 async function readComposer(session, recipientName) {
   return await evaluate(session, (expectedRecipient) => {
-    const root = document.querySelector("#interop-outlet")?.shadowRoot;
-    if (!root) return null;
     const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
-    const bubble = [...root.querySelectorAll(".msg-overlay-conversation-bubble")].find((candidate) =>
+    const shadowRoot = document.querySelector("#interop-outlet")?.shadowRoot;
+    const shadowBubble = shadowRoot && [...shadowRoot.querySelectorAll(".msg-overlay-conversation-bubble")].find((candidate) =>
       normalize(candidate.querySelector(".msg-overlay-bubble-header__title")?.textContent) === expectedRecipient
     );
-    const editor = bubble?.querySelector('.msg-form__contenteditable[contenteditable="true"][role="textbox"]');
-    if (!bubble || !(editor instanceof HTMLElement)) return null;
+    const pageThread = document.querySelector(".msg-compose-container");
+    const pageRecipient = pageThread?.querySelector('.msg-connections-typeahead__added-recipients button[aria-label^="Remove "]')
+      ?.getAttribute("aria-label")
+      ?.replace(/^Remove\s+/i, "")
+      .trim();
+    const container = shadowBubble ?? (pageRecipient === expectedRecipient ? pageThread : null);
+    const editor = container?.querySelector('.msg-form__contenteditable[contenteditable="true"][role="textbox"]');
+    if (!container || !(editor instanceof HTMLElement)) return null;
     return {
-      recipientName: normalize(bubble.querySelector(".msg-overlay-bubble-header__title")?.textContent),
+      recipientName: shadowBubble
+        ? normalize(shadowBubble.querySelector(".msg-overlay-bubble-header__title")?.textContent)
+        : pageRecipient,
       text: normalizeEditorText(editor.innerText),
       matchingMessageCount: 0
     };
@@ -263,30 +290,42 @@ async function readComposer(session, recipientName) {
 
 async function focusComposer(session, recipientName) {
   return await evaluate(session, (expectedRecipient) => {
-    const root = document.querySelector("#interop-outlet")?.shadowRoot;
     const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
-    const bubble = root && [...root.querySelectorAll(".msg-overlay-conversation-bubble")].find((candidate) =>
+    const shadowRoot = document.querySelector("#interop-outlet")?.shadowRoot;
+    const shadowBubble = shadowRoot && [...shadowRoot.querySelectorAll(".msg-overlay-conversation-bubble")].find((candidate) =>
       normalize(candidate.querySelector(".msg-overlay-bubble-header__title")?.textContent) === expectedRecipient
     );
-    const editor = bubble?.querySelector('.msg-form__contenteditable[contenteditable="true"][role="textbox"]');
+    const pageThread = document.querySelector(".msg-compose-container");
+    const pageRecipient = pageThread?.querySelector('.msg-connections-typeahead__added-recipients button[aria-label^="Remove "]')
+      ?.getAttribute("aria-label")
+      ?.replace(/^Remove\s+/i, "")
+      .trim();
+    const container = shadowBubble ?? (pageRecipient === expectedRecipient ? pageThread : null);
+    const editor = container?.querySelector('.msg-form__contenteditable[contenteditable="true"][role="textbox"]');
     if (!(editor instanceof HTMLElement)) return false;
     editor.focus();
-    return document.activeElement === editor || root.activeElement === editor;
+    return document.activeElement === editor || shadowRoot?.activeElement === editor;
   }, [recipientName], { userGesture: true });
 }
 
 async function readComposerText(session, recipientName, expectedText) {
   return await evaluate(session, (expectedRecipient, expected) => {
-    const root = document.querySelector("#interop-outlet")?.shadowRoot;
     const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
     const normalizeText = (value) => String(value ?? "").replace(/\r\n/g, "\n").replace(/\n$/, "");
-    const bubble = root && [...root.querySelectorAll(".msg-overlay-conversation-bubble")].find((candidate) =>
+    const shadowRoot = document.querySelector("#interop-outlet")?.shadowRoot;
+    const shadowBubble = shadowRoot && [...shadowRoot.querySelectorAll(".msg-overlay-conversation-bubble")].find((candidate) =>
       normalize(candidate.querySelector(".msg-overlay-bubble-header__title")?.textContent) === expectedRecipient
     );
-    const editor = bubble?.querySelector('.msg-form__contenteditable[contenteditable="true"][role="textbox"]');
+    const pageThread = document.querySelector(".msg-compose-container");
+    const pageRecipient = pageThread?.querySelector('.msg-connections-typeahead__added-recipients button[aria-label^="Remove "]')
+      ?.getAttribute("aria-label")
+      ?.replace(/^Remove\s+/i, "")
+      .trim();
+    const container = shadowBubble ?? (pageRecipient === expectedRecipient ? pageThread : null);
+    const editor = container?.querySelector('.msg-form__contenteditable[contenteditable="true"][role="textbox"]');
     if (!(editor instanceof HTMLElement)) return null;
     const text = normalizeText(editor.innerText);
-    const matchingMessageCount = [...bubble.querySelectorAll(".msg-s-event-listitem__body")]
+    const matchingMessageCount = [...container.querySelectorAll(".msg-s-event-listitem__body")]
       .filter((element) => normalizeText(element.innerText) === normalizeText(expected))
       .length;
     return { text, matches: text === normalizeText(expected), matchingMessageCount };
@@ -295,12 +334,18 @@ async function readComposerText(session, recipientName, expectedText) {
 
 async function readSendPoint(session, recipientName) {
   return await evaluate(session, (expectedRecipient) => {
-    const root = document.querySelector("#interop-outlet")?.shadowRoot;
     const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
-    const bubble = root && [...root.querySelectorAll(".msg-overlay-conversation-bubble")].find((candidate) =>
+    const shadowRoot = document.querySelector("#interop-outlet")?.shadowRoot;
+    const shadowBubble = shadowRoot && [...shadowRoot.querySelectorAll(".msg-overlay-conversation-bubble")].find((candidate) =>
       normalize(candidate.querySelector(".msg-overlay-bubble-header__title")?.textContent) === expectedRecipient
     );
-    const button = bubble?.querySelector('button.msg-form__send-button[type="submit"]:not([disabled])');
+    const pageThread = document.querySelector(".msg-compose-container");
+    const pageRecipient = pageThread?.querySelector('.msg-connections-typeahead__added-recipients button[aria-label^="Remove "]')
+      ?.getAttribute("aria-label")
+      ?.replace(/^Remove\s+/i, "")
+      .trim();
+    const container = shadowBubble ?? (pageRecipient === expectedRecipient ? pageThread : null);
+    const button = container?.querySelector('button.msg-form__send-button[type="submit"]:not([disabled])');
     if (!(button instanceof HTMLElement)) return null;
     const rect = button.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return null;
@@ -310,14 +355,20 @@ async function readSendPoint(session, recipientName) {
 
 async function readSentConfirmation(session, recipientName, expectedText, beforeCount) {
   return await evaluate(session, (expectedRecipient, expected, priorCount) => {
-    const root = document.querySelector("#interop-outlet")?.shadowRoot;
     const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
     const normalizeText = (value) => String(value ?? "").replace(/\r\n/g, "\n").replace(/\n$/, "");
-    const bubble = root && [...root.querySelectorAll(".msg-overlay-conversation-bubble")].find((candidate) =>
+    const shadowRoot = document.querySelector("#interop-outlet")?.shadowRoot;
+    const shadowBubble = shadowRoot && [...shadowRoot.querySelectorAll(".msg-overlay-conversation-bubble")].find((candidate) =>
       normalize(candidate.querySelector(".msg-overlay-bubble-header__title")?.textContent) === expectedRecipient
     );
-    if (!bubble) return null;
-    const matching = [...bubble.querySelectorAll(".msg-s-event-listitem__body")]
+    const pageThread = document.querySelector(".msg-compose-container");
+    const pageRecipient = pageThread?.querySelector('.msg-connections-typeahead__added-recipients button[aria-label^="Remove "]')
+      ?.getAttribute("aria-label")
+      ?.replace(/^Remove\s+/i, "")
+      .trim();
+    const container = shadowBubble ?? (pageRecipient === expectedRecipient ? pageThread : null);
+    if (!container) return null;
+    const matching = [...container.querySelectorAll(".msg-s-event-listitem__body")]
       .filter((element) => normalizeText(element.innerText) === normalizeText(expected));
     if (matching.length <= priorCount) return { confirmed: false };
     const event = matching.at(-1)?.closest(".msg-s-event-with-indicator");
@@ -368,7 +419,7 @@ async function waitForValue(read, accept, timeoutMs) {
 async function readMessageEligibility(session) {
   return await evaluate(session, async (selectorsInput) => {
     const startedAt = Date.now();
-    const hydrationTimeoutMs = 8_000;
+    const hydrationTimeoutMs = 15_000;
     const text = document.body?.innerText?.toLowerCase() ?? "";
     const readControls = () => [...document.querySelectorAll('button, a, [role="button"], [role="menuitem"]')].map((control) => ({
       text: (control.textContent ?? "").replace(/\s+/g, " ").trim().toLowerCase(),
@@ -382,13 +433,20 @@ async function readMessageEligibility(session) {
       control.href.includes("/messaging/compose/");
     const findPrimaryMessageControl = () => {
       const preferred = [...document.querySelectorAll(selectorsInput.profileMessageControl)]
+        .filter(isVisible)
         .map((element) => readControl(element))
         .find(isMessageControl);
       if (preferred) return preferred;
 
       return readControls()
-        .filter((control) => control.element.matches('button, a[role="button"]'))
+        .filter((control) => control.element.matches('button, a[role="button"]') && isVisible(control.element))
         .find(isMessageControl);
+    };
+    const isVisible = (element) => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < innerHeight &&
+        style.visibility !== "hidden" && style.display !== "none";
     };
     const readControl = (control) => ({
       text: (control.textContent ?? "").replace(/\s+/g, " ").trim().toLowerCase(),
