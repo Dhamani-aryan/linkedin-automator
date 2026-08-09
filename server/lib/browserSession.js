@@ -174,6 +174,36 @@ export async function evaluate(session, fn, args = [], options = {}) {
   return result.result?.value;
 }
 
+export async function clickAt(session, point) {
+  if (!Number.isFinite(point?.x) || !Number.isFinite(point?.y)) {
+    throw new Error("Chrome click coordinates are invalid.");
+  }
+
+  await session.send("Input.dispatchMouseEvent", {
+    type: "mouseMoved",
+    x: point.x,
+    y: point.y
+  });
+  await session.send("Input.dispatchMouseEvent", {
+    type: "mousePressed",
+    x: point.x,
+    y: point.y,
+    button: "left",
+    clickCount: 1
+  });
+  await session.send("Input.dispatchMouseEvent", {
+    type: "mouseReleased",
+    x: point.x,
+    y: point.y,
+    button: "left",
+    clickCount: 1
+  });
+}
+
+export async function insertText(session, text) {
+  await session.send("Input.insertText", { text: String(text ?? "") });
+}
+
 export async function checkLinkedInAuth(session) {
   const page = await navigate(session, "https://www.linkedin.com/feed/", { timeoutMs: 20_000 });
   const markers = await evaluate(session, () => {
