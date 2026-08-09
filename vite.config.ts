@@ -10,7 +10,7 @@ function localControllerPlugin(): Plugin {
     name: "linkedin-automator-local-controller",
     apply: "serve",
     configureServer(server) {
-      controller = spawn(process.execPath, ["server/index.js"], {
+      controller = spawn(process.execPath, ["--watch", "server/index.js"], {
         cwd: process.cwd(),
         env: process.env,
         stdio: "inherit",
