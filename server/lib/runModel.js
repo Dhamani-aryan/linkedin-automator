@@ -327,6 +327,13 @@ export function transition(leadRun, event, actions = []) {
       lead.nextEligibleAt = null;
       return touch(lead, now);
 
+    case "RETRY":
+      assertState(lead, [leadStates.NEEDS_REVIEW]);
+      lead.state = leadStates.QUEUED;
+      lead.lastErrorCode = null;
+      lead.nextEligibleAt = now;
+      return touch(lead, now);
+
     case "STOPPED":
       if (terminalLeadStates.has(lead.state)) return touch(lead, now);
       if (lead.state === leadStates.RUNNING) {

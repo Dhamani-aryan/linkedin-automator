@@ -287,4 +287,41 @@ describe("transition", () => {
       detail: { stage: "before_send" }
     });
   });
+
+  it("requeues a reviewed lead at the same action", () => {
+    const messageActions = [actions[2]];
+    const run = createCampaignRun({
+      runId: "run-retry",
+      snapshot: {
+        profileId: "profile-1",
+        campaign: { id: "campaign-1" },
+        actions: messageActions,
+        leads: [lead],
+        safety
+      },
+      mode: "live"
+    });
+    const runningLead = transition(run.leads[0], {
+      type: "ACTION_STARTED",
+      actionId: messageActions[0].id,
+      now: "2026-08-09T10:00:01.000Z"
+    }, messageActions);
+    const reviewedLead = transition(runningLead, {
+      type: "NEEDS_REVIEW",
+      errorCode: "ELEMENT_NOT_FOUND",
+      now: "2026-08-09T10:00:02.000Z"
+    }, messageActions);
+    const retriedLead = transition(reviewedLead, {
+      type: "RETRY",
+      now: "2026-08-09T10:00:03.000Z"
+    }, messageActions);
+
+    expect(retriedLead).toMatchObject({
+      state: leadStates.QUEUED,
+      actionCursor: 0,
+      lastErrorCode: null,
+      nextEligibleAt: "2026-08-09T10:00:03.000Z"
+    });
+    expect(retriedLead.attempts).toHaveLength(1);
+  });
 });
