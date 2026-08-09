@@ -32,7 +32,17 @@ let controlWake = null;
 let authCache = null;
 
 export async function initializeRunner() {
-  await recoverInterruptedRuns();
+  const recovered = await recoverInterruptedRuns();
+  const run = recovered
+    .filter((candidate) => [runStates.RUNNING, runStates.PAUSED, runStates.NEEDS_ATTENTION].includes(candidate.state))
+    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))[0];
+  if (!run) return;
+
+  if (run.state === runStates.NEEDS_ATTENTION) {
+    activeRunId = run.id;
+    return;
+  }
+  scheduleRunLoop(run);
 }
 
 export async function startCampaignRun(snapshot) {
