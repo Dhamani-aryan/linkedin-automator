@@ -48,7 +48,7 @@ describe("runStore", () => {
     ]);
   });
 
-  it("stops active runs and marks in-flight attempts for review on recovery", async () => {
+  it("requires review when restart interrupts an in-flight attempt", async () => {
     const store = await tempStore();
     await saveRun({
       id: "run_1",
@@ -66,10 +66,60 @@ describe("runStore", () => {
     const recovered = await recoverInterruptedRuns(store, new Date("2026-08-09T11:00:00.000Z"));
 
     expect(recovered[0]).toMatchObject({
-      state: runStates.STOPPED,
-      stopReason: "controller_restart",
+      state: runStates.NEEDS_ATTENTION,
       leads: [{ state: leadStates.NEEDS_REVIEW, lastErrorCode: "CONTROLLER_RESTART_DURING_ATTEMPT" }]
     });
-    await expect(loadRun("run_1", store)).resolves.toMatchObject({ state: runStates.STOPPED });
+    await expect(loadRun("run_1", store)).resolves.toMatchObject({ state: runStates.NEEDS_ATTENTION });
+  });
+
+  it("resumes a sleeping run without changing its absolute due time", async () => {
+    const store = await tempStore();
+    await saveRun({
+      id: "run_sleeping",
+      state: runStates.SLEEPING,
+      stopRequested: false,
+      pauseRequested: false,
+      sleepingUntil: "2026-08-09T11:00:00.000Z",
+      leads: [{
+        id: "lead-1",
+        state: leadStates.WAITING_DELAY,
+        attempts: [],
+        nextEligibleAt: "2026-08-09T12:00:00.000Z"
+      }]
+    }, store);
+
+    const [recovered] = await recoverInterruptedRuns(store, new Date("2026-08-09T10:30:00.000Z"));
+
+    expect(recovered).toMatchObject({
+      state: runStates.RUNNING,
+      stopRequested: false,
+      pauseRequested: false,
+      sleepingUntil: null,
+      leads: [{ state: leadStates.WAITING_DELAY, nextEligibleAt: "2026-08-09T12:00:00.000Z" }]
+    });
+  });
+
+  it("keeps a paused run paused with its original due time", async () => {
+    const store = await tempStore();
+    await saveRun({
+      id: "run_paused",
+      state: runStates.PAUSED,
+      stopRequested: false,
+      pauseRequested: true,
+      leads: [{
+        id: "lead-1",
+        state: leadStates.WAITING_DELAY,
+        attempts: [],
+        nextEligibleAt: "2026-08-09T12:00:00.000Z"
+      }]
+    }, store);
+
+    const [recovered] = await recoverInterruptedRuns(store, new Date("2026-08-09T11:30:00.000Z"));
+
+    expect(recovered).toMatchObject({
+      state: runStates.PAUSED,
+      pauseRequested: true,
+      leads: [{ nextEligibleAt: "2026-08-09T12:00:00.000Z" }]
+    });
   });
 });

@@ -72,20 +72,36 @@ export async function recoverInterruptedRuns(store = createRunStore(), now = new
     }
 
     const nowIso = now.toISOString();
+    const leads = run.leads.map((lead) => recoverLead(lead, nowIso));
+    const interruptedAttempt = leads.some((lead) =>
+      lead.state === leadStates.NEEDS_REVIEW &&
+      lead.lastErrorCode === "CONTROLLER_RESTART_DURING_ATTEMPT"
+    );
+    const wasPaused = run.state === runStates.PAUSED;
+    const wasStopping = run.state === runStates.STOPPING;
+    const state = interruptedAttempt
+      ? runStates.NEEDS_ATTENTION
+      : wasPaused
+        ? runStates.PAUSED
+        : wasStopping
+          ? runStates.STOPPED
+          : runStates.RUNNING;
     const nextRun = {
       ...run,
-      state: runStates.STOPPED,
-      stopReason: "controller_restart",
+      state,
+      stopRequested: wasStopping,
+      pauseRequested: wasPaused,
+      stopReason: wasStopping ? "stop_completed_after_restart" : null,
       sleepingUntil: null,
       sleepingReason: null,
       updatedAt: nowIso,
-      leads: run.leads.map((lead) => recoverLead(lead, nowIso))
+      leads
     };
 
     await appendAudit(run.id, {
       ts: nowIso,
       event: "controller_restart_recovery",
-      outcome: "stopped"
+      outcome: state === runStates.RUNNING ? "resumed" : state
     }, store);
     await saveRun(nextRun, store);
     recovered.push(nextRun);
@@ -113,8 +129,8 @@ function recoverLead(lead, nowIso) {
   }
   return {
     ...lead,
-    state: leadStates.STOPPED,
-    nextEligibleAt: null,
+    state: leadStates.QUEUED,
+    nextEligibleAt: lead.nextEligibleAt ?? nowIso,
     updatedAt: nowIso
   };
 }
