@@ -33,9 +33,29 @@ export async function executeMessage({
     };
   }
 
-  const resolved = renderTemplate(action.template ?? "", lead, { missingVariable: "empty" });
+  const profileIdentity = await readProfileIdentity(session, page.title);
+  if (!profileIdentity.firstName) {
+    return {
+      outcome: "needs_review",
+      errorCode: ErrorCodes.ELEMENT_NOT_FOUND,
+      detail: {
+        actionType: "message",
+        reason: "The lead name could not be read from the LinkedIn profile heading.",
+        profileIdentity
+      }
+    };
+  }
+  const resolvedLead = { ...lead, ...profileIdentity };
+  const resolved = renderTemplate(action.template ?? "", resolvedLead, { missingVariable: "empty" });
   if (mode === "live") {
-    return await sendLiveMessage({ session, page, classification, resolved, shouldStop, shouldPause });
+    return await sendLiveMessage({
+      session,
+      recipientName: profileIdentity.displayName,
+      classification,
+      resolved,
+      shouldStop,
+      shouldPause
+    });
   }
 
   return {
@@ -47,14 +67,14 @@ export async function executeMessage({
       messageState: classification.messageState,
       matchedControl: classification.matchedControl,
       inspectedAfterMs: classification.inspectedAfterMs,
+      profileIdentity,
       resolvedText: resolved.text,
       missingVariables: resolved.missing
     }
   };
 }
 
-async function sendLiveMessage({ session, page, classification, resolved, shouldStop, shouldPause }) {
-  const recipientName = page.title.replace(/\s*\|\s*LinkedIn\s*$/i, "").trim();
+async function sendLiveMessage({ session, recipientName, classification, resolved, shouldStop, shouldPause }) {
   if (await shouldStop()) return stoppedMessageResult("before_composer", recipientName);
   if (await shouldPause()) return pausedMessageResult("before_composer", recipientName);
 
@@ -232,6 +252,27 @@ async function openMessageComposer(session, recipientName) {
     surface: "profile_main_action",
     attempts
   };
+}
+
+async function readProfileIdentity(session, pageTitle) {
+  return await evaluate(session, (fallbackTitle) => {
+    const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
+    const heading = [...document.querySelectorAll("main h1, h1")]
+      .filter((element) => {
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+      })
+      .map((element) => normalize(element.textContent))
+      .find(Boolean);
+    const displayName = heading || normalize(fallbackTitle.replace(/\s*\|\s*LinkedIn\s*$/i, ""));
+    const parts = displayName.split(" ").filter(Boolean);
+    return {
+      displayName,
+      firstName: parts[0] ?? "",
+      lastName: parts.slice(1).join(" ")
+    };
+  }, [pageTitle]);
 }
 
 async function readProfileMessageTarget(session) {
