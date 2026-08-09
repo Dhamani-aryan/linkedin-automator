@@ -125,7 +125,7 @@ describe("runStore", () => {
     });
   });
 
-  it("finds the latest stopped run that still has pending work", async () => {
+  it("does not resurrect an older stopped run after a newer terminal run", async () => {
     const store = await tempStore();
     await saveRun({
       id: "older",
@@ -146,7 +146,25 @@ describe("runStore", () => {
       leads: [{ state: leadStates.QUEUED }]
     }, store);
 
-    await expect(findLatestResumableRun(store)).resolves.toMatchObject({ id: "newer" });
+    await expect(findLatestResumableRun(store)).resolves.toBeNull();
+  });
+
+  it("finds the latest run when it is stopped with pending work", async () => {
+    const store = await tempStore();
+    await saveRun({
+      id: "older",
+      state: runStates.COMPLETED,
+      updatedAt: "2026-08-09T10:00:00.000Z",
+      leads: [{ state: leadStates.COMPLETED }]
+    }, store);
+    await saveRun({
+      id: "latest",
+      state: runStates.STOPPED,
+      updatedAt: "2026-08-09T11:00:00.000Z",
+      leads: [{ state: leadStates.WAITING_DELAY }]
+    }, store);
+
+    await expect(findLatestResumableRun(store)).resolves.toMatchObject({ id: "latest" });
   });
 
   it("finds successful deliveries for the same campaign, lead, and action", async () => {
