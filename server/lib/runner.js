@@ -26,6 +26,7 @@ import {
 import {
   appendAudit,
   findLatestResumableRun,
+  findSentActionMatches,
   loadRun,
   readAudit,
   recoverInterruptedRuns,
@@ -68,6 +69,21 @@ export async function startCampaignRun(snapshot) {
   ];
   if (validationFailures.length > 0) {
     return { ok: false, validationFailures };
+  }
+  if (mode === "live") {
+    const sentMatches = await findSentActionMatches(snapshot);
+    if (sentMatches.length > 0) {
+      const deliveryLabel = sentMatches.length === 1 ? "delivery was" : "deliveries were";
+      return {
+        ok: false,
+        validationFailures: [{
+          field: "leads",
+          code: "DUPLICATE_LIVE_DELIVERY",
+          message: `${sentMatches.length} selected lead/action ${deliveryLabel} already sent in this campaign. Duplicate live start blocked.`,
+          detail: { matches: sentMatches }
+        }]
+      };
+    }
   }
 
   const run = {
