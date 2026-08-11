@@ -54,6 +54,13 @@ export async function getCampaignRun(runId: string): Promise<CampaignRun> {
   return request<CampaignRun>(`/api/campaign-runs/${encodeURIComponent(runId)}`);
 }
 
+export async function listCampaignRuns(profileId: string): Promise<CampaignRun[]> {
+  const result = await request<{ ok: true; runs: CampaignRun[] }>(
+    `/api/campaign-runs?profileId=${encodeURIComponent(profileId)}`
+  );
+  return result.runs;
+}
+
 export async function getActiveCampaignRun(): Promise<CampaignRun | null> {
   const result = await request<{ ok: true; run: CampaignRun | null }>("/api/campaign-runs/active", undefined, {
     ignoreMissingEndpoint: true

@@ -27,6 +27,7 @@ import {
   appendAudit,
   findLatestResumableRun,
   findSentActionMatches,
+  listRuns,
   loadRun,
   readAudit,
   recoverInterruptedRuns,
@@ -116,6 +117,13 @@ export async function getActiveCampaignRun() {
     activeRunId = resumable.id;
   }
   return { ok: true, run: await getCampaignRun(activeRunId) };
+}
+
+export async function listCampaignRuns(profileId) {
+  const runs = (await listRuns())
+    .filter((run) => !profileId || run.profileId === profileId)
+    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
+  return { ok: true, runs: runs.map(decorateRun) };
 }
 
 export async function stopCampaignRun(runId) {

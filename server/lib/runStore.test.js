@@ -7,6 +7,7 @@ import {
   createRunStore,
   findLatestResumableRun,
   findSentActionMatches,
+  listRuns,
   loadRun,
   readAudit,
   recoverInterruptedRuns,
@@ -29,6 +30,17 @@ async function tempStore() {
 }
 
 describe("runStore", () => {
+  it("lists every durable run", async () => {
+    const store = await tempStore();
+    await saveRun({ id: "run-1", state: runStates.COMPLETED }, store);
+    await saveRun({ id: "run-2", state: runStates.STOPPED }, store);
+
+    await expect(listRuns(store)).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "run-1" }),
+      expect.objectContaining({ id: "run-2" })
+    ]));
+  });
+
   it("writes and reads run state atomically", async () => {
     const store = await tempStore();
     const run = { id: "run_1", state: runStates.RUNNING, leads: [] };

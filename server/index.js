@@ -13,6 +13,7 @@ import {
   getActiveCampaignRun,
   getCampaignRun,
   initializeRunner,
+  listCampaignRuns,
   pauseCampaignRun,
   retryCampaignRun,
   resumeCampaignRun,
@@ -119,6 +120,11 @@ const server = createServer(async (request, response) => {
     if (request.method === "POST" && resumeMatch) {
       const body = await readJsonBody(request);
       sendJson(response, 200, await resumeCampaignRun(resumeMatch[1], body.actions));
+      return;
+    }
+
+    if (request.method === "GET" && requestUrl.pathname === "/api/campaign-runs") {
+      sendJson(response, 200, await listCampaignRuns(requestUrl.searchParams.get("profileId") ?? ""));
       return;
     }
 

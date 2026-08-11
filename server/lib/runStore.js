@@ -63,6 +63,10 @@ export async function listRunIds(store = createRunStore()) {
   return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
 }
 
+export async function listRuns(store = createRunStore()) {
+  return await Promise.all((await listRunIds(store)).map((runId) => loadRun(runId, store)));
+}
+
 export async function recoverInterruptedRuns(store = createRunStore(), now = new Date()) {
   const recovered = [];
   for (const runId of await listRunIds(store)) {
@@ -136,7 +140,7 @@ function recoverLead(lead, nowIso) {
 }
 
 export async function findLatestResumableRun(store = createRunStore()) {
-  const runs = await Promise.all((await listRunIds(store)).map((runId) => loadRun(runId, store)));
+  const runs = await listRuns(store);
   const latestRun = runs
     .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))[0] ?? null;
   if (
