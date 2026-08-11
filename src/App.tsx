@@ -21,7 +21,9 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { AddLinkedInAccountModal } from "./components/AddLinkedInAccountModal";
 import { AccountWorkspace } from "./components/AccountWorkspace";
+import { ProfileCampaigns } from "./components/ProfileCampaigns";
 import { readAppRoute, routeToHash, type AppRoute } from "./lib/appRoute";
+import { loadCampaignWorkspaces } from "./lib/campaignStorage";
 import { getChromeStatus, openChromeUrl, startChrome, stopChrome } from "./lib/chromeApi";
 import { loadSafetySettings, saveSafetySettings } from "./lib/safetyStorage";
 import {
@@ -59,7 +61,7 @@ export function App() {
   const [humanTouchSettings, setHumanTouchSettings] = useState<HumanTouchSettings>(() => loadSafetySettings());
 
   const routeAccount =
-    route.kind === "workspace"
+    route.kind === "workspace" || route.kind === "campaigns"
       ? accounts.find((candidate) => candidate.id === route.profileId) ?? null
       : null;
   const selectedAccount = routeAccount ?? accounts.find((candidate) => candidate.id === selectedAccountId) ?? accounts[0] ?? null;
@@ -88,8 +90,17 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (route.kind !== "workspace" || routeAccount) return;
+    if (!["workspace", "campaigns"].includes(route.kind) || routeAccount) return;
     navigate({ kind: "manager", page: "profiles" }, true);
+  }, [route, routeAccount]);
+
+  useEffect(() => {
+    if (route.kind !== "workspace" || !routeAccount) return;
+    const campaignExists = route.campaignId && loadCampaignWorkspaces(routeAccount)
+      .some(({ campaign }) => campaign.id === route.campaignId);
+    if (!campaignExists) {
+      navigate({ kind: "campaigns", profileId: routeAccount.id }, true);
+    }
   }, [route, routeAccount]);
 
   useEffect(() => {
@@ -293,22 +304,44 @@ export function App() {
     );
   }
 
-  if (route.kind === "workspace" && routeAccount) {
+  if (route.kind === "campaigns" && routeAccount) {
+    return (
+      <ProfileCampaigns
+        account={routeAccount}
+        safetySettings={humanTouchSettings}
+        onBack={() => navigate({ kind: "manager", page: "profiles" })}
+        onOpenCampaign={(campaignId) => navigate({
+          kind: "workspace",
+          profileId: routeAccount.id,
+          campaignId,
+          tab: "workflow"
+        })}
+      />
+    );
+  }
+
+  if (route.kind === "workspace" && routeAccount && route.campaignId) {
     return (
       <AccountWorkspace
         account={routeAccount}
+        campaignId={route.campaignId}
         activeTab={route.tab}
         chromeStatus={status}
         chromeError={routeAccount.lastError}
         isBusy={isBusy}
         safetySettings={humanTouchSettings}
         onSafetySettingsChange={setHumanTouchSettings}
-        onBack={() => navigate({ kind: "manager", page: "profiles" })}
+        onBack={() => navigate({ kind: "campaigns", profileId: routeAccount.id })}
         onOpenLinkedIn={() => openLinkedIn(routeAccount.id)}
         onRefreshChrome={() => void refreshStatus(routeAccount.id)}
         onStartChrome={() => runChromeAction(() => startChrome(), routeAccount.id, true)}
         onStopChrome={() => runChromeAction(() => stopChrome(), routeAccount.id)}
-        onTabChange={(tab) => navigate({ kind: "workspace", profileId: routeAccount.id, tab })}
+        onTabChange={(tab) => navigate({
+          kind: "workspace",
+          profileId: routeAccount.id,
+          campaignId: route.campaignId,
+          tab
+        })}
       />
     );
   }
@@ -451,10 +484,10 @@ export function App() {
                     className="ghost-button compact-button"
                     onClick={() => {
                       setSelectedAccountId(account.id);
-                      navigate({ kind: "workspace", profileId: account.id, tab: "workflow" });
+                        navigate({ kind: "campaigns", profileId: account.id });
                     }}
                   >
-                    Open workspace
+                    Campaigns
                   </button>
                   <button
                     className="icon-button run"

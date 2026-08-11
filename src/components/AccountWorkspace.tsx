@@ -62,6 +62,7 @@ import { WorkflowActionPicker } from "./WorkflowActionPicker";
 
 type WorkspaceProps = {
   account: LinkedInAccount;
+  campaignId: string;
   activeTab: WorkspaceRouteTab;
   chromeError?: string;
   chromeStatus: ChromeStatus | null;
@@ -78,6 +79,7 @@ type WorkspaceProps = {
 
 export function AccountWorkspace({
   account,
+  campaignId,
   activeTab,
   chromeError,
   chromeStatus,
@@ -91,7 +93,7 @@ export function AccountWorkspace({
   onStartChrome,
   onStopChrome
 }: WorkspaceProps) {
-  const [workspace, setWorkspace] = useState<CampaignWorkspaceState>(() => loadCampaignWorkspace(account));
+  const [workspace, setWorkspace] = useState<CampaignWorkspaceState>(() => loadCampaignWorkspace(account, campaignId));
   const [activeModal, setActiveModal] = useState<"source" | "action" | "template" | null>(null);
   const [insertAt, setInsertAt] = useState(0);
   const [selectedActionId, setSelectedActionId] = useState(() => workspace.actions[0]?.id ?? "");
@@ -136,13 +138,13 @@ export function AccountWorkspace({
   );
 
   useEffect(() => {
-    const nextWorkspace = loadCampaignWorkspace(account);
+    const nextWorkspace = loadCampaignWorkspace(account, campaignId);
     setWorkspace(nextWorkspace);
     setSelectedActionId(nextWorkspace.actions[0]?.id ?? "");
     setActiveRun(null);
     setStartMode("dry_run");
     setLiveSendConfirmed(false);
-  }, [account.id]);
+  }, [account.id, campaignId]);
 
   useEffect(() => {
     saveCampaignWorkspace(account.id, workspace);
@@ -553,7 +555,7 @@ export function AccountWorkspace({
       <aside className="workspace-sidebar">
         <button className="back-link" onClick={onBack}>
           <ArrowLeft size={18} />
-          All profiles
+          All campaigns
         </button>
 
         <section className="workspace-profile">

@@ -1,0 +1,407 @@
+import {
+  ArrowLeft,
+  CheckSquare2,
+  Circle,
+  LoaderCircle,
+  Pause,
+  Play,
+  Plus,
+  Search,
+  Square,
+  Trash2
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  createCampaignWorkspace,
+  deleteCampaignWorkspace,
+  loadCampaignWorkspaces,
+  saveCampaignWorkspace
+} from "../lib/campaignStorage";
+import {
+  listCampaignRuns,
+  pauseCampaignRun,
+  resumeCampaignRun,
+  startCampaignBatch,
+  stopCampaignRun
+} from "../lib/runnerApi";
+import type {
+  CampaignRun,
+  CampaignRunState,
+  CampaignWorkspaceState,
+  HumanTouchSettings,
+  LinkedInAccount
+} from "../types";
+
+type CampaignFilter = "all" | "running" | "queued" | "paused" | "stopped" | "completed";
+type DisplayStatus = Exclude<CampaignFilter, "all"> | "ready" | "failed";
+
+type ProfileCampaignsProps = {
+  account: LinkedInAccount;
+  safetySettings: HumanTouchSettings;
+  onBack: () => void;
+  onOpenCampaign: (campaignId: string) => void;
+};
+
+const filters: Array<{ value: CampaignFilter; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "running", label: "Running" },
+  { value: "queued", label: "Queued" },
+  { value: "paused", label: "Paused" },
+  { value: "stopped", label: "Stopped" },
+  { value: "completed", label: "Completed" }
+];
+
+export function ProfileCampaigns({
+  account,
+  safetySettings,
+  onBack,
+  onOpenCampaign
+}: ProfileCampaignsProps) {
+  const [campaigns, setCampaigns] = useState(() => loadCampaignWorkspaces(account));
+  const [runs, setRuns] = useState<CampaignRun[]>([]);
+  const [filter, setFilter] = useState<CampaignFilter>("all");
+  const [query, setQuery] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [isBusy, setIsBusy] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [campaignName, setCampaignName] = useState("");
+  const [notice, setNotice] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const selectAllRef = useRef<HTMLInputElement>(null);
+
+  const latestRunByCampaign = useMemo(() => {
+    const latest = new Map<string, CampaignRun>();
+    for (const run of runs) {
+      const campaignId = run.snapshot.campaign.id;
+      if (!latest.has(campaignId)) latest.set(campaignId, run);
+    }
+    return latest;
+  }, [runs]);
+
+  const rows = useMemo(() => campaigns.map((workspace) => ({
+    workspace,
+    run: latestRunByCampaign.get(workspace.campaign.id) ?? null,
+    status: campaignDisplayStatus(latestRunByCampaign.get(workspace.campaign.id)?.state, workspace)
+  })), [campaigns, latestRunByCampaign]);
+
+  const visibleRows = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return rows.filter(({ workspace, status }) =>
+      (filter === "all" || status === filter) &&
+      (!normalizedQuery || workspace.campaign.name.toLowerCase().includes(normalizedQuery))
+    );
+  }, [filter, query, rows]);
+
+  const visibleIds = visibleRows.map(({ workspace }) => workspace.campaign.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+  const someVisibleSelected = visibleIds.some((id) => selectedIds.has(id));
+
+  useEffect(() => {
+    setCampaigns(loadCampaignWorkspaces(account));
+    setSelectedIds(new Set());
+    void refreshRuns();
+  }, [account.id]);
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someVisibleSelected && !allVisibleSelected;
+    }
+  }, [allVisibleSelected, someVisibleSelected]);
+
+  useEffect(() => {
+    const hasLiveState = rows.some(({ status }) => ["running", "queued"].includes(status));
+    if (!hasLiveState) return;
+    const interval = window.setInterval(() => void refreshRuns(), 3500);
+    return () => window.clearInterval(interval);
+  }, [rows]);
+
+  async function refreshRuns() {
+    try {
+      setRuns(await listCampaignRuns(account.id));
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Campaign states could not be refreshed."
+      });
+    }
+  }
+
+  function toggleCampaign(campaignId: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(campaignId)) next.delete(campaignId);
+      else next.add(campaignId);
+      return next;
+    });
+  }
+
+  function toggleVisibleCampaigns() {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (allVisibleSelected) visibleIds.forEach((id) => next.delete(id));
+      else visibleIds.forEach((id) => next.add(id));
+      return next;
+    });
+  }
+
+  function createCampaign() {
+    const name = campaignName.trim();
+    if (!name) return;
+    const workspace = createCampaignWorkspace(account.id, name);
+    saveCampaignWorkspace(account.id, workspace);
+    setCampaigns((current) => [...current, workspace]);
+    setCampaignName("");
+    setIsCreateOpen(false);
+    onOpenCampaign(workspace.campaign.id);
+  }
+
+  async function startSelectedCampaigns() {
+    const selected = rows.filter(({ workspace }) => selectedIds.has(workspace.campaign.id));
+    const resumable = selected.filter(({ run }) => run && ["paused", "stopped"].includes(run.state));
+    const newRuns = selected.filter(({ run }) => !run || ["completed", "failed"].includes(run.state));
+    if (resumable.length === 0 && newRuns.length === 0) return;
+
+    setIsBusy(true);
+    setNotice(null);
+    try {
+      if (newRuns.length > 0) {
+        await startCampaignBatch(newRuns.map(({ workspace }) => ({
+          profileId: account.id,
+          campaign: workspace.campaign,
+          actions: workspace.actions,
+          leads: workspace.leads,
+          safety: {
+            ...safetySettings,
+            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+          },
+          mode: "dry_run"
+        })));
+      }
+      for (const { run, workspace } of resumable) {
+        if (run) await resumeCampaignRun(run.id, workspace.actions);
+      }
+      await refreshRuns();
+      setNotice({
+        tone: "success",
+        message: `${newRuns.length + resumable.length} campaign${newRuns.length + resumable.length === 1 ? "" : "s"} started or queued.`
+      });
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Selected campaigns could not be started."
+      });
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function pauseSelectedCampaigns() {
+    await controlSelectedRuns("pause");
+  }
+
+  async function stopSelectedCampaigns() {
+    await controlSelectedRuns("stop");
+  }
+
+  async function controlSelectedRuns(action: "pause" | "stop") {
+    const selectedRuns = rows
+      .filter(({ workspace, run }) => selectedIds.has(workspace.campaign.id) && run)
+      .map(({ run }) => run as CampaignRun)
+      .filter((run) => action === "pause"
+        ? ["queued", "running", "sleeping"].includes(run.state)
+        : ["queued", "running", "sleeping", "paused", "needs_attention", "stopping"].includes(run.state))
+      .sort((left, right) => Number(left.state === "running" || left.state === "sleeping") -
+        Number(right.state === "running" || right.state === "sleeping"));
+    if (selectedRuns.length === 0) return;
+
+    setIsBusy(true);
+    setNotice(null);
+    try {
+      for (const run of selectedRuns) {
+        if (action === "pause") await pauseCampaignRun(run.id);
+        else await stopCampaignRun(run.id);
+      }
+      await refreshRuns();
+      setNotice({
+        tone: "success",
+        message: `${selectedRuns.length} campaign${selectedRuns.length === 1 ? "" : "s"} ${action === "pause" ? "paused" : "stopped"}.`
+      });
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : `Selected campaigns could not be ${action}d.`
+      });
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  function deleteSelectedCampaigns() {
+    const deletableIds = rows
+      .filter(({ workspace, status }) => selectedIds.has(workspace.campaign.id) &&
+        !["running", "queued", "paused"].includes(status))
+      .map(({ workspace }) => workspace.campaign.id);
+    if (deletableIds.length === 0) return;
+    for (const campaignId of deletableIds) deleteCampaignWorkspace(account.id, campaignId);
+    setCampaigns((current) => current.filter(({ campaign }) => !deletableIds.includes(campaign.id)));
+    setSelectedIds(new Set());
+  }
+
+  const selectedCount = selectedIds.size;
+  const canStart = rows.some(({ workspace, status }) =>
+    selectedIds.has(workspace.campaign.id) && ["ready", "paused", "stopped", "completed", "failed"].includes(status));
+  const canPause = rows.some(({ workspace, status }) =>
+    selectedIds.has(workspace.campaign.id) && ["running", "queued"].includes(status));
+  const canStop = rows.some(({ workspace, status }) =>
+    selectedIds.has(workspace.campaign.id) && ["running", "queued", "paused"].includes(status));
+
+  return (
+    <main className="campaign-index-page">
+      <header className="campaign-index-header">
+        <div>
+          <button className="back-link" onClick={onBack}><ArrowLeft size={17} /> LinkedIn profiles</button>
+          <div className="campaign-profile-title">
+            <div className="profile-avatar">in</div>
+            <div>
+              <p className="eyebrow">{account.name}</p>
+              <h1>Campaigns</h1>
+            </div>
+          </div>
+        </div>
+        <button className="primary-button" onClick={() => setIsCreateOpen(true)}>
+          <Plus size={18} /> New campaign
+        </button>
+      </header>
+
+      <section className="campaign-index-toolbar" aria-label="Campaign filters and search">
+        <div className="campaign-filter-tabs">
+          {filters.map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              className={filter === item.value ? "active" : ""}
+              onClick={() => setFilter(item.value)}
+            >
+              {item.label}
+              <span>{item.value === "all" ? rows.length : rows.filter(({ status }) => status === item.value).length}</span>
+            </button>
+          ))}
+        </div>
+        <label className="campaign-search">
+          <Search size={17} />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search campaigns" />
+        </label>
+      </section>
+
+      {selectedCount > 0 ? (
+        <section className="campaign-bulk-bar" aria-label="Selected campaign actions">
+          <span><CheckSquare2 size={17} /> {selectedCount} selected</span>
+          <div>
+            <button className="ghost-button" disabled={isBusy || !canStart} onClick={() => void startSelectedCampaigns()}>
+              {isBusy ? <LoaderCircle className="spin" size={16} /> : <Play size={16} />} Start
+            </button>
+            <button className="ghost-button" disabled={isBusy || !canPause} onClick={() => void pauseSelectedCampaigns()}>
+              <Pause size={16} /> Pause
+            </button>
+            <button className="danger-button" disabled={isBusy || !canStop} onClick={() => void stopSelectedCampaigns()}>
+              <Square size={15} /> Stop
+            </button>
+            <button className="icon-button" title="Delete selected campaigns" disabled={isBusy} onClick={deleteSelectedCampaigns}>
+              <Trash2 size={16} />
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {notice ? (
+        <div className={`workspace-feedback ${notice.tone}`} role="status">
+          <span>{notice.message}</span>
+          <button type="button" onClick={() => setNotice(null)}>Dismiss</button>
+        </div>
+      ) : null}
+
+      <section className="campaign-index-table">
+        <div className="campaign-index-table-header">
+          <input
+            ref={selectAllRef}
+            type="checkbox"
+            aria-label="Select all visible campaigns"
+            checked={allVisibleSelected}
+            onChange={toggleVisibleCampaigns}
+          />
+          <span>Campaign</span><span>Status</span><span>Leads</span><span>Progress</span><span>Actions</span><span />
+        </div>
+        {visibleRows.length === 0 ? (
+          <div className="campaign-index-empty">
+            <strong>{campaigns.length === 0 ? "No campaigns yet" : "No campaigns match this view"}</strong>
+            <p>{campaigns.length === 0 ? "Create a campaign to build its workflow and add LinkedIn leads." : "Change the filter or search term."}</p>
+          </div>
+        ) : visibleRows.map(({ workspace, run, status }) => {
+          const campaign = workspace.campaign;
+          const completed = run?.summary.completed ?? campaign.processed;
+          const failed = run?.summary.failed ?? campaign.failed;
+          return (
+            <div className="campaign-index-row" key={campaign.id}>
+              <input
+                type="checkbox"
+                aria-label={`Select ${campaign.name}`}
+                checked={selectedIds.has(campaign.id)}
+                onChange={() => toggleCampaign(campaign.id)}
+              />
+              <button className="campaign-name-button" onClick={() => onOpenCampaign(campaign.id)}>
+                <strong>{campaign.name}</strong>
+                <span>{workspace.sources.length} source{workspace.sources.length === 1 ? "" : "s"}</span>
+              </button>
+              <span className={`state-badge ${status}`}><Circle size={9} fill="currentColor" /> {statusLabel(status)}</span>
+              <span className="campaign-table-number">{campaign.profilesTotal}</span>
+              <span className="campaign-progress-cell">
+                <strong>{completed} completed</strong>
+                <small>{failed} failed</small>
+              </span>
+              <span className="campaign-table-number">{workspace.actions.filter((action) => !action.automatic).length}</span>
+              <button className="ghost-button compact-button" onClick={() => onOpenCampaign(campaign.id)}>Open</button>
+            </div>
+          );
+        })}
+      </section>
+
+      {isCreateOpen ? (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="new-campaign-title">
+          <form className="confirm-modal campaign-create-modal" onSubmit={(event) => { event.preventDefault(); createCampaign(); }}>
+            <div className="confirm-icon"><Plus size={21} /></div>
+            <div>
+              <h2 id="new-campaign-title">New campaign</h2>
+              <label htmlFor="campaign-name">Campaign name</label>
+              <input
+                id="campaign-name"
+                autoFocus
+                value={campaignName}
+                onChange={(event) => setCampaignName(event.target.value)}
+                placeholder="e.g. Founder outreach"
+              />
+            </div>
+            <footer className="modal-actions">
+              <button className="ghost-button" type="button" onClick={() => setIsCreateOpen(false)}>Cancel</button>
+              <button className="primary-button" type="submit" disabled={!campaignName.trim()}><Plus size={17} /> Create</button>
+            </footer>
+          </form>
+        </div>
+      ) : null}
+    </main>
+  );
+}
+
+function campaignDisplayStatus(
+  runState: CampaignRunState | undefined,
+  workspace: CampaignWorkspaceState
+): DisplayStatus {
+  if (!runState) return workspace.campaign.status === "sleeping" ? "running" : workspace.campaign.status;
+  if (["running", "sleeping", "stopping"].includes(runState)) return "running";
+  if (runState === "needs_attention") return "paused";
+  if (["queued", "paused", "stopped", "completed", "failed"].includes(runState)) return runState as DisplayStatus;
+  return "ready";
+}
+
+function statusLabel(status: DisplayStatus) {
+  if (status === "ready") return "Ready";
+  return `${status.slice(0, 1).toUpperCase()}${status.slice(1)}`;
+}
