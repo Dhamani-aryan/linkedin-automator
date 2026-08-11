@@ -15,7 +15,7 @@ Last verified: 2026-08-11
 ### LinkedIn profile manager
 
 - Add multiple logical LinkedIn profile records from the main page.
-- Open a campaign index for one selected LinkedIn profile at a time.
+- Open an integrated profile workspace homepage with campaigns, LinkedIn browser controls, and safety limits.
 - Delete a profile record after confirmation.
 - View the selected profile's Chrome connection state.
 
@@ -31,6 +31,7 @@ Last verified: 2026-08-11
 ### Campaign workspace
 
 - Persist multiple campaign workspaces per logical LinkedIn profile while migrating existing single-campaign data.
+- Open a campaign editor from the profile workspace without changing the workspace shell or background.
 - Filter campaigns by running, queued, paused, stopped, and completed state.
 - Search campaigns and select all campaigns visible in the current filter.
 - Start selected campaigns as a sequential dry-run queue on the shared Chrome profile.
