@@ -1,6 +1,6 @@
 # Current Working Features
 
-Last verified: 2026-08-08
+Last verified: 2026-08-11
 
 ## Working now
 
@@ -15,7 +15,7 @@ Last verified: 2026-08-08
 ### LinkedIn profile manager
 
 - Add multiple logical LinkedIn profile records from the main page.
-- Open the workspace for one selected LinkedIn profile at a time.
+- Open a campaign index for one selected LinkedIn profile at a time.
 - Delete a profile record after confirmation.
 - View the selected profile's Chrome connection state.
 
@@ -30,9 +30,14 @@ Last verified: 2026-08-08
 
 ### Campaign workspace
 
-- Persist one campaign workspace per logical LinkedIn profile.
+- Persist multiple campaign workspaces per logical LinkedIn profile while migrating existing single-campaign data.
+- Filter campaigns by running, queued, paused, stopped, and completed state.
+- Search campaigns and select all campaigns visible in the current filter.
+- Start selected campaigns as a sequential dry-run queue on the shared Chrome profile.
+- Pause or stop all selected active and queued campaign runs.
+- Keep durable campaign run history and restore campaign states after reloads.
 - Open lead intake when starting an empty campaign instead of presenting a dead disabled control.
-- Review campaign preflight details, start a persisted campaign lifecycle, and stop it without losing leads or workflow state.
+- Review campaign preflight details, start, pause, resume, restart, or stop a persisted campaign without losing workflow timing.
 - Add, select, and remove connection-request and message actions.
 - Automatically attach a wait-for-acceptance guard after connection requests.
 - Automatically attach a reply-check guard after messages.
@@ -67,9 +72,8 @@ Last verified: 2026-08-08
 
 ## Not working yet
 
-- Campaign start/stop state works, but the browser executor does not send connection requests or messages yet.
 - Logical LinkedIn profiles are not isolated into separate Chrome data directories yet.
-- Safety settings are not yet enforced by a campaign runner.
-- Reply detection, inbox synchronization, analytics, and campaign history are not implemented.
+- Live connection-request execution has not been verified end to end against a controlled profile.
+- Reply detection, inbox synchronization, and analytics are not implemented.
 - Sales Navigator collection reads only links currently loaded in the page; it does not paginate or scroll automatically.
 - Company authentication and data are local to this browser, not backed by a production server or database.
