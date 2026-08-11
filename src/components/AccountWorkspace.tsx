@@ -568,11 +568,11 @@ export function AccountWorkspace({
 
         <nav className="campaign-nav">
           <button
-            className={`nav-item ${activeTab === "workflow" || activeTab === "leads" ? "active" : ""}`}
-            onClick={() => onTabChange("workflow")}
+            className="nav-item"
+            onClick={onBack}
           >
             <Layers3 size={17} />
-            Workspace
+            Campaigns
           </button>
           <button className={`nav-item ${activeTab === "browser" ? "active" : ""}`} onClick={() => onTabChange("browser")}>
             <Chrome size={17} />

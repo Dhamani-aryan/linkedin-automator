@@ -1,12 +1,15 @@
 import {
   ArrowLeft,
   CheckSquare2,
+  Chrome,
   Circle,
   LoaderCircle,
   Pause,
   Play,
   Plus,
+  RefreshCw,
   Search,
+  ShieldCheck,
   Square,
   Trash2
 } from "lucide-react";
@@ -25,21 +28,31 @@ import {
   stopCampaignRun
 } from "../lib/runnerApi";
 import type {
+  ChromeStatus,
   CampaignRun,
   CampaignRunState,
   CampaignWorkspaceState,
   HumanTouchSettings,
   LinkedInAccount
 } from "../types";
+import { SafetyLimitsPage } from "./SafetyLimitsPage";
 
 type CampaignFilter = "all" | "running" | "queued" | "paused" | "stopped" | "completed";
 type DisplayStatus = Exclude<CampaignFilter, "all"> | "ready" | "failed";
 
 type ProfileCampaignsProps = {
   account: LinkedInAccount;
+  chromeError?: string;
+  chromeStatus: ChromeStatus | null;
+  isChromeBusy: boolean;
   safetySettings: HumanTouchSettings;
+  onSafetySettingsChange: (settings: HumanTouchSettings) => void;
   onBack: () => void;
   onOpenCampaign: (campaignId: string) => void;
+  onOpenLinkedIn: () => Promise<boolean>;
+  onRefreshChrome: () => void;
+  onStartChrome: () => Promise<boolean>;
+  onStopChrome: () => Promise<boolean>;
 };
 
 const filters: Array<{ value: CampaignFilter; label: string }> = [
@@ -53,10 +66,19 @@ const filters: Array<{ value: CampaignFilter; label: string }> = [
 
 export function ProfileCampaigns({
   account,
+  chromeError,
+  chromeStatus,
+  isChromeBusy,
   safetySettings,
+  onSafetySettingsChange,
   onBack,
-  onOpenCampaign
+  onOpenCampaign,
+  onOpenLinkedIn,
+  onRefreshChrome,
+  onStartChrome,
+  onStopChrome
 }: ProfileCampaignsProps) {
+  const [activeSection, setActiveSection] = useState<"campaigns" | "browser" | "safety">("campaigns");
   const [campaigns, setCampaigns] = useState(() => loadCampaignWorkspaces(account));
   const [runs, setRuns] = useState<CampaignRun[]>([]);
   const [filter, setFilter] = useState<CampaignFilter>("all");
@@ -67,6 +89,7 @@ export function ProfileCampaigns({
   const [campaignName, setCampaignName] = useState("");
   const [notice, setNotice] = useState<{ tone: "success" | "error"; message: string } | null>(null);
   const selectAllRef = useRef<HTMLInputElement>(null);
+  const linkedInTab = chromeStatus?.tabs.find((tab) => tab.url.includes("linkedin.com")) ?? null;
 
   const latestRunByCampaign = useMemo(() => {
     const latest = new Map<string, CampaignRun>();
@@ -253,115 +276,197 @@ export function ProfileCampaigns({
     selectedIds.has(workspace.campaign.id) && ["running", "queued"].includes(status));
   const canStop = rows.some(({ workspace, status }) =>
     selectedIds.has(workspace.campaign.id) && ["running", "queued", "paused"].includes(status));
+  const activeCampaignCount = rows.filter(({ status }) => ["running", "queued", "paused"].includes(status)).length;
+  const totalLeadCount = campaigns.reduce((total, workspace) => total + workspace.campaign.profilesTotal, 0);
 
   return (
-    <main className="campaign-index-page">
-      <header className="campaign-index-header">
-        <div>
-          <button className="back-link" onClick={onBack}><ArrowLeft size={17} /> LinkedIn profiles</button>
-          <div className="campaign-profile-title">
-            <div className="profile-avatar">in</div>
-            <div>
-              <p className="eyebrow">{account.name}</p>
-              <h1>Campaigns</h1>
-            </div>
-          </div>
-        </div>
-        <button className="primary-button" onClick={() => setIsCreateOpen(true)}>
-          <Plus size={18} /> New campaign
-        </button>
-      </header>
+    <main className="workspace-layout profile-workspace-layout">
+      <aside className="workspace-sidebar profile-home-sidebar">
+        <button className="back-link" onClick={onBack}><ArrowLeft size={17} /> All profiles</button>
 
-      <section className="campaign-index-toolbar" aria-label="Campaign filters and search">
-        <div className="campaign-filter-tabs">
-          {filters.map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              className={filter === item.value ? "active" : ""}
-              onClick={() => setFilter(item.value)}
-            >
-              {item.label}
-              <span>{item.value === "all" ? rows.length : rows.filter(({ status }) => status === item.value).length}</span>
-            </button>
-          ))}
-        </div>
-        <label className="campaign-search">
-          <Search size={17} />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search campaigns" />
-        </label>
-      </section>
-
-      {selectedCount > 0 ? (
-        <section className="campaign-bulk-bar" aria-label="Selected campaign actions">
-          <span><CheckSquare2 size={17} /> {selectedCount} selected</span>
+        <section className="workspace-profile">
+          <div className="profile-avatar">in</div>
           <div>
-            <button className="ghost-button" disabled={isBusy || !canStart} onClick={() => void startSelectedCampaigns()}>
-              {isBusy ? <LoaderCircle className="spin" size={16} /> : <Play size={16} />} Start
-            </button>
-            <button className="ghost-button" disabled={isBusy || !canPause} onClick={() => void pauseSelectedCampaigns()}>
-              <Pause size={16} /> Pause
-            </button>
-            <button className="danger-button" disabled={isBusy || !canStop} onClick={() => void stopSelectedCampaigns()}>
-              <Square size={15} /> Stop
-            </button>
-            <button className="icon-button" title="Delete selected campaigns" disabled={isBusy} onClick={deleteSelectedCampaigns}>
-              <Trash2 size={16} />
-            </button>
+            <strong>{account.name}</strong>
+            <span>{chromeStatus?.connected ? "Chrome connected" : "Chrome stopped"}</span>
           </div>
         </section>
-      ) : null}
 
-      {notice ? (
-        <div className={`workspace-feedback ${notice.tone}`} role="status">
-          <span>{notice.message}</span>
-          <button type="button" onClick={() => setNotice(null)}>Dismiss</button>
-        </div>
-      ) : null}
+        <nav className="campaign-nav">
+          <button className={`nav-item ${activeSection === "campaigns" ? "active" : ""}`} onClick={() => setActiveSection("campaigns")}>
+            <CheckSquare2 size={17} /> Campaigns
+          </button>
+          <button className={`nav-item ${activeSection === "browser" ? "active" : ""}`} onClick={() => setActiveSection("browser")}>
+            <Chrome size={17} /> LinkedIn browser
+          </button>
+          <button className={`nav-item ${activeSection === "safety" ? "active" : ""}`} onClick={() => setActiveSection("safety")}>
+            <ShieldCheck size={17} /> Safety limits
+          </button>
+        </nav>
 
-      <section className="campaign-index-table">
-        <div className="campaign-index-table-header">
-          <input
-            ref={selectAllRef}
-            type="checkbox"
-            aria-label="Select all visible campaigns"
-            checked={allVisibleSelected}
-            onChange={toggleVisibleCampaigns}
-          />
-          <span>Campaign</span><span>Status</span><span>Leads</span><span>Progress</span><span>Actions</span><span />
-        </div>
-        {visibleRows.length === 0 ? (
-          <div className="campaign-index-empty">
-            <strong>{campaigns.length === 0 ? "No campaigns yet" : "No campaigns match this view"}</strong>
-            <p>{campaigns.length === 0 ? "Create a campaign to build its workflow and add LinkedIn leads." : "Change the filter or search term."}</p>
+        <section className="profile-workspace-summary">
+          <span>Workspace overview</span>
+          <div><small>Campaigns</small><strong>{campaigns.length}</strong></div>
+          <div><small>Active or queued</small><strong>{activeCampaignCount}</strong></div>
+          <div><small>Total leads</small><strong>{totalLeadCount}</strong></div>
+        </section>
+      </aside>
+
+      <section className="workspace-main profile-home-main">
+        <header className="workspace-header compact-workspace-header campaign-home-header">
+          <div>
+            <p className="eyebrow">{account.name} workspace</p>
+            <h1>{activeSection === "campaigns" ? "Campaigns" : activeSection === "browser" ? "LinkedIn browser" : "Safety limits"}</h1>
+            <p className="status-line">
+              {campaigns.length} campaign{campaigns.length === 1 ? "" : "s"} <span>|</span> {totalLeadCount} lead{totalLeadCount === 1 ? "" : "s"} <span>|</span> same-IP local Chrome
+            </p>
           </div>
-        ) : visibleRows.map(({ workspace, run, status }) => {
-          const campaign = workspace.campaign;
-          const completed = run?.summary.completed ?? campaign.processed;
-          const failed = run?.summary.failed ?? campaign.failed;
-          return (
-            <div className="campaign-index-row" key={campaign.id}>
-              <input
-                type="checkbox"
-                aria-label={`Select ${campaign.name}`}
-                checked={selectedIds.has(campaign.id)}
-                onChange={() => toggleCampaign(campaign.id)}
-              />
-              <button className="campaign-name-button" onClick={() => onOpenCampaign(campaign.id)}>
-                <strong>{campaign.name}</strong>
-                <span>{workspace.sources.length} source{workspace.sources.length === 1 ? "" : "s"}</span>
+          <div className="header-actions">
+            {activeSection === "campaigns" ? (
+              <button className="primary-button" onClick={() => setIsCreateOpen(true)}>
+                <Plus size={18} /> New campaign
               </button>
-              <span className={`state-badge ${status}`}><Circle size={9} fill="currentColor" /> {statusLabel(status)}</span>
-              <span className="campaign-table-number">{campaign.profilesTotal}</span>
-              <span className="campaign-progress-cell">
-                <strong>{completed} completed</strong>
-                <small>{failed} failed</small>
-              </span>
-              <span className="campaign-table-number">{workspace.actions.filter((action) => !action.automatic).length}</span>
-              <button className="ghost-button compact-button" onClick={() => onOpenCampaign(campaign.id)}>Open</button>
+            ) : null}
+            <button className="ghost-button" onClick={() => void onStartChrome()} disabled={isChromeBusy}>
+              {isChromeBusy ? <LoaderCircle className="spin" size={17} /> : <Chrome size={17} />}
+              {chromeStatus?.connected ? "Chrome running" : "Start Chrome"}
+            </button>
+          </div>
+        </header>
+
+        {chromeError ? (
+          <div className="workspace-feedback error" role="alert">
+            <span>{chromeError}</span>
+            <button type="button" onClick={() => void onStartChrome()} disabled={isChromeBusy}>Try again</button>
+          </div>
+        ) : null}
+
+        {activeSection === "campaigns" ? (
+          <div className="campaign-index-page integrated-campaign-index">
+            <section className="campaign-index-toolbar" aria-label="Campaign filters and search">
+              <div className="campaign-filter-tabs">
+                {filters.map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    className={filter === item.value ? "active" : ""}
+                    onClick={() => setFilter(item.value)}
+                  >
+                    {item.label}
+                    <span>{item.value === "all" ? rows.length : rows.filter(({ status }) => status === item.value).length}</span>
+                  </button>
+                ))}
+              </div>
+              <label className="campaign-search">
+                <Search size={17} />
+                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search campaigns" />
+              </label>
+            </section>
+
+            {selectedCount > 0 ? (
+              <section className="campaign-bulk-bar" aria-label="Selected campaign actions">
+                <span><CheckSquare2 size={17} /> {selectedCount} selected</span>
+                <div>
+                  <button className="ghost-button" disabled={isBusy || !canStart} onClick={() => void startSelectedCampaigns()}>
+                    {isBusy ? <LoaderCircle className="spin" size={16} /> : <Play size={16} />} Start
+                  </button>
+                  <button className="ghost-button" disabled={isBusy || !canPause} onClick={() => void pauseSelectedCampaigns()}>
+                    <Pause size={16} /> Pause
+                  </button>
+                  <button className="danger-button" disabled={isBusy || !canStop} onClick={() => void stopSelectedCampaigns()}>
+                    <Square size={15} /> Stop
+                  </button>
+                  <button className="icon-button" title="Delete selected campaigns" disabled={isBusy} onClick={deleteSelectedCampaigns}>
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </section>
+            ) : null}
+
+            {notice ? (
+              <div className={`workspace-feedback ${notice.tone}`} role="status">
+                <span>{notice.message}</span>
+                <button type="button" onClick={() => setNotice(null)}>Dismiss</button>
+              </div>
+            ) : null}
+
+            <section className="campaign-index-table">
+              <div className="campaign-index-table-header">
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  aria-label="Select all visible campaigns"
+                  checked={allVisibleSelected}
+                  onChange={toggleVisibleCampaigns}
+                />
+                <span>Campaign</span><span>Status</span><span>Leads</span><span>Progress</span><span>Actions</span><span />
+              </div>
+              {visibleRows.length === 0 ? (
+                <div className="campaign-index-empty">
+                  <strong>{campaigns.length === 0 ? "No campaigns yet" : "No campaigns match this view"}</strong>
+                  <p>{campaigns.length === 0 ? "Create a campaign to build its workflow and add LinkedIn leads." : "Change the filter or search term."}</p>
+                </div>
+              ) : visibleRows.map(({ workspace, run, status }) => {
+                const campaign = workspace.campaign;
+                const completed = run?.summary.completed ?? campaign.processed;
+                const failed = run?.summary.failed ?? campaign.failed;
+                return (
+                  <div className="campaign-index-row" key={campaign.id}>
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${campaign.name}`}
+                      checked={selectedIds.has(campaign.id)}
+                      onChange={() => toggleCampaign(campaign.id)}
+                    />
+                    <button className="campaign-name-button" onClick={() => onOpenCampaign(campaign.id)}>
+                      <strong>{campaign.name}</strong>
+                      <span>{workspace.sources.length} source{workspace.sources.length === 1 ? "" : "s"}</span>
+                    </button>
+                    <span className={`state-badge ${status}`}><Circle size={9} fill="currentColor" /> {statusLabel(status)}</span>
+                    <span className="campaign-table-number">{campaign.profilesTotal}</span>
+                    <span className="campaign-progress-cell">
+                      <strong>{completed} completed</strong>
+                      <small>{failed} failed</small>
+                    </span>
+                    <span className="campaign-table-number">{workspace.actions.filter((action) => !action.automatic).length}</span>
+                    <button className="ghost-button compact-button" onClick={() => onOpenCampaign(campaign.id)}>Open</button>
+                  </div>
+                );
+              })}
+            </section>
+          </div>
+        ) : null}
+
+        {activeSection === "browser" ? (
+          <section className="browser-view profile-browser-view">
+            <div className="browser-view-copy">
+              <p className="section-kicker">Persistent local session</p>
+              <h2>{chromeStatus?.connected ? "Managed Chrome is connected" : "Start managed Chrome"}</h2>
+              <p>The LinkedIn login stays in this computer's profile directory and uses this computer's IP.</p>
+              <div className="browser-view-actions">
+                <button className="primary-button" onClick={() => void onOpenLinkedIn()} disabled={isChromeBusy}>
+                  <Chrome size={18} /> Open LinkedIn
+                </button>
+                <button className="ghost-button" onClick={onRefreshChrome} disabled={isChromeBusy}>
+                  <RefreshCw size={17} /> Refresh status
+                </button>
+                <button className="icon-button stop" title="Stop Chrome" onClick={() => void onStopChrome()} disabled={isChromeBusy}>
+                  <Square size={17} />
+                </button>
+              </div>
             </div>
-          );
-        })}
+            <div className="browser-status-panel">
+              <div><span>Status</span><strong>{chromeStatus?.connected ? "Connected" : "Stopped"}</strong></div>
+              <div><span>Profile directory</span><strong>{chromeStatus?.profileDir ?? ".local/chrome-profile"}</strong></div>
+              <div><span>LinkedIn tab</span><strong>{linkedInTab?.title || "Not open"}</strong></div>
+              {linkedInTab ? <a href={linkedInTab.url} target="_blank" rel="noreferrer">{linkedInTab.url}</a> : null}
+            </div>
+          </section>
+        ) : null}
+
+        {activeSection === "safety" ? (
+          <SafetyLimitsPage settings={safetySettings} onChange={onSafetySettingsChange} />
+        ) : null}
       </section>
 
       {isCreateOpen ? (

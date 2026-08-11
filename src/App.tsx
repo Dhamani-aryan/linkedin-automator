@@ -308,7 +308,11 @@ export function App() {
     return (
       <ProfileCampaigns
         account={routeAccount}
+        chromeStatus={status}
+        chromeError={routeAccount.lastError}
+        isChromeBusy={isBusy}
         safetySettings={humanTouchSettings}
+        onSafetySettingsChange={setHumanTouchSettings}
         onBack={() => navigate({ kind: "manager", page: "profiles" })}
         onOpenCampaign={(campaignId) => navigate({
           kind: "workspace",
@@ -316,6 +320,10 @@ export function App() {
           campaignId,
           tab: "workflow"
         })}
+        onOpenLinkedIn={() => openLinkedIn(routeAccount.id)}
+        onRefreshChrome={() => void refreshStatus(routeAccount.id)}
+        onStartChrome={() => runChromeAction(() => startChrome(), routeAccount.id, true)}
+        onStopChrome={() => runChromeAction(() => stopChrome(), routeAccount.id)}
       />
     );
   }
@@ -487,7 +495,7 @@ export function App() {
                         navigate({ kind: "campaigns", profileId: account.id });
                     }}
                   >
-                    Campaigns
+                    Open workspace
                   </button>
                   <button
                     className="icon-button run"
