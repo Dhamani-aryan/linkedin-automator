@@ -2700,3 +2700,90 @@ p {
     gap: 5px;
   }
 }
+
+/* Integrated LinkedIn profile workspace */
+.campaign-home-header > div:first-child {
+  min-width: 0;
+  display: block;
+  flex: 1 1 auto;
+}
+
+.campaign-home-header .eyebrow {
+  margin: 0 0 4px;
+}
+
+.campaign-home-header h1 {
+  display: block;
+  margin: 0;
+}
+
+.campaign-home-header .status-line {
+  grid-column: auto;
+}
+
+.campaign-home-header .header-actions {
+  flex: 0 0 auto;
+}
+
+.integrated-campaign-index .campaign-index-toolbar {
+  max-width: none;
+}
+
+.integrated-campaign-index .campaign-filter-tabs {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.integrated-campaign-index .campaign-filter-tabs button {
+  padding-inline: 9px;
+}
+
+.integrated-campaign-index .campaign-search {
+  width: 220px;
+}
+
+@media (max-width: 800px) {
+  .campaign-home-header .header-actions,
+  .campaign-home-header .header-actions > button,
+  .integrated-campaign-index .campaign-search {
+    width: 100%;
+  }
+}
+
+@media (max-width: 980px) {
+  .profile-workspace-layout {
+    align-content: start;
+    grid-template-rows: auto 1fr;
+  }
+
+  .profile-home-sidebar {
+    min-width: 0;
+  }
+
+  .profile-home-sidebar .campaign-nav {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .profile-home-sidebar .campaign-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .profile-home-sidebar .campaign-nav .nav-item {
+    flex: 0 0 auto;
+  }
+
+  .profile-home-sidebar .profile-workspace-summary {
+    display: none;
+  }
+
+  .integrated-campaign-index .campaign-filter-tabs {
+    scrollbar-width: none;
+  }
+
+  .integrated-campaign-index .campaign-filter-tabs::-webkit-scrollbar {
+    display: none;
+  }
+}
