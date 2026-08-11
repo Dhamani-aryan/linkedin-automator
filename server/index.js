@@ -17,6 +17,7 @@ import {
   pauseCampaignRun,
   retryCampaignRun,
   resumeCampaignRun,
+  startCampaignBatch,
   startCampaignRun,
   stopCampaignRun
 } from "./lib/runner.js";
@@ -120,6 +121,13 @@ const server = createServer(async (request, response) => {
     if (request.method === "POST" && resumeMatch) {
       const body = await readJsonBody(request);
       sendJson(response, 200, await resumeCampaignRun(resumeMatch[1], body.actions));
+      return;
+    }
+
+    if (request.method === "POST" && requestUrl.pathname === "/api/campaign-runs/batch") {
+      const body = await readJsonBody(request);
+      const result = await startCampaignBatch(body.snapshots);
+      sendJson(response, result.ok ? 201 : 400, result);
       return;
     }
 

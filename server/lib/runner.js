@@ -48,7 +48,10 @@ export async function initializeRunner() {
     .filter((candidate) => [runStates.RUNNING, runStates.PAUSED, runStates.NEEDS_ATTENTION].includes(candidate.state))
     .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))[0];
   const run = recoveredRun ?? await findLatestResumableRun();
-  if (!run) return;
+  if (!run) {
+    await startNextQueuedRun();
+    return;
+  }
 
   if ([runStates.NEEDS_ATTENTION, runStates.STOPPED].includes(run.state)) {
     activeRunId = run.id;
@@ -119,6 +122,76 @@ export async function getActiveCampaignRun() {
   return { ok: true, run: await getCampaignRun(activeRunId) };
 }
 
+export async function startCampaignBatch(snapshots) {
+  if (!Array.isArray(snapshots) || snapshots.length === 0) {
+    return {
+      ok: false,
+      validationFailures: [{
+        field: "snapshots",
+        code: "EMPTY_CAMPAIGN_BATCH",
+        message: "Select at least one campaign to start."
+      }]
+    };
+  }
+  if (activeRunId !== null) {
+    throw new AppError("ACTIVE_RUN_EXISTS", "A campaign run is already active.", { activeRunId });
+  }
+
+  const validationFailures = [];
+  for (const snapshot of snapshots) {
+    const mode = snapshot.mode === "live" ? "live" : "dry_run";
+    const campaignFailures = [
+      ...validateRun(snapshot),
+      ...validateLiveRun({ ...snapshot, mode })
+    ];
+    for (const failure of campaignFailures) {
+      validationFailures.push({
+        ...failure,
+        campaignId: snapshot.campaign?.id ?? null,
+        message: `${snapshot.campaign?.name ?? "Campaign"}: ${failure.message}`
+      });
+    }
+    if (mode === "live" && campaignFailures.length === 0) {
+      const sentMatches = await findSentActionMatches(snapshot);
+      if (sentMatches.length > 0) {
+        validationFailures.push({
+          field: "leads",
+          code: "DUPLICATE_LIVE_DELIVERY",
+          campaignId: snapshot.campaign?.id ?? null,
+          message: `${snapshot.campaign?.name ?? "Campaign"}: ${sentMatches.length} selected lead/action deliveries were already sent.`,
+          detail: { matches: sentMatches }
+        });
+      }
+    }
+  }
+  if (validationFailures.length > 0) return { ok: false, validationFailures };
+
+  const batchId = randomUUID();
+  const runs = snapshots.map((snapshot, index) => ({
+    ...createCampaignRun({
+      runId: randomUUID(),
+      snapshot,
+      mode: snapshot.mode === "live" ? "live" : "dry_run",
+      now: new Date()
+    }),
+    batchId,
+    batchPosition: index,
+    state: index === 0 ? runStates.RUNNING : runStates.QUEUED,
+    validationFailures: []
+  }));
+
+  for (const run of runs) {
+    await saveRun(run);
+    await appendAudit(run.id, {
+      event: run.state === runStates.RUNNING ? "run_started" : "run_queued",
+      outcome: run.state,
+      detail: { mode: run.mode, batchId, batchPosition: run.batchPosition }
+    });
+  }
+  scheduleRunLoop(runs[0]);
+  return { ok: true, batchId, runs: runs.map(decorateRun) };
+}
+
 export async function listCampaignRuns(profileId) {
   const runs = (await listRuns())
     .filter((run) => !profileId || run.profileId === profileId)
@@ -130,6 +203,10 @@ export async function stopCampaignRun(runId) {
   const run = await loadRun(runId);
   if ([runStates.COMPLETED, runStates.FAILED, runStates.STOPPED].includes(run.state)) {
     return { ok: true, run: decorateRun(run) };
+  }
+  if (run.state === runStates.QUEUED) {
+    run.stopRequested = true;
+    return await finalizeStopped(run);
   }
   if (run.state === runStates.NEEDS_ATTENTION) {
     run.stopRequested = true;
@@ -151,6 +228,14 @@ export async function pauseCampaignRun(runId) {
   }
   if (run.state === runStates.NEEDS_ATTENTION) {
     throw new AppError("RUN_NEEDS_ATTENTION", "Resolve the run issue before pausing or resuming it.");
+  }
+  if (run.state === runStates.QUEUED) {
+    run.pauseRequested = true;
+    run.state = runStates.PAUSED;
+    run.updatedAt = new Date().toISOString();
+    await appendAudit(run.id, { event: "queued_run_paused", outcome: "paused" });
+    await saveRun(run);
+    return { ok: true, run: decorateRun(run) };
   }
   if (run.pauseRequested && run.state === runStates.PAUSED) {
     return { ok: true, run: decorateRun(run) };
@@ -193,10 +278,17 @@ export async function resumeCampaignRun(runId, proposedActions = []) {
   run.pauseRequested = false;
   run.stopRequested = false;
   run.stopReason = null;
-  run.state = runStates.RUNNING;
+  const queuedBehindAnotherRun = activeRunId !== null && activeRunId !== run.id;
+  run.state = queuedBehindAnotherRun ? runStates.QUEUED : runStates.RUNNING;
   run.updatedAt = new Date().toISOString();
-  await appendAudit(run.id, { event: restarting ? "run_restarted" : "run_resumed", outcome: "running" });
+  await appendAudit(run.id, {
+    event: restarting ? "run_restarted" : "run_resumed",
+    outcome: queuedBehindAnotherRun ? "queued" : "running"
+  });
   await saveRun(run);
+  if (queuedBehindAnotherRun) {
+    return { ok: true, run: decorateRun(run) };
+  }
   if (restarting || activeRunId !== run.id) {
     scheduleRunLoop(run);
   } else {
@@ -263,6 +355,7 @@ async function runLoop(runId) {
       await appendAudit(run.id, { event: "run_completed", outcome: "ok" });
       await saveRun(run);
       if (activeRunId === run.id) activeRunId = null;
+      await startNextQueuedRun();
       return;
     }
 
@@ -487,8 +580,34 @@ function scheduleRunLoop(run) {
       detail: { message: error instanceof Error ? error.message : "Runner failed." }
     });
     await saveRun(failedRun);
-    if (activeRunId === run.id) activeRunId = null;
+    if (activeRunId === run.id) {
+      activeRunId = null;
+      await startNextQueuedRun();
+    }
   });
+}
+
+async function startNextQueuedRun() {
+  if (activeRunId !== null) return null;
+  const nextRun = (await listRuns())
+    .filter((run) => run.state === runStates.QUEUED && !run.pauseRequested && !run.stopRequested)
+    .sort((left, right) => {
+      const batchOrder = String(left.batchId ?? "").localeCompare(String(right.batchId ?? ""));
+      return batchOrder || (left.batchPosition ?? 0) - (right.batchPosition ?? 0) ||
+        Date.parse(left.createdAt) - Date.parse(right.createdAt);
+    })[0];
+  if (!nextRun) return null;
+
+  nextRun.state = runStates.RUNNING;
+  nextRun.updatedAt = new Date().toISOString();
+  await appendAudit(nextRun.id, {
+    event: "queued_run_started",
+    outcome: "running",
+    detail: { batchId: nextRun.batchId ?? null, batchPosition: nextRun.batchPosition ?? null }
+  });
+  await saveRun(nextRun);
+  scheduleRunLoop(nextRun);
+  return nextRun;
 }
 
 function isSafeToRetry(lead) {

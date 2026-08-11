@@ -14,6 +14,7 @@ export const leadStates = Object.freeze({
 
 export const runStates = Object.freeze({
   VALIDATING: "validating",
+  QUEUED: "queued",
   RUNNING: "running",
   SLEEPING: "sleeping",
   PAUSED: "paused",

@@ -54,6 +54,19 @@ export async function getCampaignRun(runId: string): Promise<CampaignRun> {
   return request<CampaignRun>(`/api/campaign-runs/${encodeURIComponent(runId)}`);
 }
 
+export async function startCampaignBatch(snapshots: CampaignRunSnapshot[]): Promise<CampaignRun[]> {
+  const result = await request<{ ok: true; batchId: string; runs: CampaignRun[] } | ApiFailure>(
+    "/api/campaign-runs/batch",
+    {
+      method: "POST",
+      headers: defaultHeaders,
+      body: JSON.stringify({ snapshots })
+    }
+  );
+  if (!result.ok) throw failureToError(result);
+  return result.runs;
+}
+
 export async function listCampaignRuns(profileId: string): Promise<CampaignRun[]> {
   const result = await request<{ ok: true; runs: CampaignRun[] }>(
     `/api/campaign-runs?profileId=${encodeURIComponent(profileId)}`
