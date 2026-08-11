@@ -11,6 +11,7 @@ import { executeConnectionRequest } from "./actions/connectionRequest.js";
 import { executeMessage } from "./actions/message.js";
 import { AppError, ErrorCodes } from "./errors.js";
 import {
+  createCampaignBatchRuns,
   createCampaignRun,
   followUpSchedule,
   isRunFinished,
@@ -164,18 +165,13 @@ export async function startCampaignBatch(snapshots) {
 
   const batchId = randomUUID();
   const joinsActiveQueue = activeRunId !== null;
-  const runs = snapshots.map((snapshot, index) => ({
-    ...createCampaignRun({
-      runId: randomUUID(),
-      snapshot,
-      mode: snapshot.mode === "live" ? "live" : "dry_run",
-      now: new Date()
-    }),
+  const runs = createCampaignBatchRuns({
+    snapshots,
     batchId,
-    batchPosition: index,
-    state: !joinsActiveQueue && index === 0 ? runStates.RUNNING : runStates.QUEUED,
-    validationFailures: []
-  }));
+    runIds: snapshots.map(() => randomUUID()),
+    hasActiveRun: joinsActiveQueue,
+    now: new Date()
+  });
 
   for (const run of runs) {
     await saveRun(run);

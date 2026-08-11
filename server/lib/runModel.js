@@ -423,6 +423,27 @@ export function followUpSchedule(lead, actions) {
   };
 }
 
+export function createCampaignBatchRuns({
+  snapshots,
+  batchId,
+  runIds,
+  hasActiveRun = false,
+  now = new Date()
+}) {
+  return snapshots.map((snapshot, index) => ({
+    ...createCampaignRun({
+      runId: runIds[index],
+      snapshot,
+      mode: snapshot.mode === "live" ? "live" : "dry_run",
+      now
+    }),
+    batchId,
+    batchPosition: index,
+    state: !hasActiveRun && index === 0 ? runStates.RUNNING : runStates.QUEUED,
+    validationFailures: []
+  }));
+}
+
 export function remainingDelayMs(nextEligibleAt, now = new Date()) {
   const dueMs = Date.parse(nextEligibleAt);
   if (!Number.isFinite(dueMs)) return 0;

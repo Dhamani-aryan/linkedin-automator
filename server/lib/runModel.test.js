@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  createCampaignBatchRuns,
   createCampaignRun,
   followUpSchedule,
   leadStates,
@@ -10,6 +11,43 @@ import {
   validateLiveRun,
   validateRun
 } from "./runModel.js";
+
+describe("createCampaignBatchRuns", () => {
+  const snapshots = ["one", "two", "three"].map((id) => ({
+    profileId: "profile-1",
+    campaign: { id },
+    mode: "dry_run",
+    actions: [],
+    leads: []
+  }));
+
+  it("starts the first campaign and queues the rest of a new batch", () => {
+    const runs = createCampaignBatchRuns({
+      snapshots,
+      batchId: "batch-1",
+      runIds: ["run-1", "run-2", "run-3"],
+      now: new Date("2026-08-11T00:00:00.000Z")
+    });
+
+    expect(runs.map(({ id, state, batchPosition }) => ({ id, state, batchPosition }))).toEqual([
+      { id: "run-1", state: runStates.RUNNING, batchPosition: 0 },
+      { id: "run-2", state: runStates.QUEUED, batchPosition: 1 },
+      { id: "run-3", state: runStates.QUEUED, batchPosition: 2 }
+    ]);
+  });
+
+  it("queues every campaign when another run already owns Chrome", () => {
+    const runs = createCampaignBatchRuns({
+      snapshots: snapshots.slice(0, 1),
+      batchId: "batch-2",
+      runIds: ["run-4"],
+      hasActiveRun: true,
+      now: new Date("2026-08-11T00:00:00.000Z")
+    });
+
+    expect(runs[0]).toMatchObject({ state: runStates.QUEUED, batchPosition: 0 });
+  });
+});
 
 const safety = {
   dailyActionLimit: 100,
