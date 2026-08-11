@@ -1,17 +1,81 @@
 import { createDefaultWorkflow, defaultMessageDelay } from "./workflow";
 import type { CampaignWorkspaceState, LeadProfile, LinkedInAccount } from "../types";
 
-const CAMPAIGN_WORKSPACE_KEY = "linkedin-automator.campaign-workspace-v1";
+const LEGACY_CAMPAIGN_WORKSPACE_KEY = "linkedin-automator.campaign-workspace-v1";
+const CAMPAIGN_WORKSPACES_KEY = "linkedin-automator.campaign-workspaces-v2";
 
-export function loadCampaignWorkspace(account: LinkedInAccount): CampaignWorkspaceState {
-  const stored = readWorkspaceMap();
-  return stored[account.id] ? normalizeWorkspace(stored[account.id]) : createInitialCampaignWorkspace(account.id);
+type CampaignStorage = Pick<Storage, "getItem" | "setItem">;
+
+export function loadCampaignWorkspaces(
+  account: LinkedInAccount,
+  storage: CampaignStorage = window.localStorage
+): CampaignWorkspaceState[] {
+  const stored = readWorkspaceMap(storage);
+  if (stored[account.id]) return stored[account.id].map(normalizeWorkspace);
+
+  const legacyWorkspace = readLegacyWorkspaceMap(storage)[account.id];
+  if (!legacyWorkspace) return [];
+
+  const migrated = normalizeWorkspace(legacyWorkspace);
+  writeWorkspaceMap({ ...stored, [account.id]: [migrated] }, storage);
+  return [migrated];
 }
 
-export function saveCampaignWorkspace(accountId: string, state: CampaignWorkspaceState) {
-  const stored = readWorkspaceMap();
-  stored[accountId] = state;
-  window.localStorage.setItem(CAMPAIGN_WORKSPACE_KEY, JSON.stringify(stored));
+export function loadCampaignWorkspace(
+  account: LinkedInAccount,
+  campaignId = "",
+  storage: CampaignStorage = window.localStorage
+): CampaignWorkspaceState {
+  const campaigns = loadCampaignWorkspaces(account, storage);
+  return campaigns.find((workspace) => workspace.campaign.id === campaignId) ??
+    campaigns[0] ??
+    createCampaignWorkspace(account.id, "Untitled campaign");
+}
+
+export function saveCampaignWorkspace(
+  accountId: string,
+  state: CampaignWorkspaceState,
+  storage: CampaignStorage = window.localStorage
+) {
+  const stored = readWorkspaceMap(storage);
+  const campaigns = stored[accountId] ?? [];
+  const existingIndex = campaigns.findIndex((workspace) => workspace.campaign.id === state.campaign.id);
+  stored[accountId] = existingIndex < 0
+    ? [...campaigns, state]
+    : campaigns.map((workspace, index) => index === existingIndex ? state : workspace);
+  writeWorkspaceMap(stored, storage);
+}
+
+export function createCampaignWorkspace(accountId: string, name: string): CampaignWorkspaceState {
+  return {
+    campaign: {
+      id: `${accountId}-${crypto.randomUUID()}`,
+      name: name.trim(),
+      status: "ready",
+      profilesTotal: 0,
+      profilesToProcess: 0,
+      processing: 0,
+      processed: 0,
+      successful: 0,
+      failed: 0,
+      accepted: 0,
+      replied: 0
+    },
+    actions: createDefaultWorkflow(),
+    leads: [],
+    sources: []
+  };
+}
+
+export function deleteCampaignWorkspace(
+  accountId: string,
+  campaignId: string,
+  storage: CampaignStorage = window.localStorage
+) {
+  const stored = readWorkspaceMap(storage);
+  stored[accountId] = (stored[accountId] ?? [])
+    .filter((workspace) => workspace.campaign.id !== campaignId);
+  writeWorkspaceMap(stored, storage);
 }
 
 export function createLeadFromUrl(url: string, sourceId: string, profileName = ""): LeadProfile {
@@ -37,34 +101,29 @@ function normalizeProfileName(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
-function createInitialCampaignWorkspace(accountId: string): CampaignWorkspaceState {
-  return {
-    campaign: {
-      id: `${accountId}-first-campaign`,
-      name: "First outreach campaign",
-      status: "ready",
-      profilesTotal: 0,
-      profilesToProcess: 0,
-      processing: 0,
-      processed: 0,
-      successful: 0,
-      failed: 0,
-      accepted: 0,
-      replied: 0
-    },
-    actions: createDefaultWorkflow(),
-    leads: [],
-    sources: []
-  };
+function readWorkspaceMap(storage: CampaignStorage): Record<string, CampaignWorkspaceState[]> {
+  try {
+    const stored = storage.getItem(CAMPAIGN_WORKSPACES_KEY);
+    return stored ? (JSON.parse(stored) as Record<string, CampaignWorkspaceState[]>) : {};
+  } catch {
+    return {};
+  }
 }
 
-function readWorkspaceMap(): Record<string, CampaignWorkspaceState> {
+function readLegacyWorkspaceMap(storage: CampaignStorage): Record<string, CampaignWorkspaceState> {
   try {
-    const stored = window.localStorage.getItem(CAMPAIGN_WORKSPACE_KEY);
+    const stored = storage.getItem(LEGACY_CAMPAIGN_WORKSPACE_KEY);
     return stored ? (JSON.parse(stored) as Record<string, CampaignWorkspaceState>) : {};
   } catch {
     return {};
   }
+}
+
+function writeWorkspaceMap(
+  workspaces: Record<string, CampaignWorkspaceState[]>,
+  storage: CampaignStorage
+) {
+  storage.setItem(CAMPAIGN_WORKSPACES_KEY, JSON.stringify(workspaces));
 }
 
 function normalizeWorkspace(state: CampaignWorkspaceState): CampaignWorkspaceState {
