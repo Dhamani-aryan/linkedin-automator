@@ -3,7 +3,8 @@ export type WorkspaceRouteTab = "workflow" | "leads" | "browser" | "safety";
 
 export type AppRoute =
   | { kind: "manager"; page: ManagerPage }
-  | { kind: "workspace"; profileId: string; tab: WorkspaceRouteTab };
+  | { kind: "campaigns"; profileId: string }
+  | { kind: "workspace"; profileId: string; campaignId?: string; tab: WorkspaceRouteTab };
 
 const workspaceTabs = new Set<WorkspaceRouteTab>(["workflow", "leads", "browser", "safety"]);
 
@@ -11,12 +12,19 @@ export function readAppRoute(hash = window.location.hash): AppRoute {
   const segments = hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
 
   if (segments[0] === "workspace" && segments[1]) {
-    const candidateTab = segments[2] as WorkspaceRouteTab | undefined;
+    const legacyTab = segments[2] as WorkspaceRouteTab | undefined;
+    const usesLegacyRoute = Boolean(legacyTab && workspaceTabs.has(legacyTab));
+    const candidateTab = segments[usesLegacyRoute ? 2 : 3] as WorkspaceRouteTab | undefined;
     return {
       kind: "workspace",
       profileId: segments[1],
+      campaignId: usesLegacyRoute ? undefined : segments[2],
       tab: candidateTab && workspaceTabs.has(candidateTab) ? candidateTab : "workflow"
     };
+  }
+
+  if (segments[0] === "profiles" && segments[1] && segments[2] === "campaigns") {
+    return { kind: "campaigns", profileId: segments[1] };
   }
 
   if (segments[0] === "settings") {
@@ -28,7 +36,9 @@ export function readAppRoute(hash = window.location.hash): AppRoute {
 
 export function routeToHash(route: AppRoute): string {
   if (route.kind === "workspace") {
-    return `#/workspace/${encodeURIComponent(route.profileId)}/${route.tab}`;
+    const campaignSegment = route.campaignId ? `/${encodeURIComponent(route.campaignId)}` : "";
+    return `#/workspace/${encodeURIComponent(route.profileId)}${campaignSegment}/${route.tab}`;
   }
+  if (route.kind === "campaigns") return `#/profiles/${encodeURIComponent(route.profileId)}/campaigns`;
   return route.page === "profiles" ? "#/profiles" : `#/${route.page}`;
 }
