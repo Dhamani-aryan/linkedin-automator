@@ -133,10 +133,6 @@ export async function startCampaignBatch(snapshots) {
       }]
     };
   }
-  if (activeRunId !== null) {
-    throw new AppError("ACTIVE_RUN_EXISTS", "A campaign run is already active.", { activeRunId });
-  }
-
   const validationFailures = [];
   for (const snapshot of snapshots) {
     const mode = snapshot.mode === "live" ? "live" : "dry_run";
@@ -167,6 +163,7 @@ export async function startCampaignBatch(snapshots) {
   if (validationFailures.length > 0) return { ok: false, validationFailures };
 
   const batchId = randomUUID();
+  const joinsActiveQueue = activeRunId !== null;
   const runs = snapshots.map((snapshot, index) => ({
     ...createCampaignRun({
       runId: randomUUID(),
@@ -176,7 +173,7 @@ export async function startCampaignBatch(snapshots) {
     }),
     batchId,
     batchPosition: index,
-    state: index === 0 ? runStates.RUNNING : runStates.QUEUED,
+    state: !joinsActiveQueue && index === 0 ? runStates.RUNNING : runStates.QUEUED,
     validationFailures: []
   }));
 
@@ -188,7 +185,7 @@ export async function startCampaignBatch(snapshots) {
       detail: { mode: run.mode, batchId, batchPosition: run.batchPosition }
     });
   }
-  scheduleRunLoop(runs[0]);
+  if (!joinsActiveQueue) scheduleRunLoop(runs[0]);
   return { ok: true, batchId, runs: runs.map(decorateRun) };
 }
 
