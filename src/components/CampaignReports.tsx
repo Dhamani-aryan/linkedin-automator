@@ -8,6 +8,15 @@ type CampaignReportsProps = {
   campaigns: CampaignWorkspaceState[];
 };
 
+type ChartSeriesKey = "invitesSent" | "accepted" | "messagesSent" | "replies";
+
+const chartSeries: Array<{ key: ChartSeriesKey; label: string; className: string }> = [
+  { key: "invitesSent", label: "Invites", className: "invite" },
+  { key: "accepted", label: "Accepted", className: "accepted" },
+  { key: "messagesSent", label: "Messages", className: "message" },
+  { key: "replies", label: "Replies", className: "reply" }
+];
+
 const emptyAnalytics: CampaignAnalytics = {
   range: { from: "", to: "", timeZone: "UTC" },
   totals: {
@@ -27,6 +36,7 @@ export function CampaignReports({ profileId, campaigns }: CampaignReportsProps) 
   const [from, setFrom] = useState(() => dateInputValue(daysAgo(29)));
   const [to, setTo] = useState(() => dateInputValue(new Date()));
   const [analytics, setAnalytics] = useState<CampaignAnalytics>(emptyAnalytics);
+  const [visibleSeries, setVisibleSeries] = useState<ChartSeriesKey[]>(() => chartSeries.map(({ key }) => key));
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -81,6 +91,15 @@ export function CampaignReports({ profileId, campaigns }: CampaignReportsProps) 
     URL.revokeObjectURL(url);
   }
 
+  function toggleSeries(key: ChartSeriesKey) {
+    setVisibleSeries((current) => {
+      if (current.includes(key)) {
+        return current.length === 1 ? current : current.filter((item) => item !== key);
+      }
+      return [...current, key];
+    });
+  }
+
   return (
     <section className="campaign-reports">
       <div className="report-toolbar">
@@ -124,14 +143,20 @@ export function CampaignReports({ profileId, campaigns }: CampaignReportsProps) 
             <p className="section-kicker">Daily activity</p>
             <h2>Campaign outcomes</h2>
           </div>
-          <div className="report-legend" aria-label="Chart legend">
-            <span><i className="invite" /> Invites</span>
-            <span><i className="accepted" /> Accepted</span>
-            <span><i className="message" /> Messages</span>
-            <span><i className="reply" /> Replies</span>
+          <div className="report-legend" aria-label="Visible chart outcomes">
+            {chartSeries.map((series) => {
+              const checked = visibleSeries.includes(series.key);
+              return (
+                <label className={`report-series-toggle ${checked ? "active" : ""}`} key={series.key}>
+                  <input type="checkbox" checked={checked} onChange={() => toggleSeries(series.key)} />
+                  <i className={series.className} />
+                  <span>{series.label}</span>
+                </label>
+              );
+            })}
           </div>
         </header>
-        <DailyActivityChart days={analytics.daily} />
+        <DailyActivityChart days={analytics.daily} visibleSeries={visibleSeries} />
       </section>
 
       <section className="report-campaign-table">
@@ -158,18 +183,17 @@ function ReportKpi({ label, value, detail }: { label: string; value: number; det
   return <div><span>{label}</span><strong>{value.toLocaleString()}</strong><small>{detail}</small></div>;
 }
 
-function DailyActivityChart({ days }: { days: CampaignAnalyticsDay[] }) {
-  const maximum = Math.max(1, ...days.flatMap((day) => [day.invitesSent, day.accepted, day.messagesSent, day.replies]));
+function DailyActivityChart({ days, visibleSeries }: { days: CampaignAnalyticsDay[]; visibleSeries: ChartSeriesKey[] }) {
+  const maximum = Math.max(1, ...days.flatMap((day) => visibleSeries.map((key) => day[key])));
   return (
     <div className="report-chart-scroll">
       <div className="report-chart" style={{ gridTemplateColumns: `repeat(${Math.max(days.length, 1)}, minmax(30px, 1fr))` }}>
         {days.length === 0 ? <div className="report-empty">No activity recorded.</div> : days.map((day, index) => (
           <div className="report-day" key={day.date} title={`${day.date}: ${day.invitesSent} invites, ${day.accepted} accepted, ${day.messagesSent} messages, ${day.replies} replies`}>
             <div className="report-bars">
-              <i className="invite" style={{ height: barHeight(day.invitesSent, maximum) }} />
-              <i className="accepted" style={{ height: barHeight(day.accepted, maximum) }} />
-              <i className="message" style={{ height: barHeight(day.messagesSent, maximum) }} />
-              <i className="reply" style={{ height: barHeight(day.replies, maximum) }} />
+              {chartSeries.filter(({ key }) => visibleSeries.includes(key)).map((series) => (
+                <i key={series.key} className={series.className} style={{ height: barHeight(day[series.key], maximum) }} />
+              ))}
             </div>
             <span>{showDateLabel(index, days.length) ? day.date.slice(5) : ""}</span>
           </div>
