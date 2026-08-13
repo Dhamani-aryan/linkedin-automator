@@ -3089,6 +3089,47 @@ button:disabled {
   gap: 18px;
 }
 
+.report-chart-settings {
+  min-width: 0;
+  display: grid;
+  justify-items: end;
+  gap: 9px;
+}
+
+.report-chart-date-controls {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
+
+.report-chart-date-controls > label {
+  display: grid;
+  gap: 4px;
+  color: #969faf;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.report-chart-date-controls select,
+.report-date-input.compact {
+  height: 34px;
+  min-height: 34px;
+  border: 1px solid #4b5060;
+  border-radius: 5px;
+  color: #edf0f6;
+  background: #2b2e37;
+}
+
+.report-chart-date-controls select {
+  min-width: 104px;
+  padding: 0 28px 0 9px;
+}
+
+.report-date-input.compact {
+  width: 150px;
+}
+
 .report-chart-section h2,
 .report-chart-section p {
   margin: 0;
@@ -3609,6 +3650,24 @@ button:disabled {
 
   .report-toolbar {
     display: flex;
+  }
+
+  .report-chart-settings {
+    width: 100%;
+    justify-items: stretch;
+  }
+
+  .report-chart-date-controls,
+  .report-legend {
+    width: 100%;
+  }
+
+  .report-chart-date-controls > label:last-child {
+    flex: 1;
+  }
+
+  .report-date-input.compact {
+    width: 100%;
   }
 
   .campaign-index-header > .primary-button,

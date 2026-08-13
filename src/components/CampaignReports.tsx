@@ -9,6 +9,7 @@ type CampaignReportsProps = {
 };
 
 type ChartSeriesKey = "invitesSent" | "accepted" | "messagesSent" | "replies";
+type ChartWindow = "7" | "14" | "30" | "all";
 
 const chartSeries: Array<{ key: ChartSeriesKey; label: string; className: string }> = [
   { key: "invitesSent", label: "Invites", className: "invite" },
@@ -35,6 +36,8 @@ export function CampaignReports({ profileId, campaigns }: CampaignReportsProps) 
   const [campaignId, setCampaignId] = useState("");
   const [from, setFrom] = useState(() => dateInputValue(daysAgo(29)));
   const [to, setTo] = useState(() => dateInputValue(new Date()));
+  const [chartWindow, setChartWindow] = useState<ChartWindow>("30");
+  const [chartEndDate, setChartEndDate] = useState(() => dateInputValue(new Date()));
   const [analytics, setAnalytics] = useState<CampaignAnalytics>(emptyAnalytics);
   const [visibleSeries, setVisibleSeries] = useState<ChartSeriesKey[]>(() => chartSeries.map(({ key }) => key));
   const [isLoading, setIsLoading] = useState(true);
@@ -61,6 +64,17 @@ export function CampaignReports({ profileId, campaigns }: CampaignReportsProps) 
   useEffect(() => {
     void refresh();
   }, [profileId, campaignId, from, to]);
+
+  useEffect(() => {
+    setChartEndDate((current) => current < from ? from : current > to ? to : current);
+  }, [from, to]);
+
+  const chartDays = useMemo(() => {
+    const earliest = chartWindow === "all"
+      ? from
+      : laterDate(from, shiftDateKey(chartEndDate, -(Number(chartWindow) - 1)));
+    return analytics.daily.filter((day) => day.date >= earliest && day.date <= chartEndDate);
+  }, [analytics.daily, chartEndDate, chartWindow, from]);
 
   const campaignRows = useMemo(() => {
     if (campaignId) return analytics.campaigns;
@@ -143,20 +157,37 @@ export function CampaignReports({ profileId, campaigns }: CampaignReportsProps) 
             <p className="section-kicker">Daily activity</p>
             <h2>Campaign outcomes</h2>
           </div>
-          <div className="report-legend" aria-label="Visible chart outcomes">
-            {chartSeries.map((series) => {
-              const checked = visibleSeries.includes(series.key);
-              return (
-                <label className={`report-series-toggle ${checked ? "active" : ""}`} key={series.key}>
-                  <input type="checkbox" checked={checked} onChange={() => toggleSeries(series.key)} />
-                  <i className={series.className} />
-                  <span>{series.label}</span>
-                </label>
-              );
-            })}
+          <div className="report-chart-settings">
+            <div className="report-chart-date-controls">
+              <label>
+                <span>Window</span>
+                <select value={chartWindow} onChange={(event) => setChartWindow(event.target.value as ChartWindow)}>
+                  <option value="7">7 days</option>
+                  <option value="14">14 days</option>
+                  <option value="30">30 days</option>
+                  <option value="all">Full range</option>
+                </select>
+              </label>
+              <label>
+                <span>Ending</span>
+                <div className="report-date-input compact"><CalendarDays size={15} /><input type="date" value={chartEndDate} min={from} max={to} onChange={(event) => setChartEndDate(event.target.value)} /></div>
+              </label>
+            </div>
+            <div className="report-legend" aria-label="Visible chart outcomes">
+              {chartSeries.map((series) => {
+                const checked = visibleSeries.includes(series.key);
+                return (
+                  <label className={`report-series-toggle ${checked ? "active" : ""}`} key={series.key}>
+                    <input type="checkbox" checked={checked} onChange={() => toggleSeries(series.key)} />
+                    <i className={series.className} />
+                    <span>{series.label}</span>
+                  </label>
+                );
+              })}
+            </div>
           </div>
         </header>
-        <DailyActivityChart days={analytics.daily} visibleSeries={visibleSeries} />
+        <DailyActivityChart days={chartDays} visibleSeries={visibleSeries} />
       </section>
 
       <section className="report-campaign-table">
@@ -241,6 +272,16 @@ function daysAgo(count: number) {
 function dateInputValue(date: Date) {
   const offset = date.getTimezoneOffset() * 60_000;
   return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+}
+
+function shiftDateKey(value: string, days: number) {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function laterDate(left: string, right: string) {
+  return left > right ? left : right;
 }
 
 function csvCell(value: string | number) {
