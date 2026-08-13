@@ -368,6 +368,32 @@ describe("transition", () => {
 });
 
 describe("followUpSchedule", () => {
+  it("anchors the first post-connection message to acceptance detection", () => {
+    const actions = [
+      { id: "connect", type: "connection_request" },
+      { id: "guard", type: "wait_for_acceptance", automatic: true },
+      { id: "message", type: "message", delay: { amount: 1, unit: "hours" } }
+    ];
+    const leadRun = {
+      actionCursor: 2,
+      acceptedAt: "2026-08-09T10:30:00.000Z",
+      attempts: [{
+        actionId: "connect",
+        completedAt: "2026-08-09T08:00:00.000Z",
+        errorCode: null,
+        outcome: "sent"
+      }],
+      delaysSatisfiedActionIds: []
+    };
+
+    expect(followUpSchedule(leadRun, actions)).toEqual({
+      actionId: "message",
+      anchorAt: "2026-08-09T10:30:00.000Z",
+      delayMs: 3_600_000,
+      dueAt: "2026-08-09T11:30:00.000Z"
+    });
+  });
+
   it.each([
     [30, "minutes", "2026-08-09T10:30:00.000Z"],
     [5, "hours", "2026-08-09T15:00:00.000Z"],

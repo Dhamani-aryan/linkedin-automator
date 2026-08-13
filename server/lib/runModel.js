@@ -236,7 +236,8 @@ export function createLeadRun(lead, actions, nowIso) {
     delaysSatisfiedActionIds: [],
     nextEligibleAt: nowIso,
     lastErrorCode: null,
-    conversationSeenAt: null
+    conversationSeenAt: null,
+    acceptedAt: null
   };
 }
 
@@ -283,6 +284,7 @@ export function transition(leadRun, event, actions = []) {
       lead.actionCursor = nextExecutableCursor(actions, lead.actionCursor + 1);
       lead.state = lead.actionCursor >= actions.length ? leadStates.COMPLETED : leadStates.QUEUED;
       lead.nextEligibleAt = now;
+      lead.acceptedAt = event.acceptedAt ?? now;
       lead.lastErrorCode = null;
       return touch(lead, now);
 
@@ -404,6 +406,19 @@ export function followUpSchedule(lead, actions) {
   const action = actions[lead.actionCursor];
   const delayMs = action?.type === "message" ? delayToMs(action.delay) : 0;
   if (delayMs <= 0 || lead.delaysSatisfiedActionIds?.includes(action.id)) return null;
+
+  const previousAction = [...actions]
+    .slice(0, lead.actionCursor)
+    .reverse()
+    .find((candidate) => candidate.automatic !== true);
+  if (previousAction?.type === "connection_request" && lead.acceptedAt) {
+    return {
+      actionId: action.id,
+      anchorAt: lead.acceptedAt,
+      delayMs,
+      dueAt: new Date(Date.parse(lead.acceptedAt) + delayMs).toISOString()
+    };
+  }
 
   const previousAttempt = [...lead.attempts]
     .reverse()

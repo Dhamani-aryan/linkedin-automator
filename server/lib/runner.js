@@ -7,7 +7,7 @@ import {
   listTabs,
   openTab
 } from "./browserSession.js";
-import { executeConnectionRequest } from "./actions/connectionRequest.js";
+import { checkConnectionAcceptance, executeConnectionRequest } from "./actions/connectionRequest.js";
 import { executeMessage } from "./actions/message.js";
 import { AppError, ErrorCodes } from "./errors.js";
 import {
@@ -37,7 +37,7 @@ import {
 import { checkSafetyGate, randomizedDelayMs } from "./safetyPolicy.js";
 
 const authCacheMs = 10 * 60_000;
-const acceptanceRecheckMs = 4 * 60 * 60_000;
+const acceptanceRecheckMs = 60 * 60_000;
 
 let activeRunId = null;
 let controlWake = null;
@@ -364,6 +364,10 @@ async function runLoop(runId) {
     }
 
     const action = run.snapshot.actions[selected.lead.actionCursor];
+    if (selected.lead.state === leadStates.WAITING_ACCEPTANCE) {
+      await reconcileAcceptance(run, selected.index);
+      continue;
+    }
     if (selected.lead.state === leadStates.WAITING_DELAY) {
       selected.lead = transition(selected.lead, {
         type: "DELAY_ELAPSED",
@@ -636,7 +640,7 @@ async function executeAction(args) {
 }
 
 function pickNextLead(run, now) {
-  const eligibleStates = new Set([leadStates.QUEUED, leadStates.WAITING_DELAY]);
+  const eligibleStates = new Set([leadStates.QUEUED, leadStates.WAITING_ACCEPTANCE, leadStates.WAITING_DELAY]);
   for (const [index, lead] of run.leads.entries()) {
     if (!eligibleStates.has(lead.state)) continue;
     if (lead.nextEligibleAt && remainingDelayMs(lead.nextEligibleAt, now) > 0) continue;
@@ -707,6 +711,85 @@ async function finalizeStopped(run) {
   await saveRun(run);
   if (activeRunId === run.id) activeRunId = null;
   return { ok: true, run: decorateRun(run) };
+}
+
+async function reconcileAcceptance(run, leadIndex) {
+  const lead = run.leads[leadIndex];
+  const action = run.snapshot.actions[lead.actionCursor];
+  const tab = await openTab("about:blank");
+  const session = await attach(tab.id);
+  try {
+    await appendAudit(run.id, {
+      event: "acceptance_check_started",
+      leadId: lead.id,
+      actionId: action?.id ?? null,
+      outcome: "started"
+    });
+    const result = await checkConnectionAcceptance({ session, lead: lead.lead });
+    const observedAt = new Date().toISOString();
+    if (result.status === "accepted") {
+      let updatedLead = transition(lead, {
+        type: "ACCEPTANCE_CONFIRMED",
+        acceptedAt: observedAt,
+        now: observedAt
+      }, run.snapshot.actions);
+      const schedule = followUpSchedule(updatedLead, run.snapshot.actions);
+      if (schedule) {
+        updatedLead = transition(updatedLead, {
+          type: "WAITING_DELAY",
+          actionId: schedule.actionId,
+          nextEligibleAt: schedule.dueAt,
+          now: observedAt
+        }, run.snapshot.actions);
+      }
+      run.leads[leadIndex] = updatedLead;
+      await appendAudit(run.id, {
+        event: "connection_accepted",
+        leadId: lead.id,
+        actionId: action?.id ?? null,
+        outcome: "accepted",
+        detail: { ...result.detail, observedAt, schedule }
+      });
+    } else if (result.status === "pending") {
+      const nextEligibleAt = new Date(Date.now() + acceptanceRecheckMs).toISOString();
+      run.leads[leadIndex] = transition(lead, {
+        type: "WAITING_ACCEPTANCE",
+        outcome: "pending",
+        detail: result.detail,
+        nextEligibleAt,
+        now: observedAt
+      }, run.snapshot.actions);
+      await appendAudit(run.id, {
+        event: "acceptance_check_completed",
+        leadId: lead.id,
+        actionId: action?.id ?? null,
+        outcome: "pending",
+        detail: { ...result.detail, nextEligibleAt }
+      });
+    } else {
+      run.leads[leadIndex] = transition(lead, {
+        type: "NEEDS_REVIEW",
+        outcome: "needs_review",
+        errorCode: result.errorCode,
+        detail: result.detail,
+        now: observedAt
+      }, run.snapshot.actions);
+      run.state = runStates.NEEDS_ATTENTION;
+      await appendAudit(run.id, {
+        event: "acceptance_check_completed",
+        leadId: lead.id,
+        actionId: action?.id ?? null,
+        outcome: "needs_review",
+        errorCode: result.errorCode,
+        detail: result.detail
+      });
+    }
+    run.updatedAt = observedAt;
+    await saveRun(run);
+  } finally {
+    session.close();
+    if (tab?.id) await closeTab(tab.id).catch(() => false);
+  }
 }
 
 async function waitWhilePaused(runId) {
