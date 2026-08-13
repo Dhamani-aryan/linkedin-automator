@@ -8,6 +8,7 @@ import {
   status,
   stop
 } from "./lib/browserSession.js";
+import { getCampaignAnalytics } from "./lib/analytics.js";
 import { AppError, ErrorCodes, toErrorResponse } from "./lib/errors.js";
 import {
   getActiveCampaignRun,
@@ -133,6 +134,17 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "GET" && requestUrl.pathname === "/api/campaign-runs") {
       sendJson(response, 200, await listCampaignRuns(requestUrl.searchParams.get("profileId") ?? ""));
+      return;
+    }
+
+    if (request.method === "GET" && requestUrl.pathname === "/api/analytics/campaigns") {
+      sendJson(response, 200, await getCampaignAnalytics({
+        profileId: requestUrl.searchParams.get("profileId") ?? "",
+        campaignId: requestUrl.searchParams.get("campaignId") ?? "",
+        from: requestUrl.searchParams.get("from") ?? "",
+        to: requestUrl.searchParams.get("to") ?? "",
+        timeZone: requestUrl.searchParams.get("timeZone") ?? "UTC"
+      }));
       return;
     }
 

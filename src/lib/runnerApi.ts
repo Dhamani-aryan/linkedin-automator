@@ -1,5 +1,6 @@
 import type {
   CampaignRun,
+  CampaignAnalytics,
   CampaignSummary,
   CampaignWorkflowAction,
   HumanTouchSettings,
@@ -72,6 +73,23 @@ export async function listCampaignRuns(profileId: string): Promise<CampaignRun[]
     `/api/campaign-runs?profileId=${encodeURIComponent(profileId)}`
   );
   return result.runs;
+}
+
+export async function getCampaignAnalytics(filters: {
+  profileId: string;
+  campaignId?: string;
+  from: string;
+  to: string;
+  timeZone: string;
+}): Promise<CampaignAnalytics> {
+  const query = new URLSearchParams({
+    profileId: filters.profileId,
+    from: filters.from,
+    to: filters.to,
+    timeZone: filters.timeZone
+  });
+  if (filters.campaignId) query.set("campaignId", filters.campaignId);
+  return request<CampaignAnalytics>(`/api/analytics/campaigns?${query.toString()}`);
 }
 
 export async function getActiveCampaignRun(): Promise<CampaignRun | null> {

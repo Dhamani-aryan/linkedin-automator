@@ -89,8 +89,7 @@ export function aggregateCampaignEvents(events, filters = {}, now = new Date()) 
     daily: [...dailyByDate.values()].sort((left, right) => left.date.localeCompare(right.date)),
     campaigns: [...campaigns.values()]
       .map(withRates)
-      .sort((left, right) => right.messagesSent - left.messagesSent || left.name.localeCompare(right.name)),
-    events: uniqueEvents
+      .sort((left, right) => right.messagesSent - left.messagesSent || left.name.localeCompare(right.name))
   };
 }
 

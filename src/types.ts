@@ -184,6 +184,33 @@ export type CampaignRun = {
   };
 };
 
+export type CampaignAnalyticsTotals = {
+  invitesSent: number;
+  accepted: number;
+  messagesSent: number;
+  replies: number;
+  acceptanceRate: number;
+  replyRate: number;
+};
+
+export type CampaignAnalyticsDay = Omit<CampaignAnalyticsTotals, "acceptanceRate" | "replyRate"> & {
+  date: string;
+};
+
+export type CampaignAnalytics = {
+  range: {
+    from: string;
+    to: string;
+    timeZone: string;
+  };
+  totals: CampaignAnalyticsTotals;
+  daily: CampaignAnalyticsDay[];
+  campaigns: Array<CampaignAnalyticsTotals & {
+    id: string;
+    name: string;
+  }>;
+};
+
 export type WorkflowCardKind = "source" | "action" | "reply_check";
 
 export type WorkflowCard = {
