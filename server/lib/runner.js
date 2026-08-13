@@ -433,6 +433,7 @@ async function executeLeadAction(run, leadIndex, action) {
       lead: lead.lead,
       action,
       mode: run.mode,
+      replyBaseline: findReplyBaseline(lead),
       reuseCurrentPage: existingTab !== null,
       shouldStop: async () => (await loadRun(run.id)).stopRequested,
       shouldPause: async () => (await loadRun(run.id)).pauseRequested
@@ -481,6 +482,14 @@ async function executeLeadAction(run, leadIndex, action) {
         now: new Date().toISOString()
       }, run.snapshot.actions);
       run.state = runStates.NEEDS_ATTENTION;
+    } else if (result.event === "reply_received") {
+      lead = transition(lead, {
+        type: "REPLIED",
+        outcome: result.outcome,
+        detail: result.detail,
+        conversationSeenAt: result.detail?.observedAt,
+        now: new Date().toISOString()
+      }, run.snapshot.actions);
     } else if (action.type === "connection_request") {
       lead = transition(lead, {
         type: "WAITING_ACCEPTANCE",
@@ -612,6 +621,23 @@ function isSafeToRetry(lead) {
   if (attempt?.errorCode === ErrorCodes.ELEMENT_NOT_FOUND) return true;
   return attempt?.errorCode === ErrorCodes.AMBIGUOUS_OUTCOME &&
     attempt.detail?.reason === "The composer text did not exactly match the resolved template. Send was not clicked.";
+}
+
+function findReplyBaseline(lead) {
+  const attempt = [...(lead.attempts ?? [])]
+    .reverse()
+    .find((candidate) =>
+      candidate.completedAt &&
+      candidate.errorCode === null &&
+      candidate.outcome === "sent" &&
+      typeof candidate.detail?.resolvedText === "string"
+    );
+  if (!attempt) return null;
+  return {
+    text: attempt.detail.resolvedText,
+    sentAt: attempt.completedAt,
+    actionId: attempt.actionId
+  };
 }
 
 async function findOpenProfileTab(linkedinUrl) {

@@ -10,6 +10,7 @@ export async function executeMessage({
   lead,
   action,
   mode,
+  replyBaseline = null,
   reuseCurrentPage = false,
   shouldStop = async () => false,
   shouldPause = async () => false
@@ -58,11 +59,61 @@ export async function executeMessage({
   const resolvedLead = { ...lead, ...profileIdentity };
   const resolved = renderTemplate(action.template ?? "", resolvedLead, { missingVariable: "empty" });
   if (mode === "live") {
+    let opening = null;
+    if (replyBaseline) {
+      opening = await openMessageComposer(session, profileIdentity.displayName);
+      if (!opening.composer) {
+        return {
+          outcome: "needs_review",
+          errorCode: ErrorCodes.ELEMENT_NOT_FOUND,
+          detail: {
+            actionType: "reply_check",
+            reason: "The profile Message control did not open the campaign conversation for reply checking.",
+            recipientName: profileIdentity.displayName,
+            composerOpening: opening
+          }
+        };
+      }
+      const messages = await readConversationMessages(session, profileIdentity.displayName);
+      const reply = classifyConversationReply(messages, replyBaseline, {
+        recipientName: profileIdentity.displayName,
+        recipientUrl: lead.linkedinUrl
+      });
+      if (reply.status === "replied") {
+        return {
+          outcome: "replied",
+          event: "reply_received",
+          detail: {
+            actionType: "reply_check",
+            source: "profile_conversation_check",
+            recipientName: profileIdentity.displayName,
+            baselineSentAt: replyBaseline.sentAt,
+            externalMessageId: reply.message.externalId,
+            replyText: reply.message.text,
+            observedAt: new Date().toISOString()
+          }
+        };
+      }
+      if (reply.status === "needs_review") {
+        return {
+          outcome: "needs_review",
+          errorCode: ErrorCodes.AMBIGUOUS_OUTCOME,
+          detail: {
+            actionType: "reply_check",
+            reason: reply.reason,
+            recipientName: profileIdentity.displayName,
+            baselineSentAt: replyBaseline.sentAt,
+            messageCount: messages.length
+          }
+        };
+      }
+    }
     return await sendLiveMessage({
       session,
       recipientName: profileIdentity.displayName,
       classification,
       resolved,
+      opening,
       shouldStop,
       shouldPause
     });
@@ -84,11 +135,11 @@ export async function executeMessage({
   };
 }
 
-async function sendLiveMessage({ session, recipientName, classification, resolved, shouldStop, shouldPause }) {
+async function sendLiveMessage({ session, recipientName, classification, resolved, opening, shouldStop, shouldPause }) {
   if (await shouldStop()) return stoppedMessageResult("before_composer", recipientName);
   if (await shouldPause()) return pausedMessageResult("before_composer", recipientName);
 
-  const opening = await openMessageComposer(session, recipientName);
+  opening ??= await openMessageComposer(session, recipientName);
   if (!opening.composer) {
     return {
       outcome: "needs_review",
@@ -343,6 +394,92 @@ async function readMessagingSurface(session) {
         : 0
     };
   }, []);
+}
+
+async function readConversationMessages(session, recipientName) {
+  return await evaluate(session, (expectedRecipient) => {
+    const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
+    const readStructuredText = (element) => {
+      let output = "";
+      const visit = (node) => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          output += node.textContent ?? "";
+          return;
+        }
+        if (!node || typeof node.nodeType !== "number") return;
+        if (node.nodeName === "BR") {
+          output += "\n";
+          return;
+        }
+        for (const child of node.childNodes) visit(child);
+        if (["DIV", "P", "LI"].includes(node.nodeName) && !output.endsWith("\n")) output += "\n";
+      };
+      visit(element);
+      return output.replace(/\r\n/g, "\n").replace(/\n$/, "").trim();
+    };
+    const shadowRoot = document.querySelector("#interop-outlet")?.shadowRoot;
+    const shadowBubbles = shadowRoot ? [...shadowRoot.querySelectorAll(".msg-overlay-conversation-bubble")] : [];
+    const shadowBubble = shadowBubbles.find((candidate) =>
+      normalize(candidate.querySelector(".msg-overlay-bubble-header__title")?.textContent) === expectedRecipient
+    );
+    const container = shadowBubble ?? document.querySelector(".msg-compose-container");
+    if (!container) return [];
+
+    return [...container.querySelectorAll(".msg-s-event-listitem")].map((item, index) => {
+      const event = item.closest(".msg-s-message-list__event") ?? item;
+      const authorElement = event.querySelector(
+        ".msg-s-message-group__name, .msg-s-message-group__profile-link, [data-anonymize='person-name']"
+      );
+      const profileLink = event.querySelector('a[href*="/in/"]');
+      const body = item.querySelector(".msg-s-event-listitem__body") ?? item;
+      const time = item.querySelector("time") ?? event.querySelector("time");
+      return {
+        index,
+        externalId: event.getAttribute("data-event-urn") ?? item.getAttribute("data-event-urn") ?? `thread-${index}`,
+        text: readStructuredText(body),
+        author: normalize(authorElement?.textContent ?? authorElement?.getAttribute("aria-label")),
+        profileUrl: profileLink?.href ?? null,
+        displayedAt: time?.getAttribute("datetime") ?? time?.getAttribute("title") ?? normalize(time?.textContent)
+      };
+    }).filter((message) => message.text.length > 0);
+  }, [recipientName]);
+}
+
+export function classifyConversationReply(messages, baseline, recipient) {
+  const normalizeText = (value) => String(value ?? "").replace(/\r\n/g, "\n").trim();
+  const normalizeName = (value) => String(value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+  const normalizeUrl = (value) => String(value ?? "").replace(/[?#].*$/, "").replace(/\/$/, "").toLowerCase();
+  const baselineText = normalizeText(baseline?.text);
+  const baselineIndex = messages.reduce((latest, message, index) =>
+    normalizeText(message.text) === baselineText ? index : latest, -1);
+  if (!baselineText || baselineIndex < 0) {
+    return {
+      status: "needs_review",
+      reason: "The last confirmed campaign message was not visible in the opened conversation."
+    };
+  }
+
+  const recipientName = normalizeName(recipient.recipientName);
+  const recipientUrl = normalizeUrl(recipient.recipientUrl);
+  let hasUnattributedMessage = false;
+  for (const message of messages.slice(baselineIndex + 1)) {
+    const author = normalizeName(message.author);
+    const profileUrl = normalizeUrl(message.profileUrl);
+    const isRecipient = Boolean(
+      (author && (author === recipientName || recipientName.startsWith(`${author} `))) ||
+      (profileUrl && recipientUrl && profileUrl === recipientUrl)
+    );
+    if (isRecipient) return { status: "replied", message };
+    if (!author && !profileUrl) hasUnattributedMessage = true;
+  }
+
+  if (hasUnattributedMessage) {
+    return {
+      status: "needs_review",
+      reason: "A message after the campaign baseline could not be attributed to the sender or recipient."
+    };
+  }
+  return { status: "no_reply" };
 }
 
 async function readComposer(session, recipientName) {
