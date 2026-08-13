@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  BarChart3,
   CheckSquare2,
   Chrome,
   Circle,
@@ -36,6 +37,7 @@ import type {
   LinkedInAccount
 } from "../types";
 import { SafetyLimitsPage } from "./SafetyLimitsPage";
+import { CampaignReports } from "./CampaignReports";
 
 type CampaignFilter = "all" | "running" | "queued" | "paused" | "stopped" | "completed";
 type DisplayStatus = Exclude<CampaignFilter, "all"> | "ready" | "failed";
@@ -78,7 +80,7 @@ export function ProfileCampaigns({
   onStartChrome,
   onStopChrome
 }: ProfileCampaignsProps) {
-  const [activeSection, setActiveSection] = useState<"campaigns" | "browser" | "safety">("campaigns");
+  const [activeSection, setActiveSection] = useState<"campaigns" | "reports" | "browser" | "safety">("campaigns");
   const [campaigns, setCampaigns] = useState(() => loadCampaignWorkspaces(account));
   const [runs, setRuns] = useState<CampaignRun[]>([]);
   const [filter, setFilter] = useState<CampaignFilter>("all");
@@ -296,6 +298,9 @@ export function ProfileCampaigns({
           <button className={`nav-item ${activeSection === "campaigns" ? "active" : ""}`} onClick={() => setActiveSection("campaigns")}>
             <CheckSquare2 size={17} /> Campaigns
           </button>
+          <button className={`nav-item ${activeSection === "reports" ? "active" : ""}`} onClick={() => setActiveSection("reports")}>
+            <BarChart3 size={17} /> Reports
+          </button>
           <button className={`nav-item ${activeSection === "browser" ? "active" : ""}`} onClick={() => setActiveSection("browser")}>
             <Chrome size={17} /> LinkedIn browser
           </button>
@@ -316,7 +321,7 @@ export function ProfileCampaigns({
         <header className="workspace-header compact-workspace-header campaign-home-header">
           <div>
             <p className="eyebrow">{account.name} workspace</p>
-            <h1>{activeSection === "campaigns" ? "Campaigns" : activeSection === "browser" ? "LinkedIn browser" : "Safety limits"}</h1>
+            <h1>{activeSection === "campaigns" ? "Campaigns" : activeSection === "reports" ? "Reports" : activeSection === "browser" ? "LinkedIn browser" : "Safety limits"}</h1>
             <p className="status-line">
               {campaigns.length} campaign{campaigns.length === 1 ? "" : "s"} <span>|</span> {totalLeadCount} lead{totalLeadCount === 1 ? "" : "s"} <span>|</span> same-IP local Chrome
             </p>
@@ -462,6 +467,10 @@ export function ProfileCampaigns({
               {linkedInTab ? <a href={linkedInTab.url} target="_blank" rel="noreferrer">{linkedInTab.url}</a> : null}
             </div>
           </section>
+        ) : null}
+
+        {activeSection === "reports" ? (
+          <CampaignReports profileId={account.id} campaigns={campaigns} />
         ) : null}
 
         {activeSection === "safety" ? (
