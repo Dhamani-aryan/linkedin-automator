@@ -133,12 +133,12 @@ export async function readConnectionPage(session) {
     } else if (degreeMarker) {
       connectionState = "connected";
       evidence = "first_degree_marker";
-    } else if (hasMessage) {
-      connectionState = "connected";
-      evidence = "profile_message_control";
     } else if (hasConnect) {
       connectionState = "connect_available";
       evidence = "connect_control";
+    } else if (hasMessage) {
+      connectionState = "connected";
+      evidence = "profile_message_control";
     }
 
     return {
