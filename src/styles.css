@@ -3164,12 +3164,19 @@ button:disabled {
 }
 
 .report-day {
+  position: relative;
   min-width: 0;
   height: 253px;
   display: grid;
   grid-template-rows: 220px 24px;
   gap: 8px;
   align-items: end;
+  outline: 0;
+}
+
+.report-day:hover,
+.report-day:focus-visible {
+  z-index: 3;
 }
 
 .report-bars {
@@ -3194,14 +3201,88 @@ button:disabled {
   white-space: nowrap;
 }
 
+.report-tooltip {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  width: 168px;
+  display: grid;
+  gap: 7px;
+  z-index: 4;
+  border: 1px solid #585e6c;
+  border-radius: 6px;
+  color: #eef1f7;
+  background: #24272f;
+  box-shadow: 0 14px 36px rgb(0 0 0 / 0.34);
+  padding: 11px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(4px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.report-day:first-child .report-tooltip {
+  left: 0;
+  transform: translateX(0) translateY(4px);
+}
+
+.report-day:last-child .report-tooltip {
+  right: 0;
+  left: auto;
+  transform: translateX(0) translateY(4px);
+}
+
+.report-day:hover .report-tooltip,
+.report-day:focus-visible .report-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.report-day:first-child:hover .report-tooltip,
+.report-day:first-child:focus-visible .report-tooltip,
+.report-day:last-child:hover .report-tooltip,
+.report-day:last-child:focus-visible .report-tooltip {
+  transform: translateX(0) translateY(0);
+}
+
+.report-tooltip > strong {
+  border-bottom: 1px solid #454a56;
+  padding-bottom: 7px;
+  font-size: 12px;
+}
+
+.report-tooltip > span {
+  display: grid;
+  grid-template-columns: 9px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  color: #bfc6d3;
+  font-size: 11px;
+}
+
+.report-tooltip i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.report-tooltip b {
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
 .report-legend .invite,
-.report-bars .invite { background: #76a0ff; }
+.report-bars .invite,
+.report-tooltip .invite { background: #76a0ff; }
 .report-legend .accepted,
-.report-bars .accepted { background: #66cf82; }
+.report-bars .accepted,
+.report-tooltip .accepted { background: #66cf82; }
 .report-legend .message,
-.report-bars .message { background: #e0a65c; }
+.report-bars .message,
+.report-tooltip .message { background: #e0a65c; }
 .report-legend .reply,
-.report-bars .reply { background: #d686dc; }
+.report-bars .reply,
+.report-tooltip .reply { background: #d686dc; }
 
 .report-campaign-table {
   overflow-x: auto;

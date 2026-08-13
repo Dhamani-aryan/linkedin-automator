@@ -189,13 +189,24 @@ function DailyActivityChart({ days, visibleSeries }: { days: CampaignAnalyticsDa
     <div className="report-chart-scroll">
       <div className="report-chart" style={{ gridTemplateColumns: `repeat(${Math.max(days.length, 1)}, minmax(30px, 1fr))` }}>
         {days.length === 0 ? <div className="report-empty">No activity recorded.</div> : days.map((day, index) => (
-          <div className="report-day" key={day.date} title={`${day.date}: ${day.invitesSent} invites, ${day.accepted} accepted, ${day.messagesSent} messages, ${day.replies} replies`}>
+          <div
+            className="report-day"
+            key={day.date}
+            tabIndex={0}
+            aria-label={`${formatChartDate(day.date)} campaign outcomes`}
+          >
             <div className="report-bars">
               {chartSeries.filter(({ key }) => visibleSeries.includes(key)).map((series) => (
                 <i key={series.key} className={series.className} style={{ height: barHeight(day[series.key], maximum) }} />
               ))}
             </div>
             <span>{showDateLabel(index, days.length) ? day.date.slice(5) : ""}</span>
+            <div className="report-tooltip" role="tooltip">
+              <strong>{formatChartDate(day.date)}</strong>
+              {chartSeries.filter(({ key }) => visibleSeries.includes(key)).map((series) => (
+                <span key={series.key}><i className={series.className} /> {series.label}<b>{day[series.key]}</b></span>
+              ))}
+            </div>
           </div>
         ))}
       </div>
@@ -214,6 +225,11 @@ function showDateLabel(index: number, total: number) {
 
 function formatPercent(value: number) {
   return `${value.toLocaleString(undefined, { maximumFractionDigits: 1 })}%`;
+}
+
+function formatChartDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })
+    .format(new Date(`${value}T00:00:00.000Z`));
 }
 
 function daysAgo(count: number) {
