@@ -73,6 +73,16 @@ export type LeadProfile = {
   company: string;
   position: string;
   location: string;
+  headline?: string;
+  companyLinkedinUrl?: string;
+  salesNavigatorUrl?: string;
+  industry?: string;
+  about?: string;
+  email?: string;
+  phone?: string;
+  website?: string;
+  publicId?: string;
+  connectionDegree?: string;
   sourceId: string;
   status: "to_process" | "processing" | "processed" | "accepted" | "replied" | "failed" | "excluded";
   addedAt: string;
