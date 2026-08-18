@@ -1,4 +1,4 @@
-import type { ChromeStatus } from "../types";
+import type { ChromeStatus, LeadProfile } from "../types";
 
 type ChromeApiFailure = {
   ok: false;
@@ -85,6 +85,33 @@ export async function resolveProfileIdentities(
     headers: defaultHeaders,
     body: JSON.stringify({ profiles })
   });
+}
+
+export function mergeResolvedProfileData(lead: LeadProfile, identity: ResolvedProfileIdentity): LeadProfile {
+  const text = (value: string | undefined) => value?.trim() || undefined;
+  const personalLinkedInUrl = text(identity.personalLinkedInUrl);
+  return {
+    ...lead,
+    ...(text(identity.displayName) ? { displayName: text(identity.displayName) as string } : {}),
+    ...(text(identity.firstName) ? { firstName: text(identity.firstName) as string } : {}),
+    ...(text(identity.lastName) ? { lastName: text(identity.lastName) as string } : {}),
+    ...(personalLinkedInUrl && /linkedin\.com\/in\//i.test(personalLinkedInUrl)
+      ? { linkedinUrl: personalLinkedInUrl }
+      : {}),
+    ...(text(identity.salesNavigatorUrl) ? { salesNavigatorUrl: text(identity.salesNavigatorUrl) } : {}),
+    ...(text(identity.headline) ? { headline: text(identity.headline) } : {}),
+    ...(text(identity.position) ? { position: text(identity.position) as string } : {}),
+    ...(text(identity.company) ? { company: text(identity.company) as string } : {}),
+    ...(text(identity.companyLinkedinUrl) ? { companyLinkedinUrl: text(identity.companyLinkedinUrl) } : {}),
+    ...(text(identity.location) ? { location: text(identity.location) as string } : {}),
+    ...(text(identity.industry) ? { industry: text(identity.industry) } : {}),
+    ...(text(identity.about) ? { about: text(identity.about) } : {}),
+    ...(text(identity.email) ? { email: text(identity.email) } : {}),
+    ...(text(identity.phone) ? { phone: text(identity.phone) } : {}),
+    ...(text(identity.website) ? { website: text(identity.website) } : {}),
+    ...(text(identity.publicId) ? { publicId: text(identity.publicId) } : {}),
+    ...(text(identity.connectionDegree) ? { connectionDegree: text(identity.connectionDegree) } : {})
+  };
 }
 
 export async function stopChrome(): Promise<{ ok: true; stopped: boolean; message?: string }> {

@@ -4,6 +4,7 @@ import {
   Check,
   Chrome,
   Clock3,
+  Download,
   ExternalLink,
   Inbox,
   Layers3,
@@ -26,7 +27,12 @@ import {
   X
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { collectVisibleProfiles, resolveProfileIdentities } from "../lib/chromeApi";
+import {
+  collectVisibleProfiles,
+  mergeResolvedProfileData,
+  resolveProfileIdentities,
+  type ResolvedProfileIdentity
+} from "../lib/chromeApi";
 import type { WorkspaceRouteTab } from "../lib/appRoute";
 import { SafetyLimitsPage } from "./SafetyLimitsPage";
 import {
@@ -44,6 +50,7 @@ import {
   stopCampaignRun
 } from "../lib/runnerApi";
 import { renderTemplate } from "../lib/templateEngine";
+import { buildProspectCsv, prospectCsvFilename } from "../lib/prospectCsv";
 import { createWorkflowAction, removeWorkflowAction } from "../lib/workflow";
 import type {
   CampaignRun,
@@ -312,6 +319,63 @@ export function AccountWorkspace({
     const result = await collectVisibleProfiles(sourceUrl);
     onRefreshChrome();
     return result.profiles;
+  }
+
+  function exportProspects() {
+    if (workspace.leads.length === 0) return;
+    const csv = buildProspectCsv({
+      campaignName: workspace.campaign.name,
+      leads: workspace.leads,
+      sources: workspace.sources
+    });
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = prospectCsvFilename(workspace.campaign.name);
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setCampaignNotice({
+      tone: "success",
+      message: `${workspace.leads.length} prospect${workspace.leads.length === 1 ? "" : "s"} exported for CRM upload.`
+    });
+  }
+
+  async function enrichProspects() {
+    if (workspace.leads.length === 0 || hasActiveServerRun) return;
+    setIsCampaignBusy(true);
+    setCampaignNotice(null);
+    try {
+      const chromeReady = chromeStatus?.connected || (await onStartChrome());
+      if (!chromeReady) throw new Error("Managed Chrome must be connected to enrich prospect data.");
+
+      const resolvedProfiles: ResolvedProfileIdentity[] = [];
+      for (let index = 0; index < workspace.leads.length; index += 20) {
+        const batch = workspace.leads.slice(index, index + 20);
+        const result = await resolveProfileIdentities(batch.map((lead) => ({ id: lead.id, url: lead.linkedinUrl })));
+        resolvedProfiles.push(...result.profiles);
+      }
+      const resolvedById = new Map(resolvedProfiles.map((profile) => [profile.id, profile]));
+      const successful = resolvedProfiles.filter((profile) => profile.resolved).length;
+      setWorkspace((current) => ({
+        ...current,
+        leads: current.leads.map((lead) => {
+          const identity = resolvedById.get(lead.id);
+          return identity?.resolved ? mergeResolvedProfileData(lead, identity) : lead;
+        })
+      }));
+      setCampaignNotice({
+        tone: successful === workspace.leads.length ? "success" : "error",
+        message: `${successful} of ${workspace.leads.length} prospect${workspace.leads.length === 1 ? "" : "s"} enriched from LinkedIn.`
+      });
+      onRefreshChrome();
+    } catch (error) {
+      setCampaignNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Prospect data could not be enriched."
+      });
+    } finally {
+      setIsCampaignBusy(false);
+    }
   }
 
   async function requestCampaignStart() {
@@ -835,10 +899,19 @@ export function AccountWorkspace({
                 <p className="section-kicker">Campaign queue</p>
                 <h2>Leads to process</h2>
               </div>
-              <button className="primary-button" onClick={() => setActiveModal("source")} disabled={hasActiveServerRun}>
-                <Plus size={17} />
-                Add leads
-              </button>
+              <div className="lead-list-actions">
+                <button className="ghost-button" onClick={() => void enrichProspects()} disabled={workspace.leads.length === 0 || hasActiveServerRun || isCampaignBusy}>
+                  {isCampaignBusy ? <LoaderCircle className="spin" size={17} /> : <RefreshCw size={17} />}
+                  {isCampaignBusy ? "Enriching" : "Enrich data"}
+                </button>
+                <button className="primary-button" onClick={exportProspects} disabled={workspace.leads.length === 0}>
+                  <Download size={17} />
+                  Export CRM CSV
+                </button>
+                <button className="icon-button" title="Add leads" onClick={() => setActiveModal("source")} disabled={hasActiveServerRun}>
+                  <Plus size={17} />
+                </button>
+              </div>
             </header>
             {workspace.leads.length === 0 ? (
               <div className="empty-profile-list">
@@ -857,6 +930,7 @@ export function AccountWorkspace({
                       <div className="profile-avatar small">in</div>
                       <div>
                         <strong>{lead.displayName}</strong>
+                        {lead.position || lead.company ? <small>{[lead.position, lead.company].filter(Boolean).join(" at ")}</small> : null}
                         <a href={lead.linkedinUrl} target="_blank" rel="noreferrer">
                           {lead.linkedinUrl}<ExternalLink size={12} />
                         </a>

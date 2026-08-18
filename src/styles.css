@@ -2346,6 +2346,12 @@ code {
   padding: 12px 18px;
 }
 
+.lead-list-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .profiles-view h2,
 .browser-view h2 {
   margin: 4px 0 0;
@@ -2389,6 +2395,17 @@ code {
 .lead-identity strong,
 .lead-identity a {
   display: block;
+}
+
+.lead-identity small {
+  display: block;
+  overflow: hidden;
+  max-width: 420px;
+  color: #b5bdcc;
+  margin-top: 3px;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .lead-identity a {
@@ -2863,6 +2880,18 @@ button:disabled {
 
   .basic-workspace-tabs .tab-button {
     font-size: 12px;
+  }
+
+  .lead-list-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr 38px;
+  }
+
+  .lead-list-actions .ghost-button,
+  .lead-list-actions .primary-button {
+    min-width: 0;
+    padding-inline: 9px;
   }
 
   .functional-workflow-canvas {
