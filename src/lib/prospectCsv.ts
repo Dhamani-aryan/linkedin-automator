@@ -12,6 +12,9 @@ const headers = [
   "Company LinkedIn URL",
   "Sales Navigator URL",
   "Location",
+  "City",
+  "State",
+  "Country",
   "Industry",
   "Email",
   "Phone",
@@ -39,6 +42,7 @@ export function buildProspectCsv({ campaignName, leads, sources }: ProspectCsvIn
     [...headers],
     ...leads.map((lead) => {
       const source = sourceById.get(lead.sourceId);
+      const location = splitLinkedInLocation(lead.location);
       return [
         lead.id,
         lead.firstName,
@@ -51,6 +55,9 @@ export function buildProspectCsv({ campaignName, leads, sources }: ProspectCsvIn
         lead.companyLinkedinUrl ?? "",
         lead.salesNavigatorUrl ?? "",
         lead.location,
+        location.city,
+        location.state,
+        location.country,
         lead.industry ?? "",
         lead.email ?? "",
         lead.phone ?? "",
@@ -78,6 +85,18 @@ export function prospectCsvFilename(campaignName: string, date = new Date()) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "") || "campaign";
   return `${safeName}-prospects-${date.toISOString().slice(0, 10)}.csv`;
+}
+
+export function splitLinkedInLocation(value: string) {
+  const parts = value.split(",").map((part) => part.trim()).filter(Boolean);
+  if (parts.length === 0) return { city: "", state: "", country: "" };
+  if (parts.length === 1) return { city: parts[0], state: "", country: "" };
+  if (parts.length === 2) return { city: parts[0], state: "", country: parts[1] };
+  return {
+    city: parts.slice(0, -2).join(", "),
+    state: parts[parts.length - 2] ?? "",
+    country: parts[parts.length - 1] ?? ""
+  };
 }
 
 function fullName(lead: LeadProfile) {

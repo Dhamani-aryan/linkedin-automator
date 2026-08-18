@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { mergeResolvedProfileData } from "./chromeApi";
-import { buildProspectCsv, prospectCsvFilename } from "./prospectCsv";
+import { buildProspectCsv, prospectCsvFilename, splitLinkedInLocation } from "./prospectCsv";
 import type { LeadProfile, LeadSource } from "../types";
 
 const lead: LeadProfile = {
@@ -34,7 +34,9 @@ describe("prospect CSV", () => {
     const csv = buildProspectCsv({ campaignName: "Founder outreach", leads: [lead], sources: [source] });
 
     expect(csv.startsWith("\uFEFFRecord ID,First Name,Last Name")).toBe(true);
+    expect(csv).toContain("Location,City,State,Country,Industry");
     expect(csv).toContain('"Analytical, Engines Ltd."');
+    expect(csv).toContain('"London, United Kingdom",London,,United Kingdom');
     expect(csv).toContain('"Builds ""thinking machines""\nwith careful notes."');
     expect(csv).toContain("https://www.linkedin.com/company/example-engines/");
     expect(csv).toContain(",sample-founder,Founder outreach,accepted,UK founders,sales_navigator,");
@@ -43,6 +45,24 @@ describe("prospect CSV", () => {
   it("creates a stable dated filename", () => {
     expect(prospectCsvFilename("  Founder / UK Outreach  ", new Date("2026-08-18T12:00:00.000Z")))
       .toBe("founder-uk-outreach-prospects-2026-08-18.csv");
+  });
+
+  it("splits LinkedIn locations into CRM address fields", () => {
+    expect(splitLinkedInLocation("Noida, Uttar Pradesh, India")).toEqual({
+      city: "Noida",
+      state: "Uttar Pradesh",
+      country: "India"
+    });
+    expect(splitLinkedInLocation("London, United Kingdom")).toEqual({
+      city: "London",
+      state: "",
+      country: "United Kingdom"
+    });
+    expect(splitLinkedInLocation("Greater Bengaluru Area")).toEqual({
+      city: "Greater Bengaluru Area",
+      state: "",
+      country: ""
+    });
   });
 
   it("keeps resolved job, company, and company LinkedIn data in the CRM export", () => {
