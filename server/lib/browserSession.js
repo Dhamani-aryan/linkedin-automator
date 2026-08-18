@@ -325,6 +325,7 @@ export async function resolveProfileIdentities(profiles) {
         for (let attempt = 0; attempt < 8 && !hasProfileHeading(); attempt += 1) {
           await delay(250);
         }
+        await delay(500);
       }, [], { timeoutMs: 5_000 });
       const identity = await evaluate(session, (requestedUrl) => {
         const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
@@ -384,7 +385,9 @@ export async function resolveProfileIdentities(profiles) {
         const companyFromLine = experienceLines[1]?.replace(/\s*·.*$/, "") ?? "";
         const companyLinkLabel = distinctLines(companyLink?.innerText)[0] ?? "";
         const headlineJob = headline.match(/^(.+?)\s+(?:at|@)\s+([^|•]+)(?:[|•]|$)/i);
-        const topCardCompany = contactInfoIndex >= 0 ? topLines[contactInfoIndex + 1] ?? "" : "";
+        const topCompanyButton = [...(topCard?.querySelectorAll('[role="button"]') ?? [])]
+          .find((button) => [...button.querySelectorAll("svg")].some((icon) => /^company-/i.test(icon.id)));
+        const topCardCompany = normalize(topCompanyButton?.innerText || topCompanyButton?.textContent);
         const company = normalize(companyFromLine) || normalize(companyLinkLabel) || normalize(topCardCompany) || normalize(headlineJob?.[2]);
         const position = experienceLines[0] ?? normalize(headlineJob?.[1]);
         const aboutSection = sectionByHeading("about");
@@ -415,23 +418,39 @@ export async function resolveProfileIdentities(profiles) {
       }, [profile.url]);
 
       if (identity.company && !identity.companyLinkedinUrl) {
-        identity.companyLinkedinUrl = await evaluate(session, async (companyName) => {
+        const companyIdentity = await evaluate(session, async (companyName) => {
           const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
+          const comparableName = (value) => normalize(value)
+            .toLowerCase()
+            .replace(/\b(?:limited|ltd|incorporated|inc|llc|plc|pvt)\b\.?/g, "")
+            .replace(/[^a-z0-9]+/g, "");
+          const requestedCompany = comparableName(companyName);
           const companyLink = () => [...document.querySelectorAll('a[href*="/company/"]')]
-            .find((anchor) => normalize(anchor.innerText || anchor.textContent).toLowerCase() === companyName.toLowerCase());
+            .find((anchor) => comparableName(anchor.innerText || anchor.textContent) === requestedCompany);
           const existingLink = companyLink();
-          if (existingLink?.href) return existingLink.href.replace(/\/$/, "");
+          if (existingLink?.href) {
+            return {
+              name: normalize(existingLink.innerText || existingLink.textContent),
+              url: existingLink.href.replace(/\/$/, "")
+            };
+          }
 
           const titleName = normalize(document.title.replace(/\s*\|\s*LinkedIn\s*$/i, ""));
           const profileHeading = [...document.querySelectorAll("h1, h2")]
             .find((heading) => normalize(heading.innerText || heading.textContent) === titleName);
           const topCard = profileHeading?.closest("section");
           const companyButton = [...(topCard?.querySelectorAll('[role="button"]') ?? [])]
-            .find((button) => normalize(button.innerText || button.textContent).toLowerCase() === companyName.toLowerCase());
+            .find((button) => comparableName(button.innerText || button.textContent) === requestedCompany);
           companyButton?.click();
           if (companyButton) await new Promise((resolve) => setTimeout(resolve, 1_800));
-          return companyLink()?.href?.replace(/\/$/, "") ?? "";
+          const loadedLink = companyLink();
+          return {
+            name: normalize(companyButton?.innerText || companyButton?.textContent) || normalize(loadedLink?.innerText || loadedLink?.textContent),
+            url: loadedLink?.href?.replace(/\/$/, "") ?? ""
+          };
         }, [identity.company], { timeoutMs: 4_000, userGesture: true });
+        identity.company = companyIdentity.name || identity.company;
+        identity.companyLinkedinUrl = companyIdentity.url;
       }
 
       resolved.push({
