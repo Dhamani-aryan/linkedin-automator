@@ -60,6 +60,20 @@ export type ResolvedProfileIdentity = {
   firstName?: string;
   lastName?: string;
   url?: string;
+  personalLinkedInUrl?: string;
+  salesNavigatorUrl?: string;
+  headline?: string;
+  position?: string;
+  company?: string;
+  companyLinkedinUrl?: string;
+  location?: string;
+  industry?: string;
+  about?: string;
+  email?: string;
+  phone?: string;
+  website?: string;
+  publicId?: string;
+  connectionDegree?: string;
   error?: string;
 };
 

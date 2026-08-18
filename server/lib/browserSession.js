@@ -317,27 +317,85 @@ export async function resolveProfileIdentities(profiles) {
     try {
       session = await attach(tab.id);
       await navigate(session, profile.url, { timeoutMs: 25_000 });
-      const identity = await evaluate(session, () => {
+      const identity = await evaluate(session, (requestedUrl) => {
         const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
+        const isVisible = (element) => {
+          if (!element) return false;
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+        };
+        const normalizedLinkedInUrl = (value) => {
+          try {
+            const url = new URL(value, location.href);
+            return `${url.origin}${url.pathname}`.replace(/\/$/, "");
+          } catch {
+            return "";
+          }
+        };
+        const sectionByHeading = (label) => [...document.querySelectorAll("main h2, main h3")]
+          .find((heading) => isVisible(heading) && normalize(heading.textContent).toLowerCase() === label)
+          ?.closest("section");
+        const distinctLines = (value) => {
+          const seen = new Set();
+          return String(value ?? "")
+            .split(/\n+/)
+            .map(normalize)
+            .filter((line) => line && !seen.has(line.toLowerCase()) && seen.add(line.toLowerCase()));
+        };
         const visibleHeadings = [...document.querySelectorAll("main h1, h1")]
-          .filter((element) => {
-            const rect = element.getBoundingClientRect();
-            const style = getComputedStyle(element);
-            return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
-          })
+          .filter(isVisible)
           .map((element) => normalize(element.textContent))
           .filter(Boolean);
         const titleName = normalize(document.title.replace(/\s*\|\s*LinkedIn\s*$/i, ""));
         const displayName = visibleHeadings[0] || titleName;
         const parts = displayName.split(" ").filter(Boolean);
+        const heading = [...document.querySelectorAll("main h1, h1")].find(isVisible);
+        const topCard = heading?.closest("section") ?? heading?.parentElement?.parentElement?.parentElement ?? null;
+        const headline = normalize(
+          topCard?.querySelector('[data-anonymize="headline"], .text-body-medium.break-words, [data-generated-suggestion-target]')
+            ?.textContent
+        );
+        const locationText = normalize(
+          topCard?.querySelector('[data-anonymize="location"], .text-body-small.inline.t-black--light.break-words')
+            ?.textContent
+        );
+        const experienceSection = sectionByHeading("experience");
+        const experienceItem = experienceSection?.querySelector("li") ?? null;
+        const experienceLines = distinctLines(experienceItem?.innerText);
+        const experienceCompanyLink = experienceItem?.querySelector('a[href*="/company/"], a[href*="/sales/company/"]');
+        const topCompanyLink = topCard?.querySelector('a[href*="/company/"], a[href*="/sales/company/"]');
+        const companyLink = experienceCompanyLink ?? topCompanyLink;
+        const companyFromLine = experienceLines[1]?.replace(/\s*·.*$/, "") ?? "";
+        const company = normalize(companyLink?.textContent) || normalize(companyFromLine);
+        const position = experienceLines[0] ?? "";
+        const aboutSection = sectionByHeading("about");
+        const aboutLines = distinctLines(aboutSection?.innerText)
+          .filter((line) => line.toLowerCase() !== "about" && line.toLowerCase() !== "see more");
+        const topLines = distinctLines(topCard?.innerText);
+        const connectionDegree = topLines.find((line) => /^(?:·\s*)?(?:1st|2nd|3rd)(?: degree connection)?$/i.test(line))
+          ?.replace(/^·\s*/, "") ?? "";
+        const personalLinkedInUrl = normalizedLinkedInUrl(location.href);
+        const publicId = personalLinkedInUrl.match(/\/in\/([^/]+)/i)?.[1] ?? "";
+        const requestedIsSales = /linkedin\.com\/sales\/lead\//i.test(requestedUrl);
         return {
           pageKind: /linkedin\.com\/(in|sales\/lead)\//i.test(location.href) ? "profile" : "unknown",
           displayName,
           firstName: parts[0] ?? "",
           lastName: parts.slice(1).join(" "),
-          url: location.href
+          url: personalLinkedInUrl,
+          personalLinkedInUrl,
+          salesNavigatorUrl: requestedIsSales ? normalizedLinkedInUrl(requestedUrl) : "",
+          headline,
+          position,
+          company,
+          companyLinkedinUrl: normalizedLinkedInUrl(companyLink?.href),
+          location: locationText,
+          about: aboutLines.join("\n"),
+          publicId: decodeURIComponent(publicId),
+          connectionDegree
         };
-      }, []);
+      }, [profile.url]);
 
       resolved.push({
         id: profile.id,
