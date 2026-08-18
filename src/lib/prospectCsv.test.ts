@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { mergeResolvedProfileData } from "./chromeApi";
 import { buildProspectCsv, prospectCsvFilename } from "./prospectCsv";
 import type { LeadProfile, LeadSource } from "../types";
 
@@ -42,5 +43,33 @@ describe("prospect CSV", () => {
   it("creates a stable dated filename", () => {
     expect(prospectCsvFilename("  Founder / UK Outreach  ", new Date("2026-08-18T12:00:00.000Z")))
       .toBe("founder-uk-outreach-prospects-2026-08-18.csv");
+  });
+
+  it("keeps resolved job, company, and company LinkedIn data in the CRM export", () => {
+    const enrichedLead = mergeResolvedProfileData({
+      ...lead,
+      displayName: "Taylor Example",
+      firstName: "Taylor",
+      lastName: "Shrimal",
+      linkedinUrl: "https://www.linkedin.com/in/sample-enriched-profile/",
+      company: "",
+      position: ""
+    }, {
+      id: lead.id,
+      requestedUrl: "https://www.linkedin.com/in/sample-enriched-profile/",
+      resolved: true,
+      displayName: "Taylor Example",
+      firstName: "Taylor",
+      lastName: "Shrimal",
+      headline: "SWE @ Example Systems Ltd. | Python Developer",
+      position: "SWE",
+      company: "Example Systems",
+      companyLinkedinUrl: "https://www.linkedin.com/company/example-systems"
+    });
+
+    const csv = buildProspectCsv({ campaignName: "First outreach campaign", leads: [enrichedLead], sources: [source] });
+
+    expect(csv).toContain("Taylor,Shrimal,Taylor Example,SWE,SWE @ Example Systems Ltd. | Python Developer,Example Systems");
+    expect(csv).toContain("https://www.linkedin.com/company/example-systems");
   });
 });

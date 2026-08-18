@@ -317,6 +317,15 @@ export async function resolveProfileIdentities(profiles) {
     try {
       session = await attach(tab.id);
       await navigate(session, profile.url, { timeoutMs: 25_000 });
+      await evaluate(session, async () => {
+        const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+        const titleName = document.title.replace(/\s*\|\s*LinkedIn\s*$/i, "").trim();
+        const hasProfileHeading = () => [...document.querySelectorAll("h1, h2")]
+          .some((heading) => (heading.innerText || heading.textContent || "").replace(/\s+/g, " ").trim() === titleName);
+        for (let attempt = 0; attempt < 8 && !hasProfileHeading(); attempt += 1) {
+          await delay(250);
+        }
+      }, [], { timeoutMs: 5_000 });
       const identity = await evaluate(session, (requestedUrl) => {
         const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
         const isVisible = (element) => {
@@ -326,6 +335,7 @@ export async function resolveProfileIdentities(profiles) {
           return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
         };
         const normalizedLinkedInUrl = (value) => {
+          if (!value) return "";
           try {
             const url = new URL(value, location.href);
             return `${url.origin}${url.pathname}`.replace(/\/$/, "");
@@ -334,7 +344,7 @@ export async function resolveProfileIdentities(profiles) {
           }
         };
         const sectionByHeading = (label) => [...document.querySelectorAll("main h2, main h3")]
-          .find((heading) => isVisible(heading) && normalize(heading.textContent).toLowerCase() === label)
+          .find((heading) => isVisible(heading) && normalize(heading.innerText || heading.textContent).toLowerCase().startsWith(label))
           ?.closest("section");
         const distinctLines = (value) => {
           const seen = new Set();
@@ -343,36 +353,43 @@ export async function resolveProfileIdentities(profiles) {
             .map(normalize)
             .filter((line) => line && !seen.has(line.toLowerCase()) && seen.add(line.toLowerCase()));
         };
-        const visibleHeadings = [...document.querySelectorAll("main h1, h1")]
-          .filter(isVisible)
-          .map((element) => normalize(element.textContent))
-          .filter(Boolean);
         const titleName = normalize(document.title.replace(/\s*\|\s*LinkedIn\s*$/i, ""));
-        const displayName = visibleHeadings[0] || titleName;
+        const headingCandidates = [...document.querySelectorAll("main h1, main h2, h1, h2")].filter(isVisible);
+        const heading = headingCandidates.find((element) => normalize(element.innerText || element.textContent) === titleName)
+          ?? headingCandidates.find((element) => normalize(element.innerText || element.textContent).toLowerCase() === titleName.toLowerCase());
+        const displayName = normalize(heading?.innerText || heading?.textContent) || titleName;
         const parts = displayName.split(" ").filter(Boolean);
-        const heading = [...document.querySelectorAll("main h1, h1")].find(isVisible);
         const topCard = heading?.closest("section") ?? heading?.parentElement?.parentElement?.parentElement ?? null;
+        const topLines = distinctLines(topCard?.innerText);
+        const contactInfoIndex = topLines.findIndex((line) => line.toLowerCase() === "contact info");
+        const identityLines = topLines.slice(1, contactInfoIndex >= 0 ? contactInfoIndex : Math.min(topLines.length, 7))
+          .filter((line) => line !== "·" && !/^(?:·\s*)?(?:1st|2nd|3rd)(?: degree connection)?$/i.test(line));
+        const fallbackLocation = identityLines.length >= 2 ? identityLines.at(-1) ?? "" : "";
+        const fallbackHeadline = identityLines.length >= 2 ? identityLines.at(-2) ?? "" : identityLines[0] ?? "";
         const headline = normalize(
           topCard?.querySelector('[data-anonymize="headline"], .text-body-medium.break-words, [data-generated-suggestion-target]')
             ?.textContent
-        );
+        ) || normalize(fallbackHeadline);
         const locationText = normalize(
           topCard?.querySelector('[data-anonymize="location"], .text-body-small.inline.t-black--light.break-words')
             ?.textContent
-        );
+        ) || normalize(fallbackLocation);
         const experienceSection = sectionByHeading("experience");
         const experienceItem = experienceSection?.querySelector("li") ?? null;
-        const experienceLines = distinctLines(experienceItem?.innerText);
+        const experienceLines = distinctLines(experienceItem?.innerText)
+          .filter((line) => !/\s+logo$/i.test(line));
         const experienceCompanyLink = experienceItem?.querySelector('a[href*="/company/"], a[href*="/sales/company/"]');
         const topCompanyLink = topCard?.querySelector('a[href*="/company/"], a[href*="/sales/company/"]');
         const companyLink = experienceCompanyLink ?? topCompanyLink;
         const companyFromLine = experienceLines[1]?.replace(/\s*·.*$/, "") ?? "";
-        const company = normalize(companyLink?.textContent) || normalize(companyFromLine);
-        const position = experienceLines[0] ?? "";
+        const companyLinkLabel = distinctLines(companyLink?.innerText)[0] ?? "";
+        const headlineJob = headline.match(/^(.+?)\s+(?:at|@)\s+([^|•]+)(?:[|•]|$)/i);
+        const topCardCompany = contactInfoIndex >= 0 ? topLines[contactInfoIndex + 1] ?? "" : "";
+        const company = normalize(companyFromLine) || normalize(companyLinkLabel) || normalize(topCardCompany) || normalize(headlineJob?.[2]);
+        const position = experienceLines[0] ?? normalize(headlineJob?.[1]);
         const aboutSection = sectionByHeading("about");
         const aboutLines = distinctLines(aboutSection?.innerText)
           .filter((line) => line.toLowerCase() !== "about" && line.toLowerCase() !== "see more");
-        const topLines = distinctLines(topCard?.innerText);
         const connectionDegree = topLines.find((line) => /^(?:·\s*)?(?:1st|2nd|3rd)(?: degree connection)?$/i.test(line))
           ?.replace(/^·\s*/, "") ?? "";
         const personalLinkedInUrl = normalizedLinkedInUrl(location.href);
@@ -396,6 +413,26 @@ export async function resolveProfileIdentities(profiles) {
           connectionDegree
         };
       }, [profile.url]);
+
+      if (identity.company && !identity.companyLinkedinUrl) {
+        identity.companyLinkedinUrl = await evaluate(session, async (companyName) => {
+          const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
+          const companyLink = () => [...document.querySelectorAll('a[href*="/company/"]')]
+            .find((anchor) => normalize(anchor.innerText || anchor.textContent).toLowerCase() === companyName.toLowerCase());
+          const existingLink = companyLink();
+          if (existingLink?.href) return existingLink.href.replace(/\/$/, "");
+
+          const titleName = normalize(document.title.replace(/\s*\|\s*LinkedIn\s*$/i, ""));
+          const profileHeading = [...document.querySelectorAll("h1, h2")]
+            .find((heading) => normalize(heading.innerText || heading.textContent) === titleName);
+          const topCard = profileHeading?.closest("section");
+          const companyButton = [...(topCard?.querySelectorAll('[role="button"]') ?? [])]
+            .find((button) => normalize(button.innerText || button.textContent).toLowerCase() === companyName.toLowerCase());
+          companyButton?.click();
+          if (companyButton) await new Promise((resolve) => setTimeout(resolve, 1_800));
+          return companyLink()?.href?.replace(/\/$/, "") ?? "";
+        }, [identity.company], { timeoutMs: 4_000, userGesture: true });
+      }
 
       resolved.push({
         id: profile.id,

@@ -58,6 +58,7 @@ import type {
   CampaignWorkspaceState,
   ChromeStatus,
   HumanTouchSettings,
+  LeadProfile,
   LeadSource,
   LinkedInAccount,
   WorkflowDelay,
@@ -108,6 +109,7 @@ export function AccountWorkspace({
   const [startMode, setStartMode] = useState<"dry_run" | "live">("dry_run");
   const [liveSendConfirmed, setLiveSendConfirmed] = useState(false);
   const [isCampaignBusy, setIsCampaignBusy] = useState(false);
+  const [prospectOperation, setProspectOperation] = useState<"enrich" | "export" | null>(null);
   const [activeRun, setActiveRun] = useState<CampaignRun | null>(null);
   const [isStartPending, setIsStartPending] = useState(false);
   const [campaignNotice, setCampaignNotice] = useState<{
@@ -321,11 +323,10 @@ export function AccountWorkspace({
     return result.profiles;
   }
 
-  function exportProspects() {
-    if (workspace.leads.length === 0) return;
+  function downloadProspects(leads: LeadProfile[]) {
     const csv = buildProspectCsv({
       campaignName: workspace.campaign.name,
-      leads: workspace.leads,
+      leads,
       sources: workspace.sources
     });
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
@@ -334,38 +335,68 @@ export function AccountWorkspace({
     anchor.download = prospectCsvFilename(workspace.campaign.name);
     anchor.click();
     URL.revokeObjectURL(url);
-    setCampaignNotice({
-      tone: "success",
-      message: `${workspace.leads.length} prospect${workspace.leads.length === 1 ? "" : "s"} exported for CRM upload.`
-    });
+  }
+
+  async function resolveProspectData(leads: LeadProfile[]) {
+    const chromeReady = chromeStatus?.connected || (await onStartChrome());
+    if (!chromeReady) throw new Error("Managed Chrome must be connected to read prospect data from LinkedIn.");
+
+    const resolvedProfiles: ResolvedProfileIdentity[] = [];
+    for (let index = 0; index < leads.length; index += 20) {
+      const batch = leads.slice(index, index + 20);
+      const result = await resolveProfileIdentities(batch.map((lead) => ({ id: lead.id, url: lead.linkedinUrl })));
+      resolvedProfiles.push(...result.profiles);
+    }
+    const resolvedById = new Map(resolvedProfiles.map((profile) => [profile.id, profile]));
+    return {
+      leads: leads.map((lead) => {
+        const identity = resolvedById.get(lead.id);
+        return identity?.resolved ? mergeResolvedProfileData(lead, identity) : lead;
+      }),
+      successful: resolvedProfiles.filter((profile) => profile.resolved).length
+    };
+  }
+
+  async function exportProspects() {
+    if (workspace.leads.length === 0 || hasActiveServerRun || isCampaignBusy) return;
+    setIsCampaignBusy(true);
+    setProspectOperation("export");
+    setCampaignNotice(null);
+    try {
+      const result = await resolveProspectData(workspace.leads);
+      setWorkspace((current) => ({
+        ...current,
+        leads: result.leads
+      }));
+      downloadProspects(result.leads);
+      const companyCount = result.leads.filter((lead) => lead.company?.trim()).length;
+      setCampaignNotice({
+        tone: result.successful === workspace.leads.length ? "success" : "error",
+        message: `${result.leads.length} prospect${result.leads.length === 1 ? "" : "s"} exported after refreshing ${result.successful} LinkedIn profile${result.successful === 1 ? "" : "s"}. Company data was found for ${companyCount}.`
+      });
+      onRefreshChrome();
+    } catch (error) {
+      setCampaignNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : "The CRM export could not be prepared."
+      });
+    } finally {
+      setProspectOperation(null);
+      setIsCampaignBusy(false);
+    }
   }
 
   async function enrichProspects() {
-    if (workspace.leads.length === 0 || hasActiveServerRun) return;
+    if (workspace.leads.length === 0 || hasActiveServerRun || isCampaignBusy) return;
     setIsCampaignBusy(true);
+    setProspectOperation("enrich");
     setCampaignNotice(null);
     try {
-      const chromeReady = chromeStatus?.connected || (await onStartChrome());
-      if (!chromeReady) throw new Error("Managed Chrome must be connected to enrich prospect data.");
-
-      const resolvedProfiles: ResolvedProfileIdentity[] = [];
-      for (let index = 0; index < workspace.leads.length; index += 20) {
-        const batch = workspace.leads.slice(index, index + 20);
-        const result = await resolveProfileIdentities(batch.map((lead) => ({ id: lead.id, url: lead.linkedinUrl })));
-        resolvedProfiles.push(...result.profiles);
-      }
-      const resolvedById = new Map(resolvedProfiles.map((profile) => [profile.id, profile]));
-      const successful = resolvedProfiles.filter((profile) => profile.resolved).length;
-      setWorkspace((current) => ({
-        ...current,
-        leads: current.leads.map((lead) => {
-          const identity = resolvedById.get(lead.id);
-          return identity?.resolved ? mergeResolvedProfileData(lead, identity) : lead;
-        })
-      }));
+      const result = await resolveProspectData(workspace.leads);
+      setWorkspace((current) => ({ ...current, leads: result.leads }));
       setCampaignNotice({
-        tone: successful === workspace.leads.length ? "success" : "error",
-        message: `${successful} of ${workspace.leads.length} prospect${workspace.leads.length === 1 ? "" : "s"} enriched from LinkedIn.`
+        tone: result.successful === workspace.leads.length ? "success" : "error",
+        message: `${result.successful} of ${workspace.leads.length} prospect${workspace.leads.length === 1 ? "" : "s"} enriched from LinkedIn.`
       });
       onRefreshChrome();
     } catch (error) {
@@ -374,6 +405,7 @@ export function AccountWorkspace({
         message: error instanceof Error ? error.message : "Prospect data could not be enriched."
       });
     } finally {
+      setProspectOperation(null);
       setIsCampaignBusy(false);
     }
   }
@@ -416,14 +448,7 @@ export function AccountWorkspace({
         ...current,
         leads: current.leads.map((lead) => {
           const identity = identities.get(lead.id);
-          return identity?.displayName && identity.firstName !== undefined && identity.lastName !== undefined
-            ? {
-                ...lead,
-                displayName: identity.displayName,
-                firstName: identity.firstName,
-                lastName: identity.lastName
-              }
-            : lead;
+          return identity?.resolved ? mergeResolvedProfileData(lead, identity) : lead;
         })
       }));
       setLiveSendConfirmed(false);
@@ -901,12 +926,12 @@ export function AccountWorkspace({
               </div>
               <div className="lead-list-actions">
                 <button className="ghost-button" onClick={() => void enrichProspects()} disabled={workspace.leads.length === 0 || hasActiveServerRun || isCampaignBusy}>
-                  {isCampaignBusy ? <LoaderCircle className="spin" size={17} /> : <RefreshCw size={17} />}
-                  {isCampaignBusy ? "Enriching" : "Enrich data"}
+                  {prospectOperation === "enrich" ? <LoaderCircle className="spin" size={17} /> : <RefreshCw size={17} />}
+                  {prospectOperation === "enrich" ? "Enriching" : "Enrich data"}
                 </button>
-                <button className="primary-button" onClick={exportProspects} disabled={workspace.leads.length === 0}>
-                  <Download size={17} />
-                  Export CRM CSV
+                <button className="primary-button" onClick={() => void exportProspects()} disabled={workspace.leads.length === 0 || hasActiveServerRun || isCampaignBusy}>
+                  {prospectOperation === "export" ? <LoaderCircle className="spin" size={17} /> : <Download size={17} />}
+                  {prospectOperation === "export" ? "Preparing CSV" : "Export CRM CSV"}
                 </button>
                 <button className="icon-button" title="Add leads" onClick={() => setActiveModal("source")} disabled={hasActiveServerRun}>
                   <Plus size={17} />
