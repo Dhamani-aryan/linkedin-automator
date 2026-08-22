@@ -23,6 +23,8 @@ interface ReplyNotification {
   leadName: string;
   replyText: string | null;
   occurredAt: string | null;
+  externalMessageId: string | null;
+  baselineSentAt: string | null;
 }
 
 export function ReplyNotificationButton({
@@ -193,7 +195,7 @@ function buildReplyNotifications(runs: CampaignRun[]): ReplyNotification[] {
     }
   }
 
-  return Array.from(campaigns.entries())
+  const candidates = Array.from(campaigns.entries())
     .flatMap(([campaignId, campaignName]) =>
       campaignOutcomeRecords(campaignId, runs).replied.map((record) => ({
         campaignId,
@@ -204,9 +206,25 @@ function buildReplyNotifications(runs: CampaignRun[]): ReplyNotification[] {
           [record.lead.firstName, record.lead.lastName].filter(Boolean).join(" ") ||
           "LinkedIn profile",
         replyText: record.replyText,
-        occurredAt: record.occurredAt
+        occurredAt: record.occurredAt,
+        externalMessageId: record.externalMessageId,
+        baselineSentAt: record.baselineSentAt
       }))
-    )
+    );
+  const uniqueNotifications = new Map<string, ReplyNotification>();
+  for (const notification of candidates) {
+    const key = notification.externalMessageId ??
+      `${notification.campaignId}:${notification.leadUrl}:${notification.occurredAt ?? "unknown"}`;
+    const existing = uniqueNotifications.get(key);
+    if (
+      !existing ||
+      notificationTime(notification.baselineSentAt) > notificationTime(existing.baselineSentAt)
+    ) {
+      uniqueNotifications.set(key, notification);
+    }
+  }
+
+  return Array.from(uniqueNotifications.values())
     .sort((left, right) => notificationTime(right.occurredAt) - notificationTime(left.occurredAt));
 }
 

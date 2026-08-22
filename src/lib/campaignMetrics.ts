@@ -7,6 +7,8 @@ export type CampaignOutcomeRecord = {
   occurredAt: string | null;
   replyText: string | null;
   detail: string | null;
+  externalMessageId: string | null;
+  baselineSentAt: string | null;
 };
 
 export type CampaignOutcomeRecords = Record<CampaignOutcomeKey, CampaignOutcomeRecord[]>;
@@ -121,11 +123,15 @@ function upsertRecord(
   if (current?.occurredAt && Date.parse(current.occurredAt) > Date.parse(occurredAt)) return;
   const replyText = attempt?.detail?.replyText;
   const reason = attempt?.detail?.reason;
+  const externalMessageId = attempt?.detail?.externalMessageId;
+  const baselineSentAt = attempt?.detail?.baselineSentAt;
   records.set(key, {
     lead: leadRun.lead,
     occurredAt,
     replyText: typeof replyText === "string" ? replyText : null,
-    detail: typeof reason === "string" ? reason : attempt?.errorCode ?? null
+    detail: typeof reason === "string" ? reason : attempt?.errorCode ?? null,
+    externalMessageId: typeof externalMessageId === "string" ? externalMessageId : null,
+    baselineSentAt: typeof baselineSentAt === "string" ? baselineSentAt : null
   });
 }
 
