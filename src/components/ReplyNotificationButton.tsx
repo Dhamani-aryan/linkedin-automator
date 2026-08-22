@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
-import { Bell, MessageSquareReply } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Bell, LoaderCircle, MessageSquareReply, RefreshCw } from "lucide-react";
 import { campaignOutcomeRecords } from "../lib/campaignMetrics";
+import { checkCampaignReplies } from "../lib/runnerApi";
 import {
   loadReplyNotificationsSeenAt,
   saveReplyNotificationsSeenAt
@@ -10,7 +11,9 @@ import type { CampaignRun } from "../types";
 interface ReplyNotificationButtonProps {
   profileId: string;
   runs: CampaignRun[];
+  chromeConnected: boolean;
   onOpenCampaign: (campaignId: string) => void;
+  onRepliesChecked: () => Promise<void>;
 }
 
 interface ReplyNotification {
@@ -25,9 +28,15 @@ interface ReplyNotification {
 export function ReplyNotificationButton({
   profileId,
   runs,
-  onOpenCampaign
+  chromeConnected,
+  onOpenCampaign,
+  onRepliesChecked
 }: ReplyNotificationButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
+  const [checkError, setCheckError] = useState<string | null>(null);
+  const isCheckingRef = useRef(false);
+  const onRepliesCheckedRef = useRef(onRepliesChecked);
   const [seenAt, setSeenAt] = useState<string | null>(() =>
     loadReplyNotificationsSeenAt(profileId)
   );
@@ -44,6 +53,36 @@ export function ReplyNotificationButton({
     setIsOpen(false);
     setSeenAt(loadReplyNotificationsSeenAt(profileId));
   }, [profileId]);
+
+  useEffect(() => {
+    onRepliesCheckedRef.current = onRepliesChecked;
+  }, [onRepliesChecked]);
+
+  useEffect(() => {
+    if (!chromeConnected) return;
+    const initialCheck = window.setTimeout(() => void runReplyCheck(false), 1500);
+    const interval = window.setInterval(() => void runReplyCheck(false), 120_000);
+    return () => {
+      window.clearTimeout(initialCheck);
+      window.clearInterval(interval);
+    };
+  }, [chromeConnected, profileId]);
+
+  async function runReplyCheck(force: boolean) {
+    if (isCheckingRef.current) return;
+    isCheckingRef.current = true;
+    setIsChecking(true);
+    setCheckError(null);
+    try {
+      await checkCampaignReplies(profileId, force);
+      await onRepliesCheckedRef.current();
+    } catch (error) {
+      setCheckError(error instanceof Error ? error.message : "Replies could not be checked.");
+    } finally {
+      isCheckingRef.current = false;
+      setIsChecking(false);
+    }
+  }
 
   function toggleNotifications() {
     setIsOpen((current) => {
@@ -90,7 +129,23 @@ export function ReplyNotificationButton({
                   : `${notifications.length} total`}
               </span>
             </div>
+            <button
+              type="button"
+              className="icon-button reply-notification-refresh"
+              aria-label="Check replies now"
+              title={chromeConnected ? "Check replies now" : "Start Chrome to check replies"}
+              disabled={!chromeConnected || isChecking}
+              onClick={() => void runReplyCheck(true)}
+            >
+              {isChecking ? <LoaderCircle className="spin" size={15} /> : <RefreshCw size={15} />}
+            </button>
           </header>
+
+          {checkError ? (
+            <div className="reply-notification-error" role="alert">
+              {checkError}
+            </div>
+          ) : null}
 
           {notifications.length === 0 ? (
             <div className="reply-notification-empty">

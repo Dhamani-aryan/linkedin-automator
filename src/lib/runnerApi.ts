@@ -75,6 +75,26 @@ export async function listCampaignRuns(profileId: string): Promise<CampaignRun[]
   return result.runs;
 }
 
+export type CampaignReplyCheckResult = {
+  ok: true;
+  checked: number;
+  replied: number;
+  needsReview: number;
+  busy?: boolean;
+  throttled?: boolean;
+};
+
+export async function checkCampaignReplies(
+  profileId: string,
+  force = false
+): Promise<CampaignReplyCheckResult> {
+  return request<CampaignReplyCheckResult>("/api/campaign-replies/check", {
+    method: "POST",
+    headers: defaultHeaders,
+    body: JSON.stringify({ profileId, force })
+  });
+}
+
 export async function getCampaignAnalytics(filters: {
   profileId: string;
   campaignId?: string;

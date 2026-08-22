@@ -797,7 +797,11 @@ export function AccountWorkspace({
             <ReplyNotificationButton
               profileId={account.id}
               runs={campaignRuns}
+              chromeConnected={chromeStatus?.connected === true}
               onOpenCampaign={(targetCampaignId) => onOpenCampaign(targetCampaignId, "replied")}
+              onRepliesChecked={async () => {
+                setCampaignRuns(await listCampaignRuns(account.id));
+              }}
             />
             <button className="ghost-button" onClick={onStartChrome} disabled={isBusy}>
               {isBusy ? <LoaderCircle className="spin" size={18} /> : <Play size={18} />}

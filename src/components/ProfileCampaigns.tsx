@@ -368,7 +368,9 @@ export function ProfileCampaigns({
             <ReplyNotificationButton
               profileId={account.id}
               runs={runs}
+              chromeConnected={chromeStatus?.connected === true}
               onOpenCampaign={(campaignId) => onOpenCampaign(campaignId, "replied")}
+              onRepliesChecked={refreshRuns}
             />
             {activeSection === "campaigns" ? (
               <button className="primary-button" onClick={() => setIsCreateOpen(true)}>

@@ -3121,6 +3121,10 @@ button:disabled {
   position: sticky;
   top: 0;
   z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 14px 16px;
   border-bottom: 1px solid #474c59;
   background: #2b2f39;
@@ -3129,8 +3133,29 @@ button:disabled {
 .reply-notification-panel > header div {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
   gap: 16px;
+}
+
+.reply-notification-refresh {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  color: #c8cede;
+  background: #3a3f4b;
+}
+
+.reply-notification-refresh:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.reply-notification-error {
+  border-bottom: 1px solid #70474d;
+  padding: 9px 16px;
+  color: #ffb4b8;
+  background: #432f35;
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .reply-notification-panel > header strong {
