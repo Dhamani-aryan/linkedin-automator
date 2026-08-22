@@ -11,6 +11,7 @@ import {
 import { getCampaignAnalytics } from "./lib/analytics.js";
 import { AppError, ErrorCodes, toErrorResponse } from "./lib/errors.js";
 import {
+  checkCampaignReplies,
   getActiveCampaignRun,
   getCampaignRun,
   initializeRunner,
@@ -134,6 +135,12 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "GET" && requestUrl.pathname === "/api/campaign-runs") {
       sendJson(response, 200, await listCampaignRuns(requestUrl.searchParams.get("profileId") ?? ""));
+      return;
+    }
+
+    if (request.method === "POST" && requestUrl.pathname === "/api/campaign-replies/check") {
+      const body = await readJsonBody(request);
+      sendJson(response, 200, await checkCampaignReplies(body.profileId, { force: body.force === true }));
       return;
     }
 

@@ -42,6 +42,8 @@ const acceptanceRecheckMs = 60 * 60_000;
 let activeRunId = null;
 let controlWake = null;
 let authCache = null;
+let replyCheckPromise = null;
+const lastReplyCheckAt = new Map();
 
 export async function initializeRunner() {
   const recovered = await recoverInterruptedRuns();
@@ -190,6 +192,116 @@ export async function listCampaignRuns(profileId) {
     .filter((run) => !profileId || run.profileId === profileId)
     .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
   return { ok: true, runs: runs.map(decorateRun) };
+}
+
+export async function checkCampaignReplies(profileId, { force = false } = {}) {
+  if (!profileId) {
+    throw new AppError("MISSING_PROFILE", "A LinkedIn profile is required to check replies.");
+  }
+  if (replyCheckPromise) return await replyCheckPromise;
+
+  const lastCheckedAt = lastReplyCheckAt.get(profileId) ?? 0;
+  if (!force && Date.now() - lastCheckedAt < 60_000) {
+    return { ok: true, checked: 0, replied: 0, needsReview: 0, throttled: true };
+  }
+
+  replyCheckPromise = runReplyCheck(profileId)
+    .finally(() => {
+      lastReplyCheckAt.set(profileId, Date.now());
+      replyCheckPromise = null;
+    });
+  return await replyCheckPromise;
+}
+
+async function runReplyCheck(profileId) {
+  if (activeRunId !== null) {
+    const activeRun = await loadRun(activeRunId);
+    if ([runStates.RUNNING, runStates.SLEEPING, runStates.STOPPING].includes(activeRun.state)) {
+      return { ok: true, checked: 0, replied: 0, needsReview: 0, busy: true };
+    }
+  }
+
+  const latestByCampaign = new Map();
+  const profileRuns = (await listRuns())
+    .filter((run) =>
+      run.profileId === profileId &&
+      run.mode === "live" &&
+      run.snapshot?.safety?.autoReplyCheck !== false
+    )
+    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
+  for (const run of profileRuns) {
+    const campaignId = run.snapshot.campaign.id;
+    if (!latestByCampaign.has(campaignId)) latestByCampaign.set(campaignId, run);
+  }
+
+  await launch("https://www.linkedin.com/feed/");
+  let checked = 0;
+  let replied = 0;
+  let needsReview = 0;
+
+  for (const run of latestByCampaign.values()) {
+    let runChanged = false;
+    for (const [leadIndex, lead] of run.leads.entries()) {
+      if (lead.state === leadStates.REPLIED) continue;
+      const replyBaseline = findReplyBaseline(lead);
+      if (!replyBaseline) continue;
+
+      const tab = await openTab("about:blank");
+      const session = await attach(tab.id);
+      try {
+        const action = run.snapshot.actions[lead.actionCursor] ?? {
+          id: `${replyBaseline.actionId}-reply-monitor`,
+          type: "message",
+          template: ""
+        };
+        const result = await executeMessage({
+          session,
+          lead: lead.lead,
+          action,
+          mode: "live",
+          replyBaseline,
+          replyCheckOnly: true
+        });
+        checked += 1;
+        if (result.event === "reply_received") {
+          const now = new Date().toISOString();
+          run.leads[leadIndex] = transition(lead, {
+            type: "REPLY_OBSERVED",
+            actionId: `${replyBaseline.actionId}-reply-monitor`,
+            outcome: result.outcome,
+            detail: result.detail,
+            conversationSeenAt: result.detail?.observedAt,
+            now
+          }, run.snapshot.actions);
+          run.updatedAt = now;
+          runChanged = true;
+          replied += 1;
+          await appendAudit(run.id, {
+            event: "reply_received",
+            leadId: lead.id,
+            actionId: `${replyBaseline.actionId}-reply-monitor`,
+            outcome: "replied",
+            detail: result.detail
+          });
+        } else if (result.errorCode) {
+          needsReview += 1;
+        }
+      } finally {
+        session.close();
+        await closeTab(tab.id).catch(() => false);
+      }
+    }
+
+    if (runChanged) {
+      if (run.leads.every((lead) => [leadStates.REPLIED, leadStates.COMPLETED].includes(lead.state))) {
+        run.state = runStates.COMPLETED;
+        if (activeRunId === run.id) activeRunId = null;
+      }
+      await saveRun(run);
+    }
+  }
+
+  return { ok: true, checked, replied, needsReview };
 }
 
 export async function stopCampaignRun(runId) {

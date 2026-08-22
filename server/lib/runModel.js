@@ -330,6 +330,23 @@ export function transition(leadRun, event, actions = []) {
       lead.nextEligibleAt = null;
       return touch(lead, now);
 
+    case "REPLY_OBSERVED":
+      if (lead.state === leadStates.REPLIED) return touch(lead, now);
+      lead.attempts.push({
+        actionId: event.actionId,
+        attempt: countAttemptsForAction(lead, event.actionId) + 1,
+        startedAt: now,
+        completedAt: now,
+        outcome: event.outcome ?? "replied",
+        errorCode: null,
+        detail: event.detail ?? null
+      });
+      lead.state = leadStates.REPLIED;
+      lead.conversationSeenAt = event.conversationSeenAt ?? now;
+      lead.lastErrorCode = null;
+      lead.nextEligibleAt = null;
+      return touch(lead, now);
+
     case "RETRY":
       assertState(lead, [leadStates.NEEDS_REVIEW]);
       lead.state = leadStates.QUEUED;

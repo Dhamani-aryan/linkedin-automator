@@ -11,6 +11,7 @@ export async function executeMessage({
   action,
   mode,
   replyBaseline = null,
+  replyCheckOnly = false,
   reuseCurrentPage = false,
   shouldStop = async () => false,
   shouldPause = async () => false
@@ -104,6 +105,20 @@ export async function executeMessage({
             recipientName: profileIdentity.displayName,
             baselineSentAt: replyBaseline.sentAt,
             messageCount: messages.length
+          }
+        };
+      }
+      if (replyCheckOnly) {
+        return {
+          outcome: "no_reply",
+          event: "reply_not_found",
+          detail: {
+            actionType: "reply_check",
+            source: "profile_conversation_check",
+            recipientName: profileIdentity.displayName,
+            baselineSentAt: replyBaseline.sentAt,
+            messageCount: messages.length,
+            observedAt: new Date().toISOString()
           }
         };
       }

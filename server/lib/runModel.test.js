@@ -365,6 +365,49 @@ describe("transition", () => {
     });
     expect(retriedLead.attempts).toHaveLength(1);
   });
+
+  it("records a reply observed after a lead entered review", () => {
+    const messageActions = [actions[2]];
+    const run = createCampaignRun({
+      runId: "run-monitored-reply",
+      snapshot: {
+        profileId: "profile-1",
+        campaign: { id: "campaign-1" },
+        actions: messageActions,
+        leads: [lead],
+        safety
+      },
+      mode: "live"
+    });
+    const runningLead = transition(run.leads[0], {
+      type: "ACTION_STARTED",
+      actionId: messageActions[0].id,
+      now: "2026-08-09T10:00:01.000Z"
+    }, messageActions);
+    const reviewedLead = transition(runningLead, {
+      type: "NEEDS_REVIEW",
+      errorCode: "AMBIGUOUS_OUTCOME",
+      now: "2026-08-09T10:00:02.000Z"
+    }, messageActions);
+    const repliedLead = transition(reviewedLead, {
+      type: "REPLY_OBSERVED",
+      actionId: `${messageActions[0].id}-reply-monitor`,
+      detail: { replyText: "Yes" },
+      conversationSeenAt: "2026-08-09T10:05:00.000Z",
+      now: "2026-08-09T10:05:00.000Z"
+    }, messageActions);
+
+    expect(repliedLead).toMatchObject({
+      state: leadStates.REPLIED,
+      lastErrorCode: null,
+      nextEligibleAt: null,
+      conversationSeenAt: "2026-08-09T10:05:00.000Z"
+    });
+    expect(repliedLead.attempts.at(-1)).toMatchObject({
+      outcome: "replied",
+      detail: { replyText: "Yes" }
+    });
+  });
 });
 
 describe("followUpSchedule", () => {
