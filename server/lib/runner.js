@@ -641,6 +641,7 @@ function findReplyBaseline(lead) {
   return {
     text: attempt.detail.resolvedText,
     sentAt: attempt.completedAt,
+    externalMessageId: attempt.detail.externalMessageId ?? null,
     actionId: attempt.actionId
   };
 }

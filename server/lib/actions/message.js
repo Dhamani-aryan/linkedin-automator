@@ -231,14 +231,15 @@ async function sendLiveMessage({ session, recipientName, classification, resolve
   return {
     outcome: "sent",
     event: "message_sent",
-    detail: {
-      actionType: "message",
-      recipientName,
-      resolvedText: resolved.text,
-      missingVariables: resolved.missing,
-      confirmation: confirmation.indicator,
-      sentAt: confirmation.sentAt
-    }
+      detail: {
+        actionType: "message",
+        recipientName,
+        resolvedText: resolved.text,
+        missingVariables: resolved.missing,
+        confirmation: confirmation.indicator,
+        sentAt: confirmation.sentAt,
+        externalMessageId: confirmation.externalMessageId ?? null
+      }
   };
 }
 
@@ -687,12 +688,18 @@ async function readSentConfirmation(session, recipientName, expectedText, before
     const matching = [...container.querySelectorAll(".msg-s-event-listitem__body")]
       .filter((element) => readStructuredText(element) === expected);
     if (matching.length <= priorCount) return { confirmed: false };
-    const event = matching.at(-1)?.closest(".msg-s-event-with-indicator");
-    const indicator = event?.querySelector(".msg-s-event-with-indicator__sending-indicator--sent");
+    const sentBody = matching.at(-1);
+    const messageEvent = sentBody?.closest(".msg-s-message-list__event");
+    const indicatorEvent = sentBody?.closest(".msg-s-event-with-indicator");
+    const indicator = indicatorEvent?.querySelector(".msg-s-event-with-indicator__sending-indicator--sent");
     return {
       confirmed: Boolean(indicator),
       indicator: indicator ? "sent_indicator" : null,
-      sentAt: indicator?.getAttribute("title") ?? new Date().toISOString()
+      sentAt: indicator?.getAttribute("title") ?? new Date().toISOString(),
+      externalMessageId:
+        messageEvent?.getAttribute("data-event-urn") ??
+        indicatorEvent?.getAttribute("data-event-urn") ??
+        null
     };
   }, [recipientName, expectedText, beforeCount]);
 }
