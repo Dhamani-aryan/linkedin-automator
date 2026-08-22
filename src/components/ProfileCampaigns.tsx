@@ -144,8 +144,7 @@ export function ProfileCampaigns({
 
   useEffect(() => {
     const hasLiveState = rows.some(({ status }) => ["running", "queued"].includes(status));
-    if (!hasLiveState) return;
-    const interval = window.setInterval(() => void refreshRuns(), 3500);
+    const interval = window.setInterval(() => void refreshRuns(), hasLiveState ? 3500 : 12000);
     return () => window.clearInterval(interval);
   }, [rows]);
 

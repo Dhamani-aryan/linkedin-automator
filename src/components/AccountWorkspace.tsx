@@ -201,20 +201,25 @@ export function AccountWorkspace({
 
   useEffect(() => {
     let cancelled = false;
-    void listCampaignRuns(account.id)
-      .then((runs) => {
-        if (!cancelled) setCampaignRuns(runs);
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setCampaignNotice({
-            tone: "error",
-            message: error instanceof Error ? error.message : "Campaign outcome history could not be loaded."
-          });
-        }
-      });
+    const refreshCampaignRuns = () => {
+      void listCampaignRuns(account.id)
+        .then((runs) => {
+          if (!cancelled) setCampaignRuns(runs);
+        })
+        .catch((error) => {
+          if (!cancelled) {
+            setCampaignNotice({
+              tone: "error",
+              message: error instanceof Error ? error.message : "Campaign outcome history could not be loaded."
+            });
+          }
+        });
+    };
+    refreshCampaignRuns();
+    const interval = window.setInterval(refreshCampaignRuns, 12000);
     return () => {
       cancelled = true;
+      window.clearInterval(interval);
     };
   }, [account.id, campaignId]);
 
