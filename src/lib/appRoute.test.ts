@@ -27,4 +27,17 @@ describe("campaign routes", () => {
       tab: "safety"
     });
   });
+
+  it("preserves a campaign outcome drill-down", () => {
+    const route = {
+      kind: "workspace",
+      profileId: "profile-1",
+      campaignId: "campaign-1",
+      tab: "leads",
+      leadFilter: "replied"
+    } as const;
+
+    expect(routeToHash(route)).toBe("#/workspace/profile-1/campaign-1/leads/replied");
+    expect(readAppRoute(routeToHash(route))).toEqual(route);
+  });
 });
