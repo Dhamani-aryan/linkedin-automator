@@ -69,6 +69,7 @@ import type {
 import { LeadSourceWizard, type LeadImportPayload } from "./LeadSourceWizard";
 import { MessageTemplateEditor } from "./MessageTemplateEditor";
 import { WorkflowActionPicker } from "./WorkflowActionPicker";
+import { ReplyNotificationButton } from "./ReplyNotificationButton";
 
 type WorkspaceProps = {
   account: LinkedInAccount;
@@ -81,6 +82,7 @@ type WorkspaceProps = {
   onSafetySettingsChange: (settings: HumanTouchSettings) => void;
   isBusy: boolean;
   onBack: () => void;
+  onOpenCampaign: (campaignId: string, leadFilter?: WorkspaceLeadFilter) => void;
   onTabChange: (tab: WorkspaceRouteTab) => void;
   onOpenLinkedIn: () => Promise<boolean>;
   onRefreshChrome: () => void;
@@ -107,6 +109,7 @@ export function AccountWorkspace({
   onSafetySettingsChange,
   isBusy,
   onBack,
+  onOpenCampaign,
   onTabChange,
   onOpenLinkedIn,
   onRefreshChrome,
@@ -786,6 +789,11 @@ export function AccountWorkspace({
             </p>
           </div>
           <div className="header-actions">
+            <ReplyNotificationButton
+              profileId={account.id}
+              runs={campaignRuns}
+              onOpenCampaign={(targetCampaignId) => onOpenCampaign(targetCampaignId, "replied")}
+            />
             <button className="ghost-button" onClick={onStartChrome} disabled={isBusy}>
               {isBusy ? <LoaderCircle className="spin" size={18} /> : <Play size={18} />}
               {isBusy ? "Starting Chrome" : chromeStatus?.connected ? "Chrome running" : "Start Chrome"}

@@ -42,6 +42,7 @@ import type {
 } from "../types";
 import { SafetyLimitsPage } from "./SafetyLimitsPage";
 import { CampaignReports } from "./CampaignReports";
+import { ReplyNotificationButton } from "./ReplyNotificationButton";
 
 type CampaignFilter = "all" | "running" | "queued" | "paused" | "stopped" | "completed" | "archived";
 type DisplayStatus = Exclude<CampaignFilter, "all"> | "ready" | "failed";
@@ -365,6 +366,11 @@ export function ProfileCampaigns({
             </p>
           </div>
           <div className="header-actions">
+            <ReplyNotificationButton
+              profileId={account.id}
+              runs={runs}
+              onOpenCampaign={(campaignId) => onOpenCampaign(campaignId, "replied")}
+            />
             {activeSection === "campaigns" ? (
               <button className="primary-button" onClick={() => setIsCreateOpen(true)}>
                 <Plus size={18} /> New campaign

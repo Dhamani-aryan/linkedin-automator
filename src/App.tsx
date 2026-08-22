@@ -342,6 +342,13 @@ export function App() {
         safetySettings={humanTouchSettings}
         onSafetySettingsChange={setHumanTouchSettings}
         onBack={() => navigate({ kind: "campaigns", profileId: routeAccount.id })}
+        onOpenCampaign={(campaignId, leadFilter) => navigate({
+          kind: "workspace",
+          profileId: routeAccount.id,
+          campaignId,
+          tab: "leads",
+          leadFilter
+        })}
         onOpenLinkedIn={() => openLinkedIn(routeAccount.id)}
         onRefreshChrome={() => void refreshStatus(routeAccount.id)}
         onStartChrome={() => runChromeAction(() => startChrome(), routeAccount.id, true)}

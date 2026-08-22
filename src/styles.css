@@ -3055,6 +3055,197 @@ button:disabled {
   margin-bottom: 5px;
 }
 
+.reply-notification-control {
+  position: relative;
+  flex: 0 0 38px;
+}
+
+.reply-notification-button {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  color: #c8cede;
+  background: #343741;
+  border: 1px solid #555a68;
+}
+
+.reply-notification-button:hover,
+.reply-notification-button[aria-expanded="true"] {
+  color: #ffffff;
+  background: #414652;
+}
+
+.reply-notification-button.has-unread {
+  color: #ffffff;
+  background: #3d5082;
+  border-color: #7799ff;
+  animation: reply-notification-pulse 1.25s ease-in-out infinite;
+}
+
+.reply-notification-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 19px;
+  height: 19px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #252832;
+  border-radius: 999px;
+  padding: 0 4px;
+  color: #ffffff;
+  background: #e85d62;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.reply-notification-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 40;
+  width: min(380px, calc(100vw - 32px));
+  max-height: min(520px, calc(100vh - 120px));
+  overflow: auto;
+  border: 1px solid #555a68;
+  border-radius: 8px;
+  color: #f8faff;
+  background: #2b2f39;
+  box-shadow: 0 18px 42px rgb(0 0 0 / 38%);
+}
+
+.reply-notification-panel > header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 14px 16px;
+  border-bottom: 1px solid #474c59;
+  background: #2b2f39;
+}
+
+.reply-notification-panel > header div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.reply-notification-panel > header strong {
+  font-size: 14px;
+}
+
+.reply-notification-panel > header span {
+  color: #aeb5c5;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.reply-notification-list {
+  display: grid;
+}
+
+.reply-notification-item {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  border: 0;
+  border-bottom: 1px solid #414652;
+  padding: 13px 16px;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.reply-notification-item:last-child {
+  border-bottom: 0;
+}
+
+.reply-notification-item:hover,
+.reply-notification-item:focus-visible {
+  outline: none;
+  background: #353a46;
+}
+
+.reply-notification-item-icon {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: #9eb8ff;
+  background: #3c4661;
+}
+
+.reply-notification-item-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.reply-notification-item-copy strong,
+.reply-notification-item-copy small,
+.reply-notification-item-copy p {
+  overflow-wrap: anywhere;
+}
+
+.reply-notification-item-copy strong {
+  font-size: 13px;
+}
+
+.reply-notification-item-copy small {
+  color: #aeb5c5;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.reply-notification-item-copy p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 1px 0 0;
+  color: #e4e8f2;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.reply-notification-empty {
+  min-height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 24px;
+  color: #aeb5c5;
+  font-size: 12px;
+  text-align: center;
+}
+
+@keyframes reply-notification-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(119 153 255 / 44%);
+  }
+
+  50% {
+    box-shadow: 0 0 0 7px rgb(119 153 255 / 0%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reply-notification-button.has-unread {
+    animation: none;
+  }
+}
+
 .profile-home-tabs {
   display: none;
 }
@@ -4016,8 +4207,21 @@ button:disabled {
     padding: 16px 14px;
   }
 
-  .campaign-home-header .header-actions,
-  .campaign-home-header .header-actions > button {
+  .campaign-home-header .header-actions {
     width: 100%;
+  }
+
+  .campaign-home-header .header-actions > button {
+    flex: 1 1 130px;
+    width: auto;
+  }
+
+  .reply-notification-panel {
+    position: fixed;
+    top: 92px;
+    right: 14px;
+    left: 14px;
+    width: auto;
+    max-height: calc(100vh - 112px);
   }
 }
