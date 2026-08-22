@@ -158,8 +158,22 @@ export type CampaignRunLead = {
   lead: LeadProfile;
   state: CampaignRunLeadState;
   actionCursor: number;
+  attempts: CampaignRunAttempt[];
+  delaysSatisfiedActionIds: string[];
   nextEligibleAt: string | null;
   lastErrorCode: string | null;
+  acceptedAt: string | null;
+  conversationSeenAt: string | null;
+};
+
+export type CampaignRunAttempt = {
+  actionId: string;
+  attempt: number;
+  startedAt: string;
+  completedAt: string | null;
+  outcome: string | null;
+  errorCode: string | null;
+  detail: ({ actionType?: string } & Record<string, unknown>) | null;
 };
 
 export type CampaignRun = {
