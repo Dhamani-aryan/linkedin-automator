@@ -2789,19 +2789,48 @@ code {
   to { transform: rotate(360deg); }
 }
 
-.action-picker-modal {
-  width: min(720px, 100%);
-  border: 1px solid #464a55;
-  border-radius: 8px;
+.action-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  display: flex;
+  justify-content: flex-end;
+  background: rgb(0 0 0 / 0.48);
+}
+
+.action-picker-drawer {
+  width: min(440px, calc(100vw - 24px));
+  height: 100%;
+  overflow-y: auto;
+  border-left: 1px solid #4a4f5b;
   background: #2d3039;
-  box-shadow: 0 28px 100px rgb(0 0 0 / 0.48);
-  padding: 22px;
+  box-shadow: -18px 0 60px rgb(0 0 0 / 0.42);
+  animation: action-drawer-in 160ms ease-out;
+}
+
+.action-picker-drawer-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  min-height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid #464a55;
+  background: #2d3039;
+  padding: 18px 20px;
+}
+
+.action-picker-drawer-header h2 {
+  margin: 3px 0 0;
+  font-size: 21px;
 }
 
 .action-picker-list {
   display: grid;
-  gap: 10px;
-  margin-top: 20px;
+  gap: 12px;
+  padding: 18px 20px 28px;
 }
 
 .action-picker-list > button {
@@ -2854,6 +2883,11 @@ code {
   border-radius: 8px;
   color: #9eb7ff;
   background: #292d36;
+}
+
+@keyframes action-drawer-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
 
 .compact-template-modal {

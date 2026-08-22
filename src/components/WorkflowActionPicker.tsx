@@ -1,4 +1,5 @@
 import { ArrowRight, MessageSquare, ShieldCheck, UserPlus, X } from "lucide-react";
+import { useEffect } from "react";
 
 type WorkflowActionPickerProps = {
   onAdd: (type: "connection_request" | "message") => void;
@@ -6,21 +7,35 @@ type WorkflowActionPickerProps = {
 };
 
 export function WorkflowActionPicker({ onAdd, onClose }: WorkflowActionPickerProps) {
+  useEffect(() => {
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onClose]);
+
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="action-picker-title">
-      <section className="action-picker-modal">
-        <header className="modal-header">
+    <div className="action-drawer-backdrop" onMouseDown={onClose}>
+      <aside
+        className="action-picker-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="action-picker-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <header className="action-picker-drawer-header">
           <div>
-            <h2 id="action-picker-title">Add workflow action</h2>
-            <p>Start with the two core outreach actions. Safety checks are added automatically.</p>
+            <span className="section-kicker">Workflow blocks</span>
+            <h2 id="action-picker-title">Add action</h2>
           </div>
-          <button className="icon-button" title="Close" onClick={onClose}>
+          <button type="button" className="icon-button" title="Close action drawer" aria-label="Close action drawer" onClick={onClose}>
             <X size={19} />
           </button>
         </header>
 
-        <div className="action-picker-list">
-          <button onClick={() => onAdd("connection_request")}>
+        <div className="action-picker-list" aria-label="Available workflow actions">
+          <button type="button" onClick={() => onAdd("connection_request")}>
             <span className="action-picker-icon"><UserPlus size={22} /></span>
             <span>
               <strong>Send connection request</strong>
@@ -30,7 +45,7 @@ export function WorkflowActionPicker({ onAdd, onClose }: WorkflowActionPickerPro
             <ArrowRight size={19} />
           </button>
 
-          <button onClick={() => onAdd("message")}>
+          <button type="button" onClick={() => onAdd("message")}>
             <span className="action-picker-icon"><MessageSquare size={22} /></span>
             <span>
               <strong>Send message</strong>
@@ -40,7 +55,7 @@ export function WorkflowActionPicker({ onAdd, onClose }: WorkflowActionPickerPro
             <ArrowRight size={19} />
           </button>
         </div>
-      </section>
+      </aside>
     </div>
   );
 }
