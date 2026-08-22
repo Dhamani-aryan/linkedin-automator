@@ -450,27 +450,49 @@ export function classifyConversationReply(messages, baseline, recipient) {
   const normalizeName = (value) => String(value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
   const normalizeUrl = (value) => String(value ?? "").replace(/[?#].*$/, "").replace(/\/$/, "").toLowerCase();
   const baselineText = normalizeText(baseline?.text);
+  const baselineExternalId = String(baseline?.externalMessageId ?? "").trim();
+  const recipientName = normalizeName(recipient.recipientName);
+  const recipientUrl = normalizeUrl(recipient.recipientUrl);
+  const isRecipientMessage = (message) => {
+    const author = normalizeName(message.author);
+    const profileUrl = normalizeUrl(message.profileUrl);
+    return Boolean(
+      (author && (author === recipientName || recipientName.startsWith(`${author} `))) ||
+      (profileUrl && recipientUrl && profileUrl === recipientUrl)
+    );
+  };
   const baselineIndex = messages.reduce((latest, message, index) =>
-    normalizeText(message.text) === baselineText ? index : latest, -1);
-  if (!baselineText || baselineIndex < 0) {
+    (baselineExternalId && message.externalId === baselineExternalId) ||
+      (baselineText && normalizeText(message.text) === baselineText)
+      ? index
+      : latest, -1);
+  if (!baselineText && !baselineExternalId) {
     return {
       status: "needs_review",
       reason: "The last confirmed campaign message was not visible in the opened conversation."
     };
   }
 
-  const recipientName = normalizeName(recipient.recipientName);
-  const recipientUrl = normalizeUrl(recipient.recipientUrl);
+  if (baselineIndex < 0) {
+    const baselineTime = Date.parse(baseline.sentAt);
+    const timestampedReply = Number.isNaN(baselineTime)
+      ? null
+      : [...messages].reverse().find((message) => {
+          const displayedTime = Date.parse(message.displayedAt ?? "");
+          return isRecipientMessage(message) && !Number.isNaN(displayedTime) && displayedTime > baselineTime;
+        });
+    if (timestampedReply) return { status: "replied", message: timestampedReply };
+
+    return {
+      status: "needs_review",
+      reason: "The last confirmed campaign message was not visible in the opened conversation."
+    };
+  }
+
   let hasUnattributedMessage = false;
   for (const message of messages.slice(baselineIndex + 1)) {
-    const author = normalizeName(message.author);
-    const profileUrl = normalizeUrl(message.profileUrl);
-    const isRecipient = Boolean(
-      (author && (author === recipientName || recipientName.startsWith(`${author} `))) ||
-      (profileUrl && recipientUrl && profileUrl === recipientUrl)
-    );
-    if (isRecipient) return { status: "replied", message };
-    if (!author && !profileUrl) hasUnattributedMessage = true;
+    if (isRecipientMessage(message)) return { status: "replied", message };
+    if (!normalizeName(message.author) && !normalizeUrl(message.profileUrl)) hasUnattributedMessage = true;
   }
 
   if (hasUnattributedMessage) {

@@ -37,6 +37,58 @@ describe("classifyConversationReply", () => {
     expect(result).toMatchObject({ status: "needs_review" });
   });
 
+  it("detects a timestamped recipient reply when the outbound baseline was virtualized away", () => {
+    const result = classifyConversationReply([
+      {
+        text: "Yes, that works for me",
+        author: "Casey Example",
+        profileUrl: recipient.recipientUrl,
+        externalId: "reply-virtualized",
+        displayedAt: "2026-08-09T10:05:00.000Z"
+      }
+    ], baseline, recipient);
+
+    expect(result).toEqual({
+      status: "replied",
+      message: expect.objectContaining({ externalId: "reply-virtualized" })
+    });
+  });
+
+  it("does not count an older recipient message when the outbound baseline was virtualized away", () => {
+    const result = classifyConversationReply([
+      {
+        text: "An earlier reply",
+        author: "Casey Example",
+        profileUrl: recipient.recipientUrl,
+        displayedAt: "2026-08-09T09:55:00.000Z"
+      }
+    ], baseline, recipient);
+
+    expect(result).toMatchObject({ status: "needs_review" });
+  });
+
+  it("matches a persisted outbound event id when rendered text changes", () => {
+    const result = classifyConversationReply([
+      {
+        text: "LinkedIn-normalized outbound text",
+        author: "Campaign Sender",
+        profileUrl: null,
+        externalId: "outbound-1"
+      },
+      {
+        text: "Got it",
+        author: "Casey Example",
+        profileUrl: recipient.recipientUrl,
+        externalId: "reply-2"
+      }
+    ], { ...baseline, externalMessageId: "outbound-1" }, recipient);
+
+    expect(result).toEqual({
+      status: "replied",
+      message: expect.objectContaining({ externalId: "reply-2" })
+    });
+  });
+
   it("requires review for unattributed messages after the baseline", () => {
     const result = classifyConversationReply([
       { text: baseline.text, author: "Campaign Sender", profileUrl: null },

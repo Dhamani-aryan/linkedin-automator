@@ -619,6 +619,11 @@ async function startNextQueuedRun() {
 function isSafeToRetry(lead) {
   const attempt = lead.attempts.at(-1);
   if (attempt?.errorCode === ErrorCodes.ELEMENT_NOT_FOUND) return true;
+  if (
+    attempt?.errorCode === ErrorCodes.AMBIGUOUS_OUTCOME &&
+    attempt.detail?.actionType === "reply_check" &&
+    attempt.detail?.reason === "The last confirmed campaign message was not visible in the opened conversation."
+  ) return true;
   return attempt?.errorCode === ErrorCodes.AMBIGUOUS_OUTCOME &&
     attempt.detail?.reason === "The composer text did not exactly match the resolved template. Send was not clicked.";
 }
