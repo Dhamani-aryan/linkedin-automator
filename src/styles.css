@@ -3544,11 +3544,19 @@ button:disabled {
 .campaign-index-table-header,
 .campaign-index-row {
   display: grid;
-  grid-template-columns: 22px minmax(210px, 1.5fr) 116px 58px repeat(5, minmax(68px, 0.45fr)) 58px 76px;
+  grid-template-columns: 22px minmax(190px, 2fr) repeat(8, minmax(60px, 1fr)) 70px;
   align-items: center;
-  gap: 14px;
-  min-width: 1040px;
+  gap: 8px;
+  min-width: 920px;
   padding: 0 18px;
+}
+
+@media (min-width: 801px) {
+  .campaign-index-table-header > :nth-child(n + 3),
+  .campaign-index-row > :nth-child(n + 3) {
+    justify-self: center;
+    text-align: center;
+  }
 }
 
 .campaign-index-table-header {
