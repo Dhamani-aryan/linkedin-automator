@@ -33,7 +33,7 @@ export function campaignListMetrics(campaignId: string, runs: CampaignRun[]): Ca
       const key = leadIdentity(leadRun);
       const completedAttempts = leadRun.attempts.filter((attempt) => attempt.completedAt !== null);
       if (completedAttempts.length > 0) processed.add(key);
-      if (leadRun.state === "failed" || completedAttempts.some((attempt) => attempt.errorCode !== null)) failed.add(key);
+      if (leadRun.state === "failed" || completedAttempts.some((attempt) => attempt.outcome === "failed")) failed.add(key);
       if (leadRun.acceptedAt || completedAttempts.some((attempt) => attempt.outcome === "accepted")) accepted.add(key);
       if (leadRun.state === "replied" || completedAttempts.some((attempt) => attempt.outcome === "replied")) replied.add(key);
 

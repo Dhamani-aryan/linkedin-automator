@@ -21,6 +21,7 @@ import {
   loadCampaignWorkspaces,
   saveCampaignWorkspace
 } from "../lib/campaignStorage";
+import { campaignListMetrics, type CampaignListMetrics } from "../lib/campaignMetrics";
 import {
   listCampaignRuns,
   pauseCampaignRun,
@@ -66,6 +67,17 @@ const filters: Array<{ value: CampaignFilter; label: string }> = [
   { value: "completed", label: "Completed" }
 ];
 
+const outcomeMetrics: Array<{ key: keyof CampaignListMetrics; label: string }> = [
+  { key: "processing", label: "Processing" },
+  { key: "processed", label: "Processed" },
+  { key: "successful", label: "Successful" },
+  { key: "failed", label: "Failed" },
+  { key: "invited", label: "Invited" },
+  { key: "accepted", label: "Accepted" },
+  { key: "messaged", label: "Messaged" },
+  { key: "replied", label: "Replied" }
+];
+
 export function ProfileCampaigns({
   account,
   chromeError,
@@ -105,8 +117,9 @@ export function ProfileCampaigns({
   const rows = useMemo(() => campaigns.map((workspace) => ({
     workspace,
     run: latestRunByCampaign.get(workspace.campaign.id) ?? null,
-    status: campaignDisplayStatus(latestRunByCampaign.get(workspace.campaign.id)?.state, workspace)
-  })), [campaigns, latestRunByCampaign]);
+    status: campaignDisplayStatus(latestRunByCampaign.get(workspace.campaign.id)?.state, workspace),
+    metrics: campaignListMetrics(workspace.campaign.id, runs)
+  })), [campaigns, latestRunByCampaign, runs]);
 
   const visibleRows = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -404,17 +417,15 @@ export function ProfileCampaigns({
                   checked={allVisibleSelected}
                   onChange={toggleVisibleCampaigns}
                 />
-                <span>Campaign</span><span>Status</span><span>Leads</span><span>Progress</span><span>Actions</span><span />
+                <span>Campaign</span><span>Status</span><span>Leads</span><span>Campaign outcomes</span><span>Actions</span><span />
               </div>
               {visibleRows.length === 0 ? (
                 <div className="campaign-index-empty">
                   <strong>{campaigns.length === 0 ? "No campaigns yet" : "No campaigns match this view"}</strong>
                   <p>{campaigns.length === 0 ? "Create a campaign to build its workflow and add LinkedIn leads." : "Change the filter or search term."}</p>
                 </div>
-              ) : visibleRows.map(({ workspace, run, status }) => {
+              ) : visibleRows.map(({ workspace, status, metrics }) => {
                 const campaign = workspace.campaign;
-                const completed = run?.summary.completed ?? campaign.processed;
-                const failed = run?.summary.failed ?? campaign.failed;
                 return (
                   <div className="campaign-index-row" key={campaign.id}>
                     <input
@@ -428,12 +439,16 @@ export function ProfileCampaigns({
                       <span>{workspace.sources.length} source{workspace.sources.length === 1 ? "" : "s"}</span>
                     </button>
                     <span className={`state-badge ${status}`}><Circle size={9} fill="currentColor" /> {statusLabel(status)}</span>
-                    <span className="campaign-table-number">{campaign.profilesTotal}</span>
-                    <span className="campaign-progress-cell">
-                      <strong>{completed} completed</strong>
-                      <small>{failed} failed</small>
-                    </span>
-                    <span className="campaign-table-number">{workspace.actions.filter((action) => !action.automatic).length}</span>
+                    <span className="campaign-table-number campaign-lead-total" data-label="Leads">{campaign.profilesTotal}</span>
+                    <div className="campaign-outcome-grid">
+                      {outcomeMetrics.map((metric) => (
+                        <div className={`campaign-outcome-metric ${metric.key}`} key={metric.key} title={`${metric.label}: ${metrics[metric.key]}`}>
+                          <span>{metric.label}</span>
+                          <strong>{metrics[metric.key]}</strong>
+                        </div>
+                      ))}
+                    </div>
+                    <span className="campaign-table-number campaign-action-total" data-label="Actions">{workspace.actions.filter((action) => !action.automatic).length}</span>
                     <button className="ghost-button compact-button" onClick={() => onOpenCampaign(campaign.id)}>Open</button>
                   </div>
                 );

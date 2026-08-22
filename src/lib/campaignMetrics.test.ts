@@ -64,6 +64,22 @@ describe("campaignListMetrics", () => {
 
     expect(campaignListMetrics("campaign-1", [older, latest]).processing).toBe(0);
   });
+
+  it("keeps needs-review outcomes separate from failed leads", () => {
+    const run = minimalRun("2026-08-22T12:00:00.000Z", "completed");
+    run.leads[0].state = "needs_review";
+    run.leads[0].attempts = [{
+      actionId: "message",
+      attempt: 1,
+      startedAt: "2026-08-22T11:59:59.000Z",
+      completedAt: "2026-08-22T12:00:00.000Z",
+      outcome: "needs_review",
+      errorCode: "AMBIGUOUS_OUTCOME",
+      detail: { actionType: "message" }
+    }];
+
+    expect(campaignListMetrics("campaign-1", [run]).failed).toBe(0);
+  });
 });
 
 function minimalRun(updatedAt: string, state: "waiting_delay" | "completed") {
