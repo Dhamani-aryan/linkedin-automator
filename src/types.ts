@@ -54,6 +54,7 @@ export type CampaignSummary = {
   id: string;
   name: string;
   status: CampaignStatus;
+  archivedAt?: string | null;
   profilesTotal: number;
   profilesToProcess: number;
   processing: number;

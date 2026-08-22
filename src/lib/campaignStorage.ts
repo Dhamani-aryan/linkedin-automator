@@ -52,6 +52,7 @@ export function createCampaignWorkspace(accountId: string, name: string): Campai
       id: `${accountId}-${crypto.randomUUID()}`,
       name: name.trim(),
       status: "ready",
+      archivedAt: null,
       profilesTotal: 0,
       profilesToProcess: 0,
       processing: 0,
@@ -75,6 +76,27 @@ export function deleteCampaignWorkspace(
   const stored = readWorkspaceMap(storage);
   stored[accountId] = (stored[accountId] ?? [])
     .filter((workspace) => workspace.campaign.id !== campaignId);
+  writeWorkspaceMap(stored, storage);
+}
+
+export function setCampaignWorkspaceArchived(
+  accountId: string,
+  campaignId: string,
+  archived: boolean,
+  storage: CampaignStorage = window.localStorage
+) {
+  const stored = readWorkspaceMap(storage);
+  stored[accountId] = (stored[accountId] ?? []).map((workspace) =>
+    workspace.campaign.id === campaignId
+      ? {
+          ...workspace,
+          campaign: {
+            ...workspace.campaign,
+            archivedAt: archived ? new Date().toISOString() : null
+          }
+        }
+      : workspace
+  );
   writeWorkspaceMap(stored, storage);
 }
 
@@ -136,6 +158,7 @@ function normalizeWorkspace(state: CampaignWorkspaceState): CampaignWorkspaceSta
     ...state,
     campaign: {
       ...state.campaign,
+      archivedAt: state.campaign.archivedAt ?? null,
       profilesTotal: state.leads.length,
       profilesToProcess: state.leads.filter((lead) => lead.status === "to_process").length
     },

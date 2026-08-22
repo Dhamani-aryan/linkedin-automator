@@ -6,7 +6,8 @@ import {
   deleteCampaignWorkspace,
   loadCampaignWorkspace,
   loadCampaignWorkspaces,
-  saveCampaignWorkspace
+  saveCampaignWorkspace,
+  setCampaignWorkspaceArchived
 } from "./campaignStorage";
 
 const account: LinkedInAccount = {
@@ -33,6 +34,7 @@ function workspace(id: string, name: string): CampaignWorkspaceState {
       id,
       name,
       status: "ready",
+      archivedAt: null,
       profilesTotal: 0,
       profilesToProcess: 0,
       processing: 0,
@@ -102,6 +104,21 @@ describe("campaign collections", () => {
     deleteCampaignWorkspace(account.id, first.campaign.id, storage);
     expect(loadCampaignWorkspaces(account, storage).map(({ campaign }) => campaign.id))
       .toEqual([second.campaign.id]);
+  });
+
+  it("archives and restores a campaign without deleting its workspace", () => {
+    const storage = memoryStorage();
+    const campaign = workspace("campaign-1", "First");
+    saveCampaignWorkspace(account.id, campaign, storage);
+
+    setCampaignWorkspaceArchived(account.id, campaign.campaign.id, true, storage);
+    const archived = loadCampaignWorkspaces(account, storage)[0];
+    expect(archived.campaign.archivedAt).toEqual(expect.any(String));
+    expect(archived.actions).toEqual(campaign.actions);
+    expect(archived.leads).toEqual(campaign.leads);
+
+    setCampaignWorkspaceArchived(account.id, campaign.campaign.id, false, storage);
+    expect(loadCampaignWorkspaces(account, storage)[0].campaign.archivedAt).toBeNull();
   });
 
   it("creates an empty named campaign with a default workflow", () => {
