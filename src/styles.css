@@ -2427,6 +2427,97 @@ code {
   font-size: 13px;
 }
 
+.campaign-outcome-prospect-list {
+  display: grid;
+}
+
+.campaign-outcome-prospect {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto minmax(150px, auto);
+  grid-template-areas:
+    "identity badge time"
+    "detail detail detail";
+  align-items: center;
+  gap: 12px 18px;
+  border-top: 1px solid #464b57;
+  background: #343741;
+  padding: 16px 18px;
+}
+
+.campaign-outcome-prospect:first-child {
+  border-top: 0;
+}
+
+.campaign-outcome-prospect > .lead-identity {
+  grid-area: identity;
+}
+
+.campaign-outcome-prospect > time {
+  grid-area: time;
+  color: #aeb6c6;
+  font-size: 12px;
+  text-align: right;
+}
+
+.outcome-prospect-badge {
+  grid-area: badge;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.outcome-prospect-badge.invited,
+.outcome-prospect-badge.messaged {
+  color: #9ab8ff;
+  background: #263958;
+}
+
+.outcome-prospect-badge.accepted,
+.outcome-prospect-badge.replied {
+  color: #86e69a;
+  background: #203d29;
+}
+
+.outcome-prospect-badge.failed {
+  color: #ff9a96;
+  background: #482526;
+}
+
+.outcome-reply-text,
+.outcome-failure-detail {
+  grid-area: detail;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 10px;
+  border-left: 3px solid #67d47d;
+  color: #e7ebf3;
+  background: #2d3138;
+  padding: 12px 14px;
+}
+
+.outcome-failure-detail {
+  border-left-color: #ef7773;
+}
+
+.outcome-reply-text svg {
+  color: #76df8a;
+}
+
+.outcome-failure-detail svg {
+  color: #ff8b87;
+}
+
+.outcome-reply-text p,
+.outcome-failure-detail p {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 .queue-status {
   width: fit-content;
   border-radius: 6px;
@@ -3622,10 +3713,23 @@ button:disabled {
 }
 
 .campaign-outcome-number {
+  min-width: 32px;
+  min-height: 32px;
+  border: 0;
+  border-radius: 4px;
   color: #f2f5fb;
+  background: transparent;
+  padding: 6px;
   font-size: 13px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.campaign-outcome-number:hover,
+.campaign-outcome-number:focus-visible {
+  background: #484c57;
+  outline: none;
 }
 
 .campaign-outcome-number.invited,
@@ -3709,6 +3813,20 @@ button:disabled {
   .report-chart-section > header {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .campaign-outcome-prospect {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "identity identity"
+      "badge time"
+      "detail detail";
+    align-items: start;
+    padding: 14px;
+  }
+
+  .campaign-outcome-prospect > time {
+    align-self: center;
   }
 
   .report-toolbar {

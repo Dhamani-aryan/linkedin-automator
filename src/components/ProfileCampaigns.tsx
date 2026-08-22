@@ -24,7 +24,7 @@ import {
   saveCampaignWorkspace,
   setCampaignWorkspaceArchived
 } from "../lib/campaignStorage";
-import { campaignListMetrics } from "../lib/campaignMetrics";
+import { campaignListMetrics, type CampaignOutcomeKey } from "../lib/campaignMetrics";
 import {
   listCampaignRuns,
   pauseCampaignRun,
@@ -54,7 +54,7 @@ type ProfileCampaignsProps = {
   safetySettings: HumanTouchSettings;
   onSafetySettingsChange: (settings: HumanTouchSettings) => void;
   onBack: () => void;
-  onOpenCampaign: (campaignId: string) => void;
+  onOpenCampaign: (campaignId: string, leadFilter?: CampaignOutcomeKey) => void;
   onOpenLinkedIn: () => Promise<boolean>;
   onRefreshChrome: () => void;
   onStartChrome: () => Promise<boolean>;
@@ -477,11 +477,11 @@ export function ProfileCampaigns({
                     </button>
                     <span className={`state-badge ${status}`}><Circle size={9} fill="currentColor" /> {statusLabel(status)}</span>
                     <span className="campaign-table-number campaign-lead-total" data-label="Leads">{campaign.profilesTotal}</span>
-                    <span className="campaign-outcome-number invited" data-label="Invited" title={`Invited: ${metrics.invited}`}>{metrics.invited}</span>
-                    <span className="campaign-outcome-number accepted" data-label="Accepted" title={`Accepted: ${metrics.accepted}`}>{metrics.accepted}</span>
-                    <span className="campaign-outcome-number messaged" data-label="Messaged" title={`Messaged: ${metrics.messaged}`}>{metrics.messaged}</span>
-                    <span className="campaign-outcome-number replied" data-label="Replied" title={`Replied: ${metrics.replied}`}>{metrics.replied}</span>
-                    <span className="campaign-outcome-number failed" data-label="Failed" title={`Failed: ${metrics.failed}`}>{metrics.failed}</span>
+                    <button type="button" className="campaign-outcome-number invited" data-label="Invited" aria-label={`View invited prospects (${metrics.invited})`} title={`View ${metrics.invited} invited prospect${metrics.invited === 1 ? "" : "s"}`} onClick={() => onOpenCampaign(campaign.id, "invited")}>{metrics.invited}</button>
+                    <button type="button" className="campaign-outcome-number accepted" data-label="Accepted" aria-label={`View accepted prospects (${metrics.accepted})`} title={`View ${metrics.accepted} accepted prospect${metrics.accepted === 1 ? "" : "s"}`} onClick={() => onOpenCampaign(campaign.id, "accepted")}>{metrics.accepted}</button>
+                    <button type="button" className="campaign-outcome-number messaged" data-label="Messaged" aria-label={`View messaged prospects (${metrics.messaged})`} title={`View ${metrics.messaged} messaged prospect${metrics.messaged === 1 ? "" : "s"}`} onClick={() => onOpenCampaign(campaign.id, "messaged")}>{metrics.messaged}</button>
+                    <button type="button" className="campaign-outcome-number replied" data-label="Replied" aria-label={`View replied prospects (${metrics.replied})`} title={`View ${metrics.replied} replied prospect${metrics.replied === 1 ? "" : "s"}`} onClick={() => onOpenCampaign(campaign.id, "replied")}>{metrics.replied}</button>
+                    <button type="button" className="campaign-outcome-number failed" data-label="Failed" aria-label={`View failed prospects (${metrics.failed})`} title={`View ${metrics.failed} failed prospect${metrics.failed === 1 ? "" : "s"}`} onClick={() => onOpenCampaign(campaign.id, "failed")}>{metrics.failed}</button>
                     <span className="campaign-table-number campaign-action-total" data-label="Actions">{workspace.actions.filter((action) => !action.automatic).length}</span>
                     <button className="ghost-button compact-button" onClick={() => onOpenCampaign(campaign.id)}>Open</button>
                   </div>

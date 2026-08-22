@@ -33,7 +33,8 @@ import {
   resolveProfileIdentities,
   type ResolvedProfileIdentity
 } from "../lib/chromeApi";
-import type { WorkspaceRouteTab } from "../lib/appRoute";
+import type { WorkspaceLeadFilter, WorkspaceRouteTab } from "../lib/appRoute";
+import { campaignOutcomeRecords } from "../lib/campaignMetrics";
 import { SafetyLimitsPage } from "./SafetyLimitsPage";
 import {
   createLeadFromUrl,
@@ -43,6 +44,7 @@ import {
 import {
   getActiveCampaignRun,
   getCampaignRun,
+  listCampaignRuns,
   pauseCampaignRun,
   retryCampaignRun,
   resumeCampaignRun,
@@ -72,6 +74,7 @@ type WorkspaceProps = {
   account: LinkedInAccount;
   campaignId: string;
   activeTab: WorkspaceRouteTab;
+  leadFilter?: WorkspaceLeadFilter;
   chromeError?: string;
   chromeStatus: ChromeStatus | null;
   safetySettings: HumanTouchSettings;
@@ -85,10 +88,19 @@ type WorkspaceProps = {
   onStopChrome: () => Promise<boolean>;
 };
 
+const outcomeLabels: Record<WorkspaceLeadFilter, string> = {
+  invited: "Invited",
+  accepted: "Accepted",
+  messaged: "Messaged",
+  replied: "Replied",
+  failed: "Failed"
+};
+
 export function AccountWorkspace({
   account,
   campaignId,
   activeTab,
+  leadFilter,
   chromeError,
   chromeStatus,
   safetySettings,
@@ -111,6 +123,7 @@ export function AccountWorkspace({
   const [isCampaignBusy, setIsCampaignBusy] = useState(false);
   const [prospectOperation, setProspectOperation] = useState<"enrich" | "export" | null>(null);
   const [activeRun, setActiveRun] = useState<CampaignRun | null>(null);
+  const [campaignRuns, setCampaignRuns] = useState<CampaignRun[]>([]);
   const [isStartPending, setIsStartPending] = useState(false);
   const [campaignNotice, setCampaignNotice] = useState<{
     tone: "success" | "error";
@@ -151,6 +164,7 @@ export function AccountWorkspace({
     setWorkspace(nextWorkspace);
     setSelectedActionId(nextWorkspace.actions[0]?.id ?? "");
     setActiveRun(null);
+    setCampaignRuns([]);
     setStartMode("dry_run");
     setLiveSendConfirmed(false);
   }, [account.id, campaignId]);
@@ -164,7 +178,7 @@ export function AccountWorkspace({
     void getActiveCampaignRun()
       .then((run) => {
         if (cancelled) return;
-        if (run?.profileId === account.id) {
+        if (run?.profileId === account.id && run.snapshot.campaign.id === campaignId) {
           setActiveRun(run);
           syncCampaignStatus(run);
           return;
@@ -180,7 +194,31 @@ export function AccountWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [account.id]);
+  }, [account.id, campaignId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void listCampaignRuns(account.id)
+      .then((runs) => {
+        if (!cancelled) setCampaignRuns(runs);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setCampaignNotice({
+            tone: "error",
+            message: error instanceof Error ? error.message : "Campaign outcome history could not be loaded."
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [account.id, campaignId]);
+
+  useEffect(() => {
+    if (!activeRun || activeRun.snapshot.campaign.id !== campaignId) return;
+    setCampaignRuns((current) => [activeRun, ...current.filter((run) => run.id !== activeRun.id)]);
+  }, [activeRun, campaignId]);
 
   useEffect(() => {
     if (!activeRun || ["completed", "failed", "stopped"].includes(activeRun.state)) return;
@@ -204,6 +242,14 @@ export function AccountWorkspace({
     () => new Map(workspace.sources.map((source) => [source.id, source.name])),
     [workspace.sources]
   );
+  const selectedOutcomeRecords = useMemo(() => {
+    if (!leadFilter) return [];
+    const currentLeads = new Map(workspace.leads.map((lead) => [lead.linkedinUrl, lead]));
+    return campaignOutcomeRecords(campaignId, campaignRuns)[leadFilter].map((record) => ({
+      ...record,
+      lead: currentLeads.get(record.lead.linkedinUrl) ?? record.lead
+    }));
+  }, [campaignId, campaignRuns, leadFilter, workspace.leads]);
 
   function openActionPicker(index: number) {
     setInsertAt(index);
@@ -919,57 +965,110 @@ export function AccountWorkspace({
 
         {activeTab === "leads" ? (
           <section className="profiles-view">
-            <header>
-              <div>
-                <p className="section-kicker">Campaign queue</p>
-                <h2>Leads to process</h2>
-              </div>
-              <div className="lead-list-actions">
-                <button className="ghost-button" onClick={() => void enrichProspects()} disabled={workspace.leads.length === 0 || hasActiveServerRun || isCampaignBusy}>
-                  {prospectOperation === "enrich" ? <LoaderCircle className="spin" size={17} /> : <RefreshCw size={17} />}
-                  {prospectOperation === "enrich" ? "Enriching" : "Enrich data"}
-                </button>
-                <button className="primary-button" onClick={() => void exportProspects()} disabled={workspace.leads.length === 0 || hasActiveServerRun || isCampaignBusy}>
-                  {prospectOperation === "export" ? <LoaderCircle className="spin" size={17} /> : <Download size={17} />}
-                  {prospectOperation === "export" ? "Preparing CSV" : "Export CRM CSV"}
-                </button>
-                <button className="icon-button" title="Add leads" onClick={() => setActiveModal("source")} disabled={hasActiveServerRun}>
-                  <Plus size={17} />
-                </button>
-              </div>
-            </header>
-            {workspace.leads.length === 0 ? (
-              <div className="empty-profile-list">
-                <Users size={28} />
-                <strong>No leads added</strong>
-                <p>Add individual LinkedIn URLs, paste a list, upload a file, or collect leads from Sales Navigator.</p>
-              </div>
+            {leadFilter ? (
+              <>
+                <header>
+                  <div>
+                    <p className="section-kicker">Campaign outcome</p>
+                    <h2>{outcomeLabels[leadFilter]} prospects</h2>
+                  </div>
+                  <button className="ghost-button" onClick={() => onTabChange("leads")}>
+                    <List size={17} /> All leads
+                  </button>
+                </header>
+                {selectedOutcomeRecords.length === 0 ? (
+                  <div className="empty-profile-list">
+                    <Users size={28} />
+                    <strong>No {outcomeLabels[leadFilter].toLowerCase()} prospects</strong>
+                  </div>
+                ) : (
+                  <div className="campaign-outcome-prospect-list">
+                    {selectedOutcomeRecords.map((record) => (
+                      <article className={`campaign-outcome-prospect ${leadFilter}`} key={record.lead.linkedinUrl || record.lead.id}>
+                        <div className="lead-identity">
+                          <div className="profile-avatar small">in</div>
+                          <div>
+                            <strong>{record.lead.displayName || [record.lead.firstName, record.lead.lastName].filter(Boolean).join(" ") || "LinkedIn profile"}</strong>
+                            {record.lead.position || record.lead.company ? <small>{[record.lead.position, record.lead.company].filter(Boolean).join(" at ")}</small> : null}
+                            <a href={record.lead.linkedinUrl} target="_blank" rel="noreferrer">
+                              View LinkedIn profile <ExternalLink size={12} />
+                            </a>
+                          </div>
+                        </div>
+                        <span className={`outcome-prospect-badge ${leadFilter}`}>{outcomeLabels[leadFilter]}</span>
+                        <time dateTime={record.occurredAt ?? undefined}>{record.occurredAt ? formatDate(record.occurredAt) : "Time unavailable"}</time>
+                        {record.replyText ? (
+                          <div className="outcome-reply-text">
+                            <MessageSquareReply size={17} />
+                            <p>{record.replyText}</p>
+                          </div>
+                        ) : null}
+                        {leadFilter === "failed" && record.detail ? (
+                          <div className="outcome-failure-detail">
+                            <AlertTriangle size={17} />
+                            <p>{record.detail}</p>
+                          </div>
+                        ) : null}
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </>
             ) : (
-              <div className="functional-lead-table">
-                <div className="functional-lead-header">
-                  <span>Profile</span><span>Source</span><span>Status</span><span>Added</span><span />
-                </div>
-                {workspace.leads.map((lead) => (
-                  <div className="functional-lead-row" key={lead.id}>
-                    <div className="lead-identity">
-                      <div className="profile-avatar small">in</div>
-                      <div>
-                        <strong>{lead.displayName}</strong>
-                        {lead.position || lead.company ? <small>{[lead.position, lead.company].filter(Boolean).join(" at ")}</small> : null}
-                        <a href={lead.linkedinUrl} target="_blank" rel="noreferrer">
-                          {lead.linkedinUrl}<ExternalLink size={12} />
-                        </a>
-                      </div>
-                    </div>
-                    <span>{sourceNames.get(lead.sourceId) ?? "Imported list"}</span>
-                    <span className="queue-status">{leadRunLabel(activeRun, lead.id)}</span>
-                    <span>{formatDate(lead.addedAt)}</span>
-                    <button className="icon-button" title="Remove profile" onClick={() => removeLead(lead.id)} disabled={hasActiveServerRun}>
-                      <Trash2 size={15} />
+              <>
+                <header>
+                  <div>
+                    <p className="section-kicker">Campaign queue</p>
+                    <h2>Leads to process</h2>
+                  </div>
+                  <div className="lead-list-actions">
+                    <button className="ghost-button" onClick={() => void enrichProspects()} disabled={workspace.leads.length === 0 || hasActiveServerRun || isCampaignBusy}>
+                      {prospectOperation === "enrich" ? <LoaderCircle className="spin" size={17} /> : <RefreshCw size={17} />}
+                      {prospectOperation === "enrich" ? "Enriching" : "Enrich data"}
+                    </button>
+                    <button className="primary-button" onClick={() => void exportProspects()} disabled={workspace.leads.length === 0 || hasActiveServerRun || isCampaignBusy}>
+                      {prospectOperation === "export" ? <LoaderCircle className="spin" size={17} /> : <Download size={17} />}
+                      {prospectOperation === "export" ? "Preparing CSV" : "Export CRM CSV"}
+                    </button>
+                    <button className="icon-button" title="Add leads" onClick={() => setActiveModal("source")} disabled={hasActiveServerRun}>
+                      <Plus size={17} />
                     </button>
                   </div>
-                ))}
-              </div>
+                </header>
+                {workspace.leads.length === 0 ? (
+                  <div className="empty-profile-list">
+                    <Users size={28} />
+                    <strong>No leads added</strong>
+                    <p>Add individual LinkedIn URLs, paste a list, upload a file, or collect leads from Sales Navigator.</p>
+                  </div>
+                ) : (
+                  <div className="functional-lead-table">
+                    <div className="functional-lead-header">
+                      <span>Profile</span><span>Source</span><span>Status</span><span>Added</span><span />
+                    </div>
+                    {workspace.leads.map((lead) => (
+                      <div className="functional-lead-row" key={lead.id}>
+                        <div className="lead-identity">
+                          <div className="profile-avatar small">in</div>
+                          <div>
+                            <strong>{lead.displayName}</strong>
+                            {lead.position || lead.company ? <small>{[lead.position, lead.company].filter(Boolean).join(" at ")}</small> : null}
+                            <a href={lead.linkedinUrl} target="_blank" rel="noreferrer">
+                              {lead.linkedinUrl}<ExternalLink size={12} />
+                            </a>
+                          </div>
+                        </div>
+                        <span>{sourceNames.get(lead.sourceId) ?? "Imported list"}</span>
+                        <span className="queue-status">{leadRunLabel(activeRun, lead.id)}</span>
+                        <span>{formatDate(lead.addedAt)}</span>
+                        <button className="icon-button" title="Remove profile" onClick={() => removeLead(lead.id)} disabled={hasActiveServerRun}>
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </section>
         ) : null}

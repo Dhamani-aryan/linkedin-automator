@@ -314,11 +314,12 @@ export function App() {
         safetySettings={humanTouchSettings}
         onSafetySettingsChange={setHumanTouchSettings}
         onBack={() => navigate({ kind: "manager", page: "profiles" })}
-        onOpenCampaign={(campaignId) => navigate({
+        onOpenCampaign={(campaignId, leadFilter) => navigate({
           kind: "workspace",
           profileId: routeAccount.id,
           campaignId,
-          tab: "workflow"
+          tab: leadFilter ? "leads" : "workflow",
+          ...(leadFilter ? { leadFilter } : {})
         })}
         onOpenLinkedIn={() => openLinkedIn(routeAccount.id)}
         onRefreshChrome={() => void refreshStatus(routeAccount.id)}
@@ -334,6 +335,7 @@ export function App() {
         account={routeAccount}
         campaignId={route.campaignId}
         activeTab={route.tab}
+        leadFilter={route.leadFilter}
         chromeStatus={status}
         chromeError={routeAccount.lastError}
         isBusy={isBusy}
