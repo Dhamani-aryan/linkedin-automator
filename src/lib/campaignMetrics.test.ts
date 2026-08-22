@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CampaignRun } from "../types";
-import { campaignListMetrics } from "./campaignMetrics";
+import { campaignListMetrics, campaignOutcomeRecords } from "./campaignMetrics";
 
 describe("campaignListMetrics", () => {
   it("summarizes Linked Helper-style profile outcomes across campaign runs", () => {
@@ -16,13 +16,13 @@ describe("campaignListMetrics", () => {
       leads: [
         {
           id: "lead-1",
-          lead: { linkedinUrl: "https://www.linkedin.com/in/one" },
+          lead: { linkedinUrl: "https://www.linkedin.com/in/one", displayName: "Taylor" },
           state: "replied",
           acceptedAt: "2026-08-22T16:10:00.000Z",
           attempts: [
             { actionId: "invite", completedAt: "2026-08-22T16:05:00.000Z", outcome: "sent", errorCode: null, detail: { actionType: "connection_request" } },
             { actionId: "message", completedAt: "2026-08-22T16:15:00.000Z", outcome: "sent", errorCode: null, detail: { actionType: "message" } },
-            { actionId: "message", completedAt: "2026-08-22T16:20:00.000Z", outcome: "replied", errorCode: null, detail: { actionType: "reply_check" } }
+            { actionId: "message", completedAt: "2026-08-22T16:20:00.000Z", outcome: "replied", errorCode: null, detail: { actionType: "reply_check", replyText: "Hi, Sample User" } }
           ]
         },
         {
@@ -56,6 +56,11 @@ describe("campaignListMetrics", () => {
       messaged: 2,
       replied: 1
     });
+    expect(campaignOutcomeRecords("campaign-1", [run]).replied).toMatchObject([{
+      lead: { displayName: "Taylor" },
+      occurredAt: "2026-08-22T16:20:00.000Z",
+      replyText: "Hi, Sample User"
+    }]);
   });
 
   it("uses only the latest run for the current processing count", () => {
