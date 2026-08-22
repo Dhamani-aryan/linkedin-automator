@@ -21,7 +21,7 @@ import {
   loadCampaignWorkspaces,
   saveCampaignWorkspace
 } from "../lib/campaignStorage";
-import { campaignListMetrics, type CampaignListMetrics } from "../lib/campaignMetrics";
+import { campaignListMetrics } from "../lib/campaignMetrics";
 import {
   listCampaignRuns,
   pauseCampaignRun,
@@ -65,17 +65,6 @@ const filters: Array<{ value: CampaignFilter; label: string }> = [
   { value: "paused", label: "Paused" },
   { value: "stopped", label: "Stopped" },
   { value: "completed", label: "Completed" }
-];
-
-const outcomeMetrics: Array<{ key: keyof CampaignListMetrics; label: string }> = [
-  { key: "processing", label: "Processing" },
-  { key: "processed", label: "Processed" },
-  { key: "successful", label: "Successful" },
-  { key: "failed", label: "Failed" },
-  { key: "invited", label: "Invited" },
-  { key: "accepted", label: "Accepted" },
-  { key: "messaged", label: "Messaged" },
-  { key: "replied", label: "Replied" }
 ];
 
 export function ProfileCampaigns({
@@ -417,7 +406,7 @@ export function ProfileCampaigns({
                   checked={allVisibleSelected}
                   onChange={toggleVisibleCampaigns}
                 />
-                <span>Campaign</span><span>Status</span><span>Leads</span><span>Campaign outcomes</span><span>Actions</span><span />
+                <span>Campaign</span><span>Status</span><span>Leads</span><span>Invited</span><span>Accepted</span><span>Messaged</span><span>Replied</span><span>Failed</span><span>Actions</span><span />
               </div>
               {visibleRows.length === 0 ? (
                 <div className="campaign-index-empty">
@@ -440,14 +429,11 @@ export function ProfileCampaigns({
                     </button>
                     <span className={`state-badge ${status}`}><Circle size={9} fill="currentColor" /> {statusLabel(status)}</span>
                     <span className="campaign-table-number campaign-lead-total" data-label="Leads">{campaign.profilesTotal}</span>
-                    <div className="campaign-outcome-grid">
-                      {outcomeMetrics.map((metric) => (
-                        <div className={`campaign-outcome-metric ${metric.key}`} key={metric.key} title={`${metric.label}: ${metrics[metric.key]}`}>
-                          <span>{metric.label}</span>
-                          <strong>{metrics[metric.key]}</strong>
-                        </div>
-                      ))}
-                    </div>
+                    <span className="campaign-outcome-number invited" data-label="Invited" title={`Invited: ${metrics.invited}`}>{metrics.invited}</span>
+                    <span className="campaign-outcome-number accepted" data-label="Accepted" title={`Accepted: ${metrics.accepted}`}>{metrics.accepted}</span>
+                    <span className="campaign-outcome-number messaged" data-label="Messaged" title={`Messaged: ${metrics.messaged}`}>{metrics.messaged}</span>
+                    <span className="campaign-outcome-number replied" data-label="Replied" title={`Replied: ${metrics.replied}`}>{metrics.replied}</span>
+                    <span className="campaign-outcome-number failed" data-label="Failed" title={`Failed: ${metrics.failed}`}>{metrics.failed}</span>
                     <span className="campaign-table-number campaign-action-total" data-label="Actions">{workspace.actions.filter((action) => !action.automatic).length}</span>
                     <button className="ghost-button compact-button" onClick={() => onOpenCampaign(campaign.id)}>Open</button>
                   </div>
