@@ -1,4 +1,6 @@
 import {
+  Archive,
+  ArchiveRestore,
   ArrowLeft,
   BarChart3,
   CheckSquare2,
@@ -19,7 +21,8 @@ import {
   createCampaignWorkspace,
   deleteCampaignWorkspace,
   loadCampaignWorkspaces,
-  saveCampaignWorkspace
+  saveCampaignWorkspace,
+  setCampaignWorkspaceArchived
 } from "../lib/campaignStorage";
 import { campaignListMetrics } from "../lib/campaignMetrics";
 import {
@@ -40,7 +43,7 @@ import type {
 import { SafetyLimitsPage } from "./SafetyLimitsPage";
 import { CampaignReports } from "./CampaignReports";
 
-type CampaignFilter = "all" | "running" | "queued" | "paused" | "stopped" | "completed";
+type CampaignFilter = "all" | "running" | "queued" | "paused" | "stopped" | "completed" | "archived";
 type DisplayStatus = Exclude<CampaignFilter, "all"> | "ready" | "failed";
 
 type ProfileCampaignsProps = {
@@ -64,7 +67,8 @@ const filters: Array<{ value: CampaignFilter; label: string }> = [
   { value: "queued", label: "Queued" },
   { value: "paused", label: "Paused" },
   { value: "stopped", label: "Stopped" },
-  { value: "completed", label: "Completed" }
+  { value: "completed", label: "Completed" },
+  { value: "archived", label: "Archived" }
 ];
 
 export function ProfileCampaigns({
@@ -103,17 +107,20 @@ export function ProfileCampaigns({
     return latest;
   }, [runs]);
 
-  const rows = useMemo(() => campaigns.map((workspace) => ({
-    workspace,
-    run: latestRunByCampaign.get(workspace.campaign.id) ?? null,
-    status: campaignDisplayStatus(latestRunByCampaign.get(workspace.campaign.id)?.state, workspace),
-    metrics: campaignListMetrics(workspace.campaign.id, runs)
-  })), [campaigns, latestRunByCampaign, runs]);
+  const rows = useMemo(() => campaigns.map((workspace) => {
+    const run = latestRunByCampaign.get(workspace.campaign.id) ?? null;
+    return {
+      workspace,
+      run,
+      status: workspace.campaign.archivedAt ? "archived" as const : campaignDisplayStatus(run?.state, workspace),
+      metrics: campaignListMetrics(workspace.campaign.id, runs)
+    };
+  }), [campaigns, latestRunByCampaign, runs]);
 
   const visibleRows = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return rows.filter(({ workspace, status }) =>
-      (filter === "all" || status === filter) &&
+      (filter === "all" ? status !== "archived" : status === filter) &&
       (!normalizedQuery || workspace.campaign.name.toLowerCase().includes(normalizedQuery))
     );
   }, [filter, query, rows]);
@@ -273,13 +280,42 @@ export function ProfileCampaigns({
     setSelectedIds(new Set());
   }
 
+  function setSelectedCampaignsArchived(archived: boolean) {
+    const targetIds = rows
+      .filter(({ workspace, status }) => selectedIds.has(workspace.campaign.id) &&
+        (archived
+          ? status !== "archived" && !["running", "queued", "paused"].includes(status)
+          : status === "archived"))
+      .map(({ workspace }) => workspace.campaign.id);
+    if (targetIds.length === 0) return;
+
+    for (const campaignId of targetIds) {
+      setCampaignWorkspaceArchived(account.id, campaignId, archived);
+    }
+    const archivedAt = archived ? new Date().toISOString() : null;
+    setCampaigns((current) => current.map((workspace) =>
+      targetIds.includes(workspace.campaign.id)
+        ? { ...workspace, campaign: { ...workspace.campaign, archivedAt } }
+        : workspace
+    ));
+    setSelectedIds(new Set());
+    setNotice({
+      tone: "success",
+      message: `${targetIds.length} campaign${targetIds.length === 1 ? "" : "s"} ${archived ? "archived" : "restored"}.`
+    });
+  }
+
   const selectedCount = selectedIds.size;
   const canStart = rows.some(({ workspace, status }) =>
-    selectedIds.has(workspace.campaign.id) && ["ready", "paused", "stopped", "completed", "failed"].includes(status));
+    selectedIds.has(workspace.campaign.id) && status !== "archived" && ["ready", "paused", "stopped", "completed", "failed"].includes(status));
   const canPause = rows.some(({ workspace, status }) =>
     selectedIds.has(workspace.campaign.id) && ["running", "queued"].includes(status));
   const canStop = rows.some(({ workspace, status }) =>
     selectedIds.has(workspace.campaign.id) && ["running", "queued", "paused"].includes(status));
+  const canArchive = rows.some(({ workspace, status }) =>
+    selectedIds.has(workspace.campaign.id) && status !== "archived" && !["running", "queued", "paused"].includes(status));
+  const canRestore = rows.some(({ workspace, status }) =>
+    selectedIds.has(workspace.campaign.id) && status === "archived");
   const activeCampaignCount = rows.filter(({ status }) => ["running", "queued", "paused"].includes(status)).length;
   const totalLeadCount = campaigns.reduce((total, workspace) => total + workspace.campaign.profilesTotal, 0);
 
@@ -357,10 +393,13 @@ export function ProfileCampaigns({
                     key={item.value}
                     type="button"
                     className={filter === item.value ? "active" : ""}
-                    onClick={() => setFilter(item.value)}
+                    onClick={() => {
+                      setFilter(item.value);
+                      setSelectedIds(new Set());
+                    }}
                   >
                     {item.label}
-                    <span>{item.value === "all" ? rows.length : rows.filter(({ status }) => status === item.value).length}</span>
+                    <span>{item.value === "all" ? rows.filter(({ status }) => status !== "archived").length : rows.filter(({ status }) => status === item.value).length}</span>
                   </button>
                 ))}
               </div>
@@ -383,6 +422,15 @@ export function ProfileCampaigns({
                   <button className="danger-button" disabled={isBusy || !canStop} onClick={() => void stopSelectedCampaigns()}>
                     <Square size={15} /> Stop
                   </button>
+                  {canRestore ? (
+                    <button className="ghost-button" disabled={isBusy} onClick={() => setSelectedCampaignsArchived(false)}>
+                      <ArchiveRestore size={16} /> Restore
+                    </button>
+                  ) : (
+                    <button className="ghost-button" disabled={isBusy || !canArchive} onClick={() => setSelectedCampaignsArchived(true)}>
+                      <Archive size={16} /> Archive
+                    </button>
+                  )}
                   <button className="icon-button" title="Delete selected campaigns" disabled={isBusy} onClick={deleteSelectedCampaigns}>
                     <Trash2 size={16} />
                   </button>

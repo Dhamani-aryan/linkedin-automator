@@ -3662,6 +3662,11 @@ button:disabled {
   background: #421d1d;
 }
 
+.state-badge.archived {
+  color: #c4cad6;
+  background: #30333b;
+}
+
 .campaign-index-empty {
   display: grid;
   gap: 6px;
@@ -3763,7 +3768,7 @@ button:disabled {
 
   .campaign-bulk-bar > div {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr)) 36px;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) 36px;
   }
 
   .campaign-bulk-bar .ghost-button,
