@@ -3765,18 +3765,18 @@ button:disabled {
 }
 
 .report-legend .invite,
-.report-tooltip .invite { background: #76a0ff; }
+.report-tooltip .invite { background: #3987e5; }
 .report-legend .accepted,
-.report-tooltip .accepted { background: #66cf82; }
+.report-tooltip .accepted { background: #d95926; }
 .report-legend .message,
-.report-tooltip .message { background: #e0a65c; }
+.report-tooltip .message { background: #199e70; }
 .report-legend .reply,
-.report-tooltip .reply { background: #d686dc; }
+.report-tooltip .reply { background: #c98500; }
 
-.report-bar.invite { fill: #76a0ff; }
-.report-bar.accepted { fill: #66cf82; }
-.report-bar.message { fill: #e0a65c; }
-.report-bar.reply { fill: #d686dc; }
+.report-bar.invite { fill: #3987e5; }
+.report-bar.accepted { fill: #d95926; }
+.report-bar.message { fill: #199e70; }
+.report-bar.reply { fill: #c98500; }
 
 .report-campaign-table {
   overflow-x: auto;
