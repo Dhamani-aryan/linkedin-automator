@@ -50,6 +50,35 @@ cookies, verification handling, concurrency limits, and the ToS picture — is i
 
 ---
 
+## Progress
+
+**Done — the replication framework (server side, not yet wired to the API):**
+
+- `server/lib/profilePaths.js` — every profile owns
+  `.local/profiles/<slug>/{chrome-profile,runs,session.json}`, the same shape the
+  single-profile install has today. The first profile ever created **copies** the
+  existing `.local/chrome-profile` and its own run history into that layout; the
+  legacy folders are left untouched.
+- `server/lib/browserSession.js` — the Chrome session is now
+  `createBrowserSession({profileId, profileDir, cdpPort})`. Every function body is
+  the single-profile implementation unchanged; only the port, directory and owned
+  process moved from module scope into the closure. A default instance keeps the
+  original entry points behaving exactly as before.
+- `server/lib/browserPool.js` — one session per profile, created on demand;
+  adopts the port from `DevToolsActivePort` when that Chrome is still alive,
+  otherwise the profile's remembered port, otherwise the first free one.
+- `server/lib/runner.js` — `createProfileRunner({profileId, browser, store})`.
+  The run loop, state machine and safety handling are byte-identical; the active
+  run, wake handle and auth cache moved into the closure.
+- `server/lib/profileRuntime.js` — storage + browser + run store + runner per
+  profile, built on first use, released independently.
+
+**Not done yet:** `server/index.js` still drives the default instances, so the
+app behaves exactly as it did for one profile. Wiring the endpoints and the UI to
+`getProfileRuntime(profileId)` is Phase 2/3 below.
+
+---
+
 ## Phase 0 — Decisions locked before code
 
 1. **Isolation:** one Chrome user-data-dir per profile
