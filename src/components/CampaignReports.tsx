@@ -1,22 +1,16 @@
 import { CalendarDays, Download, LoaderCircle, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { getCampaignAnalytics } from "../lib/runnerApi";
-import type { CampaignAnalytics, CampaignAnalyticsDay, CampaignWorkspaceState } from "../types";
+import type { CampaignAnalytics, CampaignWorkspaceState } from "../types";
+import { chartSeries, DailyActivityChart, formatChartDate, type ChartSeriesKey } from "./DailyActivityChart";
 
 type CampaignReportsProps = {
   profileId: string;
   campaigns: CampaignWorkspaceState[];
 };
 
-type ChartSeriesKey = "invitesSent" | "accepted" | "messagesSent" | "replies";
 type ChartWindow = "7" | "14" | "30" | "all";
-
-const chartSeries: Array<{ key: ChartSeriesKey; label: string; className: string }> = [
-  { key: "invitesSent", label: "Invites", className: "invite" },
-  { key: "accepted", label: "Accepted", className: "accepted" },
-  { key: "messagesSent", label: "Messages", className: "message" },
-  { key: "replies", label: "Replies", className: "reply" }
-];
+type ChartView = "chart" | "table";
 
 const emptyAnalytics: CampaignAnalytics = {
   range: { from: "", to: "", timeZone: "UTC" },
@@ -38,6 +32,7 @@ export function CampaignReports({ profileId, campaigns }: CampaignReportsProps) 
   const [to, setTo] = useState(() => dateInputValue(new Date()));
   const [chartWindow, setChartWindow] = useState<ChartWindow>("30");
   const [chartEndDate, setChartEndDate] = useState(() => dateInputValue(new Date()));
+  const [chartView, setChartView] = useState<ChartView>("chart");
   const [analytics, setAnalytics] = useState<CampaignAnalytics>(emptyAnalytics);
   const [visibleSeries, setVisibleSeries] = useState<ChartSeriesKey[]>(() => chartSeries.map(({ key }) => key));
   const [isLoading, setIsLoading] = useState(true);
@@ -75,6 +70,14 @@ export function CampaignReports({ profileId, campaigns }: CampaignReportsProps) 
       : laterDate(from, shiftDateKey(chartEndDate, -(Number(chartWindow) - 1)));
     return analytics.daily.filter((day) => day.date >= earliest && day.date <= chartEndDate);
   }, [analytics.daily, chartEndDate, chartWindow, from]);
+
+  const windowTotals = useMemo(() => {
+    const totals: Record<ChartSeriesKey, number> = { invitesSent: 0, accepted: 0, messagesSent: 0, replies: 0 };
+    for (const day of chartDays) {
+      for (const { key } of chartSeries) totals[key] += day[key];
+    }
+    return totals;
+  }, [chartDays]);
 
   const campaignRows = useMemo(() => {
     if (campaignId) return analytics.campaigns;
@@ -172,22 +175,32 @@ export function CampaignReports({ profileId, campaigns }: CampaignReportsProps) 
                 <span>Ending</span>
                 <div className="report-date-input compact"><CalendarDays size={15} /><input type="date" value={chartEndDate} min={from} max={to} onChange={(event) => setChartEndDate(event.target.value)} /></div>
               </label>
+              <div className="report-view-switch" role="group" aria-label="Chart or table view">
+                <button type="button" className={chartView === "chart" ? "active" : ""} aria-pressed={chartView === "chart"} onClick={() => setChartView("chart")}>Chart</button>
+                <button type="button" className={chartView === "table" ? "active" : ""} aria-pressed={chartView === "table"} onClick={() => setChartView("table")}>Table</button>
+              </div>
             </div>
-            <div className="report-legend" aria-label="Visible chart outcomes">
+            <div className="report-legend" aria-label="Chart outcomes and totals for this window">
               {chartSeries.map((series) => {
                 const checked = visibleSeries.includes(series.key);
+                const total = windowTotals[series.key];
                 return (
-                  <label className={`report-series-toggle ${checked ? "active" : ""}`} key={series.key}>
+                  <label className={`report-series-toggle ${checked ? "active" : ""} ${total === 0 ? "silent" : ""}`} key={series.key}>
                     <input type="checkbox" checked={checked} onChange={() => toggleSeries(series.key)} />
                     <i className={series.className} />
                     <span>{series.label}</span>
+                    <b>{total.toLocaleString()}</b>
                   </label>
                 );
               })}
             </div>
           </div>
         </header>
-        <DailyActivityChart days={chartDays} visibleSeries={visibleSeries} />
+        {chartView === "chart" ? (
+          <DailyActivityChart days={chartDays} visibleSeries={visibleSeries} timeZone={analytics.range.timeZone || "UTC"} />
+        ) : (
+          <DailyActivityTable days={chartDays} />
+        )}
       </section>
 
       <section className="report-campaign-table">
@@ -214,53 +227,32 @@ function ReportKpi({ label, value, detail }: { label: string; value: number; det
   return <div><span>{label}</span><strong>{value.toLocaleString()}</strong><small>{detail}</small></div>;
 }
 
-function DailyActivityChart({ days, visibleSeries }: { days: CampaignAnalyticsDay[]; visibleSeries: ChartSeriesKey[] }) {
-  const maximum = Math.max(1, ...days.flatMap((day) => visibleSeries.map((key) => day[key])));
+function DailyActivityTable({ days }: { days: Array<Record<ChartSeriesKey, number> & { date: string }> }) {
+  if (days.length === 0) return <div className="report-empty">No days in this window.</div>;
   return (
-    <div className="report-chart-scroll">
-      <div className="report-chart" style={{ gridTemplateColumns: `repeat(${Math.max(days.length, 1)}, minmax(30px, 1fr))` }}>
-        {days.length === 0 ? <div className="report-empty">No activity recorded.</div> : days.map((day, index) => (
-          <div
-            className="report-day"
-            key={day.date}
-            tabIndex={0}
-            aria-label={`${formatChartDate(day.date)} campaign outcomes`}
-          >
-            <div className="report-bars">
-              {chartSeries.filter(({ key }) => visibleSeries.includes(key)).map((series) => (
-                <i key={series.key} className={series.className} style={{ height: barHeight(day[series.key], maximum) }} />
-              ))}
-            </div>
-            <span>{showDateLabel(index, days.length) ? day.date.slice(5) : ""}</span>
-            <div className="report-tooltip" role="tooltip">
-              <strong>{formatChartDate(day.date)}</strong>
-              {chartSeries.filter(({ key }) => visibleSeries.includes(key)).map((series) => (
-                <span key={series.key}><i className={series.className} /> {series.label}<b>{day[series.key]}</b></span>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+    <div className="report-day-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Date</th>
+            {chartSeries.map((series) => <th scope="col" key={series.key}>{series.label}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {days.map((day) => (
+            <tr key={day.date} className={chartSeries.every((series) => day[series.key] === 0) ? "quiet" : ""}>
+              <th scope="row">{formatChartDate(day.date)}</th>
+              {chartSeries.map((series) => <td key={series.key}>{day[series.key].toLocaleString()}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
 
-function barHeight(value: number, maximum: number) {
-  return value === 0 ? "0" : `${Math.max(5, (value / maximum) * 100)}%`;
-}
-
-function showDateLabel(index: number, total: number) {
-  const interval = total > 20 ? 5 : total > 10 ? 3 : 1;
-  return index === 0 || index === total - 1 || index % interval === 0;
-}
-
 function formatPercent(value: number) {
   return `${value.toLocaleString(undefined, { maximumFractionDigits: 1 })}%`;
-}
-
-function formatChartDate(value: string) {
-  return new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })
-    .format(new Date(`${value}T00:00:00.000Z`));
 }
 
 function daysAgo(count: number) {
