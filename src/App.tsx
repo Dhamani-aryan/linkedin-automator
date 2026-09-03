@@ -541,17 +541,14 @@ export function App() {
           )}
         </section>
 
-        <section className="notice-card">
-          <AlertTriangle size={20} />
-          <div>
-            <strong>Single-profile v1</strong>
-            <p>
-              This build keeps one persistent Chrome login on this computer and does not use proxies or rotating IPs.
-              Multi-profile Chrome isolation will be added after the single-profile flow is proven.
-            </p>
-            {selectedAccount?.lastError ? <p className="error-text">{selectedAccount.lastError}</p> : null}
-          </div>
-        </section>
+        {selectedAccount?.lastError ? (
+          <section className="notice-card">
+            <AlertTriangle size={20} />
+            <div>
+              <p className="error-text">{selectedAccount.lastError}</p>
+            </div>
+          </section>
+        ) : null}
           </>
         ) : null}
       </section>
