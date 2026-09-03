@@ -433,6 +433,9 @@ export function createBrowserSession({
  */
 const defaultSession = createBrowserSession();
 
+/** The one session the single-profile entry points above drive. */
+export const getDefaultBrowserSession = () => defaultSession;
+
 export const launch = (...args) => defaultSession.launch(...args);
 export const stop = (...args) => defaultSession.stop(...args);
 export const status = (...args) => defaultSession.status(...args);
