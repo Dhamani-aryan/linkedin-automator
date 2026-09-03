@@ -7,6 +7,10 @@ global queue.
 
 Scope: local controller only. No proxies, no hosted backend, no second machine.
 
+Background research for every decision below — Chrome isolation mechanics, session
+cookies, verification handling, concurrency limits, and the ToS picture — is in
+[MULTI_PROFILE_RESEARCH.md](./MULTI_PROFILE_RESEARCH.md).
+
 ---
 
 ## What already works (do not rebuild)
@@ -53,18 +57,30 @@ Scope: local controller only. No proxies, no hosted backend, no second machine.
    Logins never mix; each profile is logged into once, by hand.
 2. **Parallelism:** one runner loop per profile, several profiles at once, but
    never two runs for the same profile, and never more than
-   `MAX_PARALLEL_PROFILES` (default 3, env-overridable) profiles executing —
+   `MAX_PARALLEL_PROFILES` (default 2, env-overridable) profiles executing —
    extra runs stay `queued`.
-3. **Ports:** allocated dynamically from 9223 upward by probing for a free
-   port; the chosen port, pid and start time are written to
-   `.local/chrome-profiles/<profileId>/session.json` so a controller restart can
-   re-attach instead of orphaning a browser.
-4. **Every browser-touching endpoint carries a `profileId`.** No implicit
+3. **Ports:** a deterministic base (`9223 + index`) recorded per profile but
+   always verified before use — probe `GET /json/version`, and read the actual
+   port from the `DevToolsActivePort` file Chrome writes into the profile
+   directory, since Chrome silently ignores the flag in several failure modes.
+   Port, pid and start time live in `.local/chrome-profiles/<profileId>/session.json`
+   so a controller restart can adopt a live browser instead of orphaning it.
+4. **Chrome 136+ constraint:** `--remote-debugging-port` is ignored when the
+   user-data-dir is the default profile location, so every automated profile
+   must live in its own non-default directory and be logged into by hand once.
+   Driving the user's everyday Chrome profile is not possible at all.
+5. **Every browser-touching endpoint carries a `profileId`.** No implicit
    "current profile" on the server — a missing id is a 400
    (`MISSING_PROFILE`), never a silent fallback to the first account.
-5. **Safety budgets are per profile and counted across runs.**
-6. Dry run stays the default; the live connection-request gate is unchanged by
+6. **Safety budgets are per profile and counted across runs.**
+7. Dry run stays the default; the live connection-request gate is unchanged by
    this plan.
+8. **No fingerprint spoofing, no stealth patches, headed Chrome only** — a
+   plain, coherent, persistent profile per account is both simpler and, per the
+   research, less detectable than a spoofed one.
+9. **A profile directory is never deleted or recreated in normal operation.**
+   Deleting it logs the account out and makes the next sign-in look like a new
+   device.
 
 ---
 
@@ -80,9 +96,12 @@ loses its module state.
   `checkLinkedInAuth` all take the browser handle (or `profileId`) explicitly.
 - Port allocation + `session.json` write/read; on startup, probe each recorded
   port and adopt the browser if it answers, otherwise clear the record.
-- **Migration:** if `.local/chrome-profile` exists, move it to
-  `.local/chrome-profiles/<first account id>` on first boot (and log it), so the
-  LinkedIn session already logged in today is not lost.
+- **Migration:** if `.local/chrome-profile` exists, **copy** it to
+  `.local/chrome-profiles/<first account id>` on first boot, verify the session
+  still authenticates there, and only then retire the old directory — never move
+  first. The `bscookie`/`li_rm` cookies that remember this device's two-step
+  verification live in that directory; losing it means logging in and verifying
+  again.
 - `stopAll()` for controller shutdown.
 
 Done when: the existing single profile behaves exactly as before but through the
@@ -112,13 +131,24 @@ profile B does not disturb profile A's window.
 - `getActiveCampaignRun(profileId)` and `/api/campaign-runs/active?profileId=`;
   add `GET /api/campaign-runs/active-all` for a cross-profile view.
 - `startNextQueuedRun(profileId)` drains that profile's queue; a global
-  admission check enforces `MAX_PARALLEL_PROFILES`.
+  admission check enforces `MAX_PARALLEL_PROFILES` (default **2** on a 16 GB
+  machine — a headed Chrome with LinkedIn loaded costs roughly 0.4–1.5 GB).
+- Profiles get **independent jitter and, by default, different working-hour
+  windows**: identical timing across accounts is itself a detection signal,
+  regardless of how well the profiles are isolated.
 - `scheduleRunLoop` / `runLoop` / stop / pause / resume / retry all key their
   bookkeeping by the run's `profileId`; `checkLinkedInAuth` caching moves into
   the per-profile entry.
 - Reply checks (`checkCampaignReplies`) already take a `profileId`; make the
   in-flight promise per profile so one profile's check cannot block another's.
-- Boot recovery: `recoverInterruptedRuns()` then resume or queue **per profile**.
+- Boot recovery: `recoverInterruptedRuns()` then resume or queue **per profile**;
+  adopt any Chrome whose recorded port still answers rather than relaunching.
+- New profile-level state `needs_verification`, separate from the run-level
+  `needs_attention`: an `AUTH_CHALLENGE` stops every run for that profile, records
+  the challenge URL and kind, and asks the human to finish verification in that
+  profile's own Chrome window. The controller never enters a code and never
+  stores a 2FA secret. Resume only on a positive authenticated probe, after a
+  cooldown and at reduced volume.
 
 Done when: unit tests cover the per-profile mutex, the parallel cap and queue
 draining, and two dry runs on two profiles complete concurrently.
