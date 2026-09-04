@@ -36,6 +36,12 @@ import {
 } from "./lib/storage";
 import type { ChromeStatus, CompanyUser, HumanTouchSettings, LinkedInAccount } from "./types";
 
+function profileFolderName(profileDir?: string) {
+  if (!profileDir) return null;
+  const parts = profileDir.split(/[\\/]+/).filter(Boolean);
+  return parts[parts.length - 2] ?? null;
+}
+
 export function App() {
   const [authMode, setAuthMode] = useState<"register" | "signin">("register");
   const [authForm, setAuthForm] = useState({
@@ -53,7 +59,8 @@ export function App() {
     const restoredAccounts = companyUser ? restoreSample UserAccountForWorkspace(companyUser, storedAccounts) : storedAccounts;
     return restoredAccounts[0]?.id ?? "";
   });
-  const [status, setStatus] = useState<ChromeStatus | null>(null);
+  const [statusByAccount, setStatusByAccount] = useState<Record<string, ChromeStatus | null>>({});
+  const statusFor = (accountId?: string) => (accountId ? statusByAccount[accountId] ?? null : null);
   const [isBusy, setIsBusy] = useState(false);
   const [route, setRoute] = useState<AppRoute>(() => readAppRoute());
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
@@ -66,15 +73,17 @@ export function App() {
       : null;
   const selectedAccount = routeAccount ?? accounts.find((candidate) => candidate.id === selectedAccountId) ?? accounts[0] ?? null;
   const activePage = route.kind === "manager" ? route.page : "profiles";
+  const selectedStatus = statusFor(selectedAccount?.id);
   const activeLinkedInTab = useMemo(
-    () => status?.tabs.find((tab) => tab.url.includes("linkedin.com")) ?? null,
-    [status]
+    () => selectedStatus?.tabs.find((tab) => tab.url.includes("linkedin.com")) ?? null,
+    [selectedStatus]
   );
 
+  // Each profile has its own Chrome, so every account row needs its own status.
   useEffect(() => {
     if (!companyUser) return;
-    void refreshStatus();
-  }, [companyUser]);
+    for (const account of accounts) void refreshStatus(account.id);
+  }, [companyUser, accounts.length]);
 
   useEffect(() => {
     const syncRoute = () => setRoute(readAppRoute());
@@ -115,9 +124,10 @@ export function App() {
   }, [humanTouchSettings]);
 
   async function refreshStatus(accountId = selectedAccount?.id) {
+    if (!accountId) return;
     try {
-      const nextStatus = await getChromeStatus();
-      setStatus(nextStatus);
+      const nextStatus = await getChromeStatus(accountId);
+      setStatusByAccount((current) => ({ ...current, [accountId]: nextStatus }));
       setAccounts((currentAccounts) =>
         currentAccounts.map((currentAccount) => ({
           ...currentAccount,
@@ -183,7 +193,8 @@ export function App() {
   }
 
   function openLinkedIn(accountId = selectedAccount?.id) {
-    return runChromeAction(() => openChromeUrl("https://www.linkedin.com/"), accountId, true);
+    if (!accountId) return Promise.resolve(false);
+    return runChromeAction(() => openChromeUrl(accountId, "https://www.linkedin.com/"), accountId, true);
   }
 
   function navigate(nextRoute: AppRoute, replace = false) {
@@ -308,7 +319,7 @@ export function App() {
     return (
       <ProfileCampaigns
         account={routeAccount}
-        chromeStatus={status}
+        chromeStatus={statusFor(routeAccount.id)}
         chromeError={routeAccount.lastError}
         isChromeBusy={isBusy}
         safetySettings={humanTouchSettings}
@@ -323,8 +334,8 @@ export function App() {
         })}
         onOpenLinkedIn={() => openLinkedIn(routeAccount.id)}
         onRefreshChrome={() => void refreshStatus(routeAccount.id)}
-        onStartChrome={() => runChromeAction(() => startChrome(), routeAccount.id, true)}
-        onStopChrome={() => runChromeAction(() => stopChrome(), routeAccount.id)}
+        onStartChrome={() => runChromeAction(() => startChrome(routeAccount.id), routeAccount.id, true)}
+        onStopChrome={() => runChromeAction(() => stopChrome(routeAccount.id), routeAccount.id)}
       />
     );
   }
@@ -336,7 +347,7 @@ export function App() {
         campaignId={route.campaignId}
         activeTab={route.tab}
         leadFilter={route.leadFilter}
-        chromeStatus={status}
+        chromeStatus={statusFor(routeAccount.id)}
         chromeError={routeAccount.lastError}
         isBusy={isBusy}
         safetySettings={humanTouchSettings}
@@ -351,8 +362,8 @@ export function App() {
         })}
         onOpenLinkedIn={() => openLinkedIn(routeAccount.id)}
         onRefreshChrome={() => void refreshStatus(routeAccount.id)}
-        onStartChrome={() => runChromeAction(() => startChrome(), routeAccount.id, true)}
-        onStopChrome={() => runChromeAction(() => stopChrome(), routeAccount.id)}
+        onStartChrome={() => runChromeAction(() => startChrome(routeAccount.id), routeAccount.id, true)}
+        onStopChrome={() => runChromeAction(() => stopChrome(routeAccount.id), routeAccount.id)}
         onTabChange={(tab) => navigate({
           kind: "workspace",
           profileId: routeAccount.id,
@@ -417,7 +428,11 @@ export function App() {
             <h1>LinkedIn profiles</h1>
           </div>
           <div className="header-actions">
-            <button className="ghost-button" onClick={() => void refreshStatus()} disabled={isBusy}>
+            <button
+              className="ghost-button"
+              onClick={() => accounts.forEach((account) => void refreshStatus(account.id))}
+              disabled={isBusy}
+            >
               <RefreshCw size={18} />
               Refresh
             </button>
@@ -466,7 +481,7 @@ export function App() {
                       onClick={() => {
                         setSelectedAccountId(account.id);
                         void runChromeAction(
-                          () => openChromeUrl("https://www.linkedin.com/"),
+                          () => openChromeUrl(account.id, "https://www.linkedin.com/"),
                           account.id,
                           true
                         );
@@ -482,10 +497,10 @@ export function App() {
                   {account.state}
                 </div>
                 <div className="session-detail">
-                  <strong>{status?.connected && selectedAccount?.id === account.id ? "Connected" : "Not connected"}</strong>
-                  <span>Profile: {status?.profileDir ?? ".local/chrome-profile"}</span>
-                  {activeLinkedInTab && selectedAccount?.id === account.id ? (
-                    <span>Tab: {activeLinkedInTab.title || "LinkedIn"}</span>
+                  <strong>{statusFor(account.id)?.connected ? "Connected" : "Not connected"}</strong>
+                  <span>Profile folder: {profileFolderName(statusFor(account.id)?.profileDir) ?? "created on first start"}</span>
+                  {statusFor(account.id)?.tabs.find((tab) => tab.url.includes("linkedin.com")) ? (
+                    <span>Tab: {statusFor(account.id)?.tabs.find((tab) => tab.url.includes("linkedin.com"))?.title || "LinkedIn"}</span>
                   ) : null}
                 </div>
                 <div className="account-meta-cell">
@@ -511,7 +526,7 @@ export function App() {
                     title="Start Chrome"
                       onClick={() => {
                         setSelectedAccountId(account.id);
-                        void runChromeAction(() => startChrome(), account.id, true);
+                        void runChromeAction(() => startChrome(account.id), account.id, true);
                     }}
                     disabled={isBusy}
                   >
@@ -522,7 +537,7 @@ export function App() {
                     title="Stop Chrome"
                       onClick={() => {
                         setSelectedAccountId(account.id);
-                        void runChromeAction(() => stopChrome(), account.id);
+                        void runChromeAction(() => stopChrome(account.id), account.id);
                     }}
                     disabled={isBusy}
                   >
