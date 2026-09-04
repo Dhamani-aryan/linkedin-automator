@@ -33,6 +33,12 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === "GET" && requestUrl.pathname === "/api/chrome/diagnose") {
+      const browser = await browserFor(requestUrl.searchParams.get("profileId"));
+      sendJson(response, 200, await browser.diagnose());
+      return;
+    }
+
     if (request.method === "GET" && requestUrl.pathname === "/api/chrome/tabs") {
       try {
         const browser = await browserFor(requestUrl.searchParams.get("profileId"));
@@ -191,7 +197,10 @@ await initializeProfileRuntimes((await listStoredProfiles()).map((stored) => sto
  * server happened to open first.
  */
 function requireProfileId(value) {
-  if (typeof value !== "string" || value.trim().length === 0) {
+  const profileId = typeof value === "string" ? value.trim() : "";
+  // "undefined" and "null" reach here as text when a caller forgets to pass an id;
+  // treating them as real profiles creates a stray profile folder and steals a port.
+  if (profileId === "" || profileId === "undefined" || profileId === "null") {
     throw new AppError("MISSING_PROFILE", "A LinkedIn profile is required for this request.");
   }
   return value.trim();
