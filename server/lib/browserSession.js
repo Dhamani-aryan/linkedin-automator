@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -40,6 +40,7 @@ export function createBrowserSession({
     }
 
     const chromePath = resolveChromePath();
+    const firstRun = !existsSync(join(profileDir, "Local State"));
     await mkdir(profileDir, { recursive: true });
 
     ownedChromeProcess = spawn(chromePath, [
@@ -61,7 +62,9 @@ export function createBrowserSession({
       ownedChromeProcess = null;
     });
 
-    await waitForCdp(12_000);
+    // A brand new profile has to be built before Chrome serves anything, which takes
+    // far longer than reopening a profile that already exists.
+    await waitForCdp(firstRun ? 45_000 : 15_000);
     return await status();
   }
 
@@ -402,17 +405,85 @@ export function createBrowserSession({
       if ((await tryReadChromeTabs()) !== null) {
         return;
       }
+
+      // Chrome records the port it actually bound. If it could not take the one we
+      // asked for, follow it to the one it chose instead of reporting a failure.
+      const boundPort = readDevToolsActivePort();
+      if (boundPort !== null && boundPort !== cdpPort && (await portAnswers(boundPort))) {
+        cdpPort = boundPort;
+        return;
+      }
+
+      if (ownedChromeProcess === null && Date.now() - started > 2_000) break;
       await sleep(250);
     }
 
-    throw new Error("Chrome opened, but the debugging endpoint did not become available.");
+    throw new AppError(ErrorCodes.CHROME_NOT_CONNECTED, chromeNotListeningMessage(), await diagnose());
+  }
+
+  function chromeNotListeningMessage() {
+    if (ownedChromeProcess === null) {
+      return "Chrome closed straight after starting for this profile. That usually means a Chrome window for this " +
+        "profile folder is already open without automation enabled - close every window of it and start again.";
+    }
+    if (readDevToolsActivePort() === null && profileLockPresent()) {
+      return "Chrome is running for this profile but never opened its automation port, so this profile cannot be " +
+        "driven. Close every Chrome window for this profile and press Start Chrome again.";
+    }
+    return "Chrome started for this profile but its automation port never answered. Close every Chrome window for " +
+      "this profile and press Start Chrome again.";
+  }
+
+  /** What this profile folder and its port say about the profile right now. */
+  async function diagnose() {
+    const boundPort = readDevToolsActivePort();
+    return {
+      ok: true,
+      profileId,
+      profileDir,
+      requestedPort: cdpPort,
+      portAnswers: await portAnswers(cdpPort),
+      devToolsActivePort: boundPort,
+      boundPortAnswers: boundPort === null ? false : await portAnswers(boundPort),
+      profileLocked: profileLockPresent(),
+      ownedProcessAlive: ownedChromeProcess !== null,
+      launchedAt,
+      firstRunPending: !existsSync(join(profileDir, "Local State"))
+    };
+  }
+
+  function readDevToolsActivePort() {
+    try {
+      const raw = readFileSync(join(profileDir, "DevToolsActivePort"), "utf8");
+      const port = Number.parseInt(raw.split(/\r?\n/)[0], 10);
+      return Number.isFinite(port) && port > 0 ? port : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Chrome keeps a lock file in the profile folder while it has that profile open. */
+  function profileLockPresent() {
+    return existsSync(join(profileDir, "lockfile")) || existsSync(join(profileDir, "SingletonLock"));
+  }
+
+  async function portAnswers(port) {
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/json/version`, { signal: AbortSignal.timeout(800) });
+      return response.ok;
+    } catch {
+      return false;
+    }
   }
 
 
   return {
     profileId,
     profileDir,
-    cdpPort,
+    get cdpPort() {
+      return cdpPort;
+    },
+    diagnose,
     launch,
     stop,
     status,
