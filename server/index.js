@@ -1,28 +1,8 @@
 import { createServer } from "node:http";
-import {
-  collectVisibleProfiles,
-  launch,
-  listTabs,
-  openChromeUrl,
-  resolveProfileIdentities,
-  status,
-  stop
-} from "./lib/browserSession.js";
 import { getCampaignAnalytics } from "./lib/analytics.js";
 import { AppError, ErrorCodes, toErrorResponse } from "./lib/errors.js";
-import {
-  checkCampaignReplies,
-  getActiveCampaignRun,
-  getCampaignRun,
-  initializeRunner,
-  listCampaignRuns,
-  pauseCampaignRun,
-  retryCampaignRun,
-  resumeCampaignRun,
-  startCampaignBatch,
-  startCampaignRun,
-  stopCampaignRun
-} from "./lib/runner.js";
+import { listStoredProfiles } from "./lib/profilePaths.js";
+import { findRuntimeForRun, getProfileRuntime, initializeProfileRuntimes } from "./lib/profileRuntime.js";
 
 const host = process.env.LINKEDIN_AUTOMATOR_HOST ?? "127.0.0.1";
 const port = Number.parseInt(process.env.LINKEDIN_AUTOMATOR_PORT ?? "4287", 10);
@@ -43,13 +23,20 @@ const server = createServer(async (request, response) => {
     }
 
     if (request.method === "GET" && requestUrl.pathname === "/api/chrome/status") {
-      sendJson(response, 200, await status());
+      const browser = await browserFor(requestUrl.searchParams.get("profileId"));
+      sendJson(response, 200, { ...(await browser.status()), profileId: browser.profileId });
+      return;
+    }
+
+    if (request.method === "GET" && requestUrl.pathname === "/api/chrome/sessions") {
+      sendJson(response, 200, { ok: true, sessions: await allProfileStatuses() });
       return;
     }
 
     if (request.method === "GET" && requestUrl.pathname === "/api/chrome/tabs") {
       try {
-        sendJson(response, 200, { ok: true, tabs: await listTabs() });
+        const browser = await browserFor(requestUrl.searchParams.get("profileId"));
+        sendJson(response, 200, { ok: true, tabs: await browser.listTabs() });
       } catch (error) {
         if (error instanceof AppError && error.code === ErrorCodes.CHROME_NOT_CONNECTED) {
           sendJson(response, 200, { ok: false, error: toErrorResponse(error) });
@@ -62,102 +49,121 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "POST" && requestUrl.pathname === "/api/chrome/start") {
       const body = await readJsonBody(request);
-      sendJson(response, 200, await launch(readOptionalUrl(body, defaultUrl)));
+      const browser = await browserFor(body.profileId);
+      sendJson(response, 200, { ...(await browser.launch(readOptionalUrl(body, defaultUrl))), profileId: browser.profileId });
       return;
     }
 
     if (request.method === "POST" && requestUrl.pathname === "/api/chrome/open") {
       const body = await readJsonBody(request);
-      sendJson(response, 200, await openChromeUrl(readRequiredUrl(body)));
+      const browser = await browserFor(body.profileId);
+      sendJson(response, 200, { ...(await browser.openChromeUrl(readRequiredUrl(body))), profileId: browser.profileId });
       return;
     }
 
     if (request.method === "POST" && requestUrl.pathname === "/api/chrome/collect-profiles") {
       const body = await readJsonBody(request);
-      sendJson(response, 200, await collectVisibleProfiles(readOptionalUrl(body, "")));
+      const browser = await browserFor(body.profileId);
+      sendJson(response, 200, await browser.collectVisibleProfiles(readOptionalUrl(body, "")));
       return;
     }
 
     if (request.method === "POST" && requestUrl.pathname === "/api/chrome/resolve-profile-identities") {
       const body = await readJsonBody(request);
-      sendJson(response, 200, await resolveProfileIdentities(readProfileIdentityRequests(body)));
+      const browser = await browserFor(body.profileId);
+      sendJson(response, 200, await browser.resolveProfileIdentities(readProfileIdentityRequests(body)));
       return;
     }
 
     if (request.method === "POST" && requestUrl.pathname === "/api/chrome/stop") {
-      sendJson(response, 200, await stop());
+      const body = await readJsonBody(request);
+      const browser = await browserFor(body.profileId);
+      sendJson(response, 200, await browser.stop());
       return;
     }
 
     if (request.method === "POST" && requestUrl.pathname === "/api/campaign-runs") {
       const body = await readJsonBody(request);
-      const result = await startCampaignRun(body);
+      const runtime = await runtimeFor(body.profileId);
+      const result = await runtime.runner.startCampaignRun(body);
       sendJson(response, result.ok ? 201 : 400, result);
       return;
     }
 
     if (request.method === "GET" && requestUrl.pathname === "/api/campaign-runs/active") {
-      sendJson(response, 200, await getActiveCampaignRun());
+      const runtime = await runtimeFor(requestUrl.searchParams.get("profileId"));
+      sendJson(response, 200, await runtime.runner.getActiveCampaignRun());
       return;
     }
 
     const runMatch = requestUrl.pathname.match(/^\/api\/campaign-runs\/([^/]+)$/);
     if (request.method === "GET" && runMatch) {
-      sendJson(response, 200, await getCampaignRun(runMatch[1]));
+      const runtime = await runtimeForRun(runMatch[1]);
+      sendJson(response, 200, await runtime.runner.getCampaignRun(runMatch[1]));
       return;
     }
 
     const stopMatch = requestUrl.pathname.match(/^\/api\/campaign-runs\/([^/]+)\/stop$/);
     if (request.method === "POST" && stopMatch) {
-      sendJson(response, 200, await stopCampaignRun(stopMatch[1]));
+      const runtime = await runtimeForRun(stopMatch[1]);
+      sendJson(response, 200, await runtime.runner.stopCampaignRun(stopMatch[1]));
       return;
     }
 
     const pauseMatch = requestUrl.pathname.match(/^\/api\/campaign-runs\/([^/]+)\/pause$/);
     if (request.method === "POST" && pauseMatch) {
-      sendJson(response, 200, await pauseCampaignRun(pauseMatch[1]));
+      const runtime = await runtimeForRun(pauseMatch[1]);
+      sendJson(response, 200, await runtime.runner.pauseCampaignRun(pauseMatch[1]));
       return;
     }
 
     const resumeMatch = requestUrl.pathname.match(/^\/api\/campaign-runs\/([^/]+)\/resume$/);
     if (request.method === "POST" && resumeMatch) {
       const body = await readJsonBody(request);
-      sendJson(response, 200, await resumeCampaignRun(resumeMatch[1], body.actions));
+      const runtime = await runtimeForRun(resumeMatch[1]);
+      sendJson(response, 200, await runtime.runner.resumeCampaignRun(resumeMatch[1], body.actions));
       return;
     }
 
     if (request.method === "POST" && requestUrl.pathname === "/api/campaign-runs/batch") {
       const body = await readJsonBody(request);
-      const result = await startCampaignBatch(body.snapshots);
+      const runtime = await runtimeFor(body.snapshots?.[0]?.profileId);
+      const result = await runtime.runner.startCampaignBatch(body.snapshots);
       sendJson(response, result.ok ? 201 : 400, result);
       return;
     }
 
     if (request.method === "GET" && requestUrl.pathname === "/api/campaign-runs") {
-      sendJson(response, 200, await listCampaignRuns(requestUrl.searchParams.get("profileId") ?? ""));
+      const profileId = requireProfileId(requestUrl.searchParams.get("profileId"));
+      const runtime = await runtimeFor(profileId);
+      sendJson(response, 200, await runtime.runner.listCampaignRuns(profileId));
       return;
     }
 
     if (request.method === "POST" && requestUrl.pathname === "/api/campaign-replies/check") {
       const body = await readJsonBody(request);
-      sendJson(response, 200, await checkCampaignReplies(body.profileId, { force: body.force === true }));
+      const runtime = await runtimeFor(body.profileId);
+      sendJson(response, 200, await runtime.runner.checkCampaignReplies(body.profileId, { force: body.force === true }));
       return;
     }
 
     if (request.method === "GET" && requestUrl.pathname === "/api/analytics/campaigns") {
+      const profileId = requireProfileId(requestUrl.searchParams.get("profileId"));
+      const runtime = await runtimeFor(profileId);
       sendJson(response, 200, await getCampaignAnalytics({
-        profileId: requestUrl.searchParams.get("profileId") ?? "",
+        profileId,
         campaignId: requestUrl.searchParams.get("campaignId") ?? "",
         from: requestUrl.searchParams.get("from") ?? "",
         to: requestUrl.searchParams.get("to") ?? "",
         timeZone: requestUrl.searchParams.get("timeZone") ?? "UTC"
-      }));
+      }, { listRuns: runtime.listRuns, readAudit: runtime.readAudit }));
       return;
     }
 
     const retryMatch = requestUrl.pathname.match(/^\/api\/campaign-runs\/([^/]+)\/retry$/);
     if (request.method === "POST" && retryMatch) {
-      sendJson(response, 200, await retryCampaignRun(retryMatch[1]));
+      const runtime = await runtimeForRun(retryMatch[1]);
+      sendJson(response, 200, await runtime.runner.retryCampaignRun(retryMatch[1]));
       return;
     }
 
@@ -177,7 +183,52 @@ server.listen(port, host, () => {
   console.log(`LinkedIn Automator local server listening on http://${host}:${port}`);
 });
 
-await initializeRunner();
+await initializeProfileRuntimes((await listStoredProfiles()).map((stored) => stored.profileId).filter(Boolean));
+
+/**
+ * Every browser and run endpoint is scoped to one LinkedIn profile. A missing
+ * profile id is an error rather than a silent fallback to whichever profile the
+ * server happened to open first.
+ */
+function requireProfileId(value) {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new AppError("MISSING_PROFILE", "A LinkedIn profile is required for this request.");
+  }
+  return value.trim();
+}
+
+async function runtimeFor(profileId) {
+  return await getProfileRuntime(requireProfileId(profileId));
+}
+
+async function browserFor(profileId) {
+  return (await runtimeFor(profileId)).browser;
+}
+
+async function runtimeForRun(runId) {
+  const runtime = await findRuntimeForRun(runId);
+  if (!runtime) {
+    throw new AppError("RUN_NOT_FOUND", "That campaign run does not belong to any known profile.");
+  }
+  return runtime;
+}
+
+async function allProfileStatuses() {
+  const stored = (await listStoredProfiles()).map((entry) => entry.profileId).filter(Boolean);
+  return await Promise.all(stored.map(async (profileId) => {
+    try {
+      const browser = await browserFor(profileId);
+      return { ...(await browser.status()), profileId };
+    } catch (error) {
+      return {
+        ok: false,
+        profileId,
+        connected: false,
+        error: error instanceof Error ? error.message : "Chrome status failed."
+      };
+    }
+  }));
+}
 
 async function readJsonBody(request) {
   const chunks = [];
@@ -270,6 +321,8 @@ function sendJson(response, status, body) {
 function statusForError(error) {
   if (error instanceof AppError && error.code === "ACTIVE_RUN_EXISTS") return 409;
   if (error instanceof AppError && error.code === "LIVE_RUN_NOT_VERIFIED") return 400;
+  if (error instanceof AppError && error.code === "MISSING_PROFILE") return 400;
+  if (error instanceof AppError && error.code === "RUN_NOT_FOUND") return 404;
   if (error instanceof AppError && error.code === ErrorCodes.CHROME_NOT_CONNECTED) return 503;
   return 500;
 }
