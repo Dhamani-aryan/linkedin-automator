@@ -653,7 +653,7 @@ Pure functions are used for state transitions, deadline calculations, safety win
 
 ## 25. Test coverage and verification
 
-The current suite has 17 test files and 104 passing tests. It covers:
+The current suite has 17 test files and 111 passing tests. It covers:
 
 - run transitions, validation, queueing, deadlines, and delay updates;
 - atomic run storage, audit reading, recovery, and duplicate-send detection;
@@ -672,7 +672,7 @@ The current suite has 17 test files and 104 passing tests. It covers:
 At the review point for this guide:
 
 ```text
-npm test       -> 17 files passed, 104 tests passed
+npm test       -> 17 files passed, 111 tests passed
 npm run build  -> TypeScript and Vite production build passed
 ```
 

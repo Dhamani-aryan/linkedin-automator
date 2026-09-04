@@ -485,7 +485,7 @@ React UI -> HTTP API -> profile runtime -> runner -> CDP -> Chrome -> LinkedIn
 
 ### 109. How did you test the project?
 
-**Answer:** The current suite has 17 Vitest files and 104 passing tests. It concentrates on pure high-risk logic: transitions, recovery, scheduling, safety, duplicate delivery, profile isolation, port allocation, analytics, routing, CSV, notifications, and message classification. TypeScript plus the Vite production build provide an additional integration check.
+**Answer:** The current suite has 17 Vitest files and 111 passing tests. It concentrates on pure high-risk logic: transitions, recovery, scheduling, safety, duplicate delivery, profile isolation, port allocation, analytics, routing, CSV, notifications, and message classification. TypeScript plus the Vite production build provide an additional integration check.
 
 ### 110. What commands verify it?
 
@@ -774,7 +774,7 @@ Vitest.
 
 ### 170. Current verified test count?
 
-104 tests in 17 files at the document review point.
+111 tests in 17 files at the document review point.
 
 ### 171. Live connection requests?
 
