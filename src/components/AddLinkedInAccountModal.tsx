@@ -70,10 +70,12 @@ export function AddLinkedInAccountModal({ onAdd, onClose }: AddLinkedInAccountMo
           <div className="login-persistence-note">
             <Info size={18} />
             <div>
-              <strong>Single-profile v1</strong>
+              <strong>Its own Chrome, its own login</strong>
               <span>
-                Uses one local Chrome profile at <code>.local/chrome-profile</code>, no proxy rotation, same machine IP.
-                Multi-profile isolation will map each LinkedIn profile to its own Chrome folder later.
+                This profile gets its own Chrome folder and window, separate from every other profile.
+                Sign in once inside that window and the session stays, including the check that this
+                device already passed two-step verification. All profiles still share this computer and
+                its IP address.
               </span>
             </div>
           </div>
@@ -82,7 +84,7 @@ export function AddLinkedInAccountModal({ onAdd, onClose }: AddLinkedInAccountMo
             <Chrome size={22} />
             <div>
               <strong>After adding</strong>
-              <span>Click start, log into LinkedIn in the Chrome window, then future starts reuse that login.</span>
+              <span>Click start to open this profile's Chrome window, sign in to LinkedIn there, and every later start reuses that login.</span>
             </div>
           </div>
 
