@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { createServer } from "node:net";
 import { join } from "node:path";
 import { createBrowserSession } from "./browserSession.js";
 import {
@@ -29,6 +30,7 @@ export function createBrowserPool(dependencies = {}) {
   const findLegacyOwner = dependencies.resolveLegacyProfileOwner ?? resolveLegacyProfileOwner;
   const claimLegacyOwner = dependencies.recordLegacyProfileOwner ?? recordLegacyProfileOwner;
   const isPortAlive = dependencies.isPortAlive ?? cdpPortIsAlive;
+  const isPortBindable = dependencies.isPortBindable ?? portIsBindable;
   const readActivePort = dependencies.readDevToolsActivePort ?? readDevToolsActivePort;
   const basePort = dependencies.basePort ?? defaultBasePort;
 
@@ -68,7 +70,20 @@ export function createBrowserPool(dependencies = {}) {
       paths,
       adoptedLegacyProfile
     });
+    // Chrome may bind a different port than the one we asked for; record whatever it
+    // ended up on so the next controller start finds this profile again.
+    const launchWithoutRecord = entry.launch;
+    entry.launch = async (...args) => {
+      const result = await launchWithoutRecord(...args);
+      await rememberSession(profileId, paths, entry.cdpPort);
+      return result;
+    };
     browsers.set(profileId, entry);
+    await rememberSession(profileId, paths, cdpPort);
+    return entry;
+  }
+
+  async function rememberSession(profileId, paths, cdpPort) {
     await writeProfileSession(profileId, {
       ...(await readProfileSession(profileId)),
       profileId,
@@ -76,7 +91,6 @@ export function createBrowserPool(dependencies = {}) {
       profileDir: paths.chromeProfileDir,
       updatedAt: new Date().toISOString()
     });
-    return entry;
   }
 
   /**
@@ -91,15 +105,25 @@ export function createBrowserPool(dependencies = {}) {
 
     const claimed = new Set([...browsers.values()].map((entry) => entry.cdpPort));
     const remembered = (await readProfileSession(profileId))?.cdpPort;
-    if (remembered && !claimed.has(remembered) && !(await isPortAlive(remembered))) return remembered;
+    if (remembered && (await isPortUsable(remembered, claimed))) return remembered;
 
     for (let offset = 0; offset < portScanLimit; offset += 1) {
       const candidate = basePort + offset;
-      if (claimed.has(candidate)) continue;
-      if (await isPortAlive(candidate)) continue;
-      return candidate;
+      if (await isPortUsable(candidate, claimed)) return candidate;
     }
     throw new Error(`No free Chrome debugging port between ${basePort} and ${basePort + portScanLimit}.`);
+  }
+
+  /**
+   * A port is only usable if nothing answers on it AND Chrome can actually bind it.
+   * On Windows whole ranges can be reserved (Hyper-V, WSL) or held by software that
+   * never answers HTTP: handing Chrome one of those makes it start with no
+   * automation port at all, which looks like a broken profile.
+   */
+  async function isPortUsable(port, claimed) {
+    if (claimed.has(port)) return false;
+    if (await isPortAlive(port)) return false;
+    return await isPortBindable(port);
   }
 
   async function status(profileId) {
@@ -149,6 +173,24 @@ export function createBrowserPool(dependencies = {}) {
     release,
     stopAll
   };
+}
+
+/** Can a server actually listen on this port on this machine right now? */
+export async function portIsBindable(port) {
+  return await new Promise((resolve) => {
+    const probe = createServer();
+    const finish = (usable) => {
+      probe.removeAllListeners();
+      resolve(usable);
+    };
+    probe.once("error", () => finish(false));
+    probe.once("listening", () => probe.close(() => finish(true)));
+    try {
+      probe.listen(port, "127.0.0.1");
+    } catch {
+      finish(false);
+    }
+  });
 }
 
 export async function cdpPortIsAlive(port) {

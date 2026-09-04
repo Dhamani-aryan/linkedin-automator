@@ -32,6 +32,7 @@ function poolWith(options = {}) {
   const pool = createBrowserPool({
     createBrowserSession: fakeSessionFactory(created),
     isPortAlive: options.isPortAlive ?? (async () => false),
+    isPortBindable: options.isPortBindable ?? (async () => true),
     readDevToolsActivePort: options.readDevToolsActivePort ?? (async () => null),
     basePort: options.basePort ?? 9223
   });
@@ -77,6 +78,21 @@ describe("browser pool", () => {
     const { pool } = poolWith({ isPortAlive: async (port) => busy.has(port) });
     const browser = await pool.get(nextProfile());
     expect(browser.cdpPort).toBe(9225);
+  });
+
+  it("skips ports this machine cannot bind, even when nothing answers on them", async () => {
+    // Windows reserves whole port ranges (Hyper-V, WSL): nothing answers, but Chrome
+    // cannot bind them either, and starts with no automation port at all.
+    const reserved = new Set([9223, 9224, 9225]);
+    const { pool } = poolWith({ isPortBindable: async (port) => !reserved.has(port) });
+    const browser = await pool.get(nextProfile());
+    expect(browser.cdpPort).toBe(9226);
+  });
+
+  it("does not reuse a remembered port that can no longer be bound", async () => {
+    const { pool } = poolWith({ isPortBindable: async (port) => port !== 9223 });
+    const browser = await pool.get(nextProfile());
+    expect(browser.cdpPort).not.toBe(9223);
   });
 
   it("adopts the port Chrome recorded for that profile when it is alive", async () => {
