@@ -112,10 +112,12 @@ export async function getCampaignAnalytics(filters: {
   return request<CampaignAnalytics>(`/api/analytics/campaigns?${query.toString()}`);
 }
 
-export async function getActiveCampaignRun(): Promise<CampaignRun | null> {
-  const result = await request<{ ok: true; run: CampaignRun | null }>("/api/campaign-runs/active", undefined, {
-    ignoreMissingEndpoint: true
-  });
+export async function getActiveCampaignRun(profileId: string): Promise<CampaignRun | null> {
+  const result = await request<{ ok: true; run: CampaignRun | null }>(
+    `/api/campaign-runs/active?profileId=${encodeURIComponent(profileId)}`,
+    undefined,
+    { ignoreMissingEndpoint: true }
+  );
   return result.run;
 }
 

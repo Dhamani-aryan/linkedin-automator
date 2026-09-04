@@ -12,23 +12,26 @@ const defaultHeaders = {
   "content-type": "application/json"
 };
 
-export async function getChromeStatus(): Promise<ChromeStatus> {
-  return request<ChromeStatus>("/api/chrome/status");
+export async function getChromeStatus(profileId: string): Promise<ChromeStatus> {
+  return request<ChromeStatus>(`/api/chrome/status?profileId=${encodeURIComponent(profileId)}`);
 }
 
-export async function startChrome(url = "https://www.linkedin.com/"): Promise<ChromeStatus> {
+export async function startChrome(
+  profileId: string,
+  url = "https://www.linkedin.com/"
+): Promise<ChromeStatus> {
   return request<ChromeStatus>("/api/chrome/start", {
     method: "POST",
     headers: defaultHeaders,
-    body: JSON.stringify({ url })
+    body: JSON.stringify({ profileId, url })
   });
 }
 
-export async function openChromeUrl(url: string): Promise<ChromeStatus> {
+export async function openChromeUrl(profileId: string, url: string): Promise<ChromeStatus> {
   return request<ChromeStatus>("/api/chrome/open", {
     method: "POST",
     headers: defaultHeaders,
-    body: JSON.stringify({ url })
+    body: JSON.stringify({ profileId, url })
   });
 }
 
@@ -44,11 +47,14 @@ export type ProfileCollectionResult = {
   profiles: CollectedProfileLink[];
 };
 
-export async function collectVisibleProfiles(sourceUrl?: string): Promise<ProfileCollectionResult> {
+export async function collectVisibleProfiles(
+  profileId: string,
+  sourceUrl?: string
+): Promise<ProfileCollectionResult> {
   return request<ProfileCollectionResult>("/api/chrome/collect-profiles", {
     method: "POST",
     headers: defaultHeaders,
-    body: JSON.stringify({ sourceUrl })
+    body: JSON.stringify({ profileId, sourceUrl })
   });
 }
 
@@ -78,12 +84,13 @@ export type ResolvedProfileIdentity = {
 };
 
 export async function resolveProfileIdentities(
+  profileId: string,
   profiles: Array<{ id: string; url: string }>
 ): Promise<{ ok: true; profiles: ResolvedProfileIdentity[] }> {
   return request<{ ok: true; profiles: ResolvedProfileIdentity[] }>("/api/chrome/resolve-profile-identities", {
     method: "POST",
     headers: defaultHeaders,
-    body: JSON.stringify({ profiles })
+    body: JSON.stringify({ profileId, profiles })
   });
 }
 
@@ -114,9 +121,11 @@ export function mergeResolvedProfileData(lead: LeadProfile, identity: ResolvedPr
   };
 }
 
-export async function stopChrome(): Promise<{ ok: true; stopped: boolean; message?: string }> {
+export async function stopChrome(profileId: string): Promise<{ ok: true; stopped: boolean; message?: string }> {
   return request<{ ok: true; stopped: boolean; message?: string }>("/api/chrome/stop", {
-    method: "POST"
+    method: "POST",
+    headers: defaultHeaders,
+    body: JSON.stringify({ profileId })
   });
 }
 
