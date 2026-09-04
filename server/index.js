@@ -189,13 +189,25 @@ server.listen(port, host, () => {
   console.log(`LinkedIn Automator local server listening on http://${host}:${port}`);
 });
 
-await initializeProfileRuntimes((await listStoredProfiles()).map((stored) => stored.profileId).filter(Boolean));
+// A profile folder is only real if it carries a usable id. Folders left behind by a
+// caller that sent no id (they land as the text "undefined") are ignored, so they
+// cannot claim a debugging port at start-up.
+await initializeProfileRuntimes(
+  (await listStoredProfiles())
+    .map((stored) => stored.profileId)
+    .filter((profileId) => isUsableProfileId(profileId))
+);
 
 /**
  * Every browser and run endpoint is scoped to one LinkedIn profile. A missing
  * profile id is an error rather than a silent fallback to whichever profile the
  * server happened to open first.
  */
+function isUsableProfileId(value) {
+  const profileId = typeof value === "string" ? value.trim() : "";
+  return profileId !== "" && profileId !== "undefined" && profileId !== "null";
+}
+
 function requireProfileId(value) {
   const profileId = typeof value === "string" ? value.trim() : "";
   // "undefined" and "null" reach here as text when a caller forgets to pass an id;
@@ -223,7 +235,7 @@ async function runtimeForRun(runId) {
 }
 
 async function allProfileStatuses() {
-  const stored = (await listStoredProfiles()).map((entry) => entry.profileId).filter(Boolean);
+  const stored = (await listStoredProfiles()).map((entry) => entry.profileId).filter(isUsableProfileId);
   return await Promise.all(stored.map(async (profileId) => {
     try {
       const browser = await browserFor(profileId);
