@@ -3,10 +3,11 @@ import { join } from "node:path";
 import { createBrowserSession } from "./browserSession.js";
 import {
   ensureProfileStorage,
-  listStoredProfiles,
   migrateLegacyProfileStorage,
   profileStoragePaths,
   readProfileSession,
+  recordLegacyProfileOwner,
+  resolveLegacyProfileOwner,
   writeProfileSession
 } from "./profilePaths.js";
 
@@ -25,6 +26,8 @@ const portScanLimit = 64;
 
 export function createBrowserPool(dependencies = {}) {
   const makeSession = dependencies.createBrowserSession ?? createBrowserSession;
+  const findLegacyOwner = dependencies.resolveLegacyProfileOwner ?? resolveLegacyProfileOwner;
+  const claimLegacyOwner = dependencies.recordLegacyProfileOwner ?? recordLegacyProfileOwner;
   const isPortAlive = dependencies.isPortAlive ?? cdpPortIsAlive;
   const readActivePort = dependencies.readDevToolsActivePort ?? readDevToolsActivePort;
   const basePort = dependencies.basePort ?? defaultBasePort;
@@ -43,13 +46,19 @@ export function createBrowserPool(dependencies = {}) {
   }
 
   async function create(profileId) {
-    // The very first profile inherits the single-profile installation's Chrome
-    // directory, so the account already logged in there stays logged in.
-    const isFirstProfile = (await listStoredProfiles()).length === 0;
+    // Only the profile that owns the single-profile installation inherits its
+    // Chrome directory. Every other profile starts empty and is logged into by
+    // hand, so a newly added account can never open the old account's session.
+    const legacyOwner = await findLegacyOwner();
     const paths = await ensureProfileStorage(profileId);
     let adoptedLegacyProfile = false;
-    if (isFirstProfile) {
+    if (legacyOwner === profileId) {
       adoptedLegacyProfile = (await migrateLegacyProfileStorage(profileId)).chromeProfileCopied;
+    } else if (legacyOwner === null) {
+      // Nothing on disk says who the old login belongs to (no run history), so the
+      // first profile to open a browser claims it, and the claim is recorded.
+      adoptedLegacyProfile = (await migrateLegacyProfileStorage(profileId)).chromeProfileCopied;
+      await claimLegacyOwner(profileId);
     }
 
     const cdpPort = await resolvePort(profileId, paths);

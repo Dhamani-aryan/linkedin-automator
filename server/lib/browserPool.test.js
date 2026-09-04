@@ -134,3 +134,28 @@ describe("browser pool", () => {
     delete process.env.LINKEDIN_AUTOMATOR_CHROME_PROFILE;
   });
 });
+
+describe("legacy chrome directory ownership", () => {
+  it("only the recorded owner inherits the existing login", async () => {
+    const legacy = mkdtempSync(join(tmpdir(), "legacy-chrome-owner-"));
+    await mkdir(join(legacy, "Default"), { recursive: true });
+    await writeFile(join(legacy, "Default", "Cookies"), "session", "utf8");
+    process.env.LINKEDIN_AUTOMATOR_CHROME_PROFILE = legacy;
+    process.env.LINKEDIN_AUTOMATOR_LOCAL_DIR = mkdtempSync(join(tmpdir(), "browser-pool-owner-"));
+
+    const pool = createBrowserPool({
+      createBrowserSession: ({ profileId, profileDir, cdpPort }) => ({ profileId, profileDir, cdpPort }),
+      isPortAlive: async () => false,
+      readDevToolsActivePort: async () => null,
+      resolveLegacyProfileOwner: async () => "the-original-account",
+      recordLegacyProfileOwner: async () => null
+    });
+
+    const newAccount = await pool.get("a-brand-new-account");
+    const original = await pool.get("the-original-account");
+
+    expect(newAccount.adoptedLegacyProfile).toBe(false);
+    expect(original.adoptedLegacyProfile).toBe(true);
+    delete process.env.LINKEDIN_AUTOMATOR_CHROME_PROFILE;
+  });
+});
