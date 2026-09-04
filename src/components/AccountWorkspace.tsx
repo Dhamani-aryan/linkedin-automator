@@ -178,7 +178,7 @@ export function AccountWorkspace({
 
   useEffect(() => {
     let cancelled = false;
-    void getActiveCampaignRun()
+    void getActiveCampaignRun(account.id)
       .then((run) => {
         if (cancelled) return;
         if (run?.profileId === account.id && run.snapshot.campaign.id === campaignId) {
@@ -372,7 +372,7 @@ export function AccountWorkspace({
   }
 
   async function collectSalesNavigator(sourceUrl: string) {
-    const result = await collectVisibleProfiles(sourceUrl);
+    const result = await collectVisibleProfiles(account.id, sourceUrl);
     onRefreshChrome();
     return result.profiles;
   }
@@ -398,7 +398,7 @@ export function AccountWorkspace({
     const resolvedProfiles: ResolvedProfileIdentity[] = [];
     for (let index = 0; index < leads.length; index += 20) {
       const batch = leads.slice(index, index + 20);
-      const result = await resolveProfileIdentities(batch.map((lead) => ({ id: lead.id, url: lead.linkedinUrl })));
+      const result = await resolveProfileIdentities(account.id, batch.map((lead) => ({ id: lead.id, url: lead.linkedinUrl })));
       resolvedProfiles.push(...result.profiles);
     }
     const resolvedById = new Map(resolvedProfiles.map((profile) => [profile.id, profile]));
@@ -486,6 +486,7 @@ export function AccountWorkspace({
       }
 
       const identityResult = await resolveProfileIdentities(
+        account.id,
         workspace.leads.map((lead) => ({ id: lead.id, url: lead.linkedinUrl }))
       );
       const unresolved = identityResult.profiles.filter((profile) =>
