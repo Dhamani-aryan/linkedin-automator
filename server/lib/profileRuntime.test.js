@@ -68,19 +68,38 @@ describe("profile runtime registry", () => {
     expect(first.runner.browser).toBe(first.browser);
   });
 
-  it("recovers each profile independently and reports failures per profile", async () => {
+  it("recovers a profile as soon as its runtime is built", async () => {
     const { registry } = registryWith();
+    const profileId = nextProfile();
+    const runtime = await registry.get(profileId);
+    expect(runtime.runner.initialized).toBe(1);
+    expect(runtime.recoveryError).toBeNull();
+
+    // asking again must not recover twice
+    await registry.initialize([profileId]);
+    expect(runtime.runner.initialized).toBe(1);
+  });
+
+  it("keeps a failed recovery on the profile that failed", async () => {
+    const { registry, runners } = registryWith();
     const healthy = nextProfile();
     const broken = nextProfile();
-    const runtime = await registry.get(broken);
-    runtime.runner.initializeRunner = async () => {
-      throw new Error("runs folder unreadable");
-    };
+    await registry.get(healthy);
+    runners[0].profileId; // healthy runtime built first
 
-    const results = await registry.initialize([healthy, broken]);
-    expect(results.find((entry) => entry.profileId === healthy)).toEqual({ profileId: healthy, ok: true });
-    expect(results.find((entry) => entry.profileId === broken).error).toBe("runs folder unreadable");
-    expect((await registry.get(healthy)).runner.initialized).toBe(1);
+    const failing = createProfileRuntimeRegistry({
+      getProfileBrowser: async (profileId) => ({ profileId }),
+      releaseProfileBrowser: async () => ({ ok: true }),
+      createProfileRunner: () => ({
+        initializeRunner: async () => {
+          throw new Error("runs folder unreadable");
+        }
+      })
+    });
+
+    const [result] = await failing.initialize([broken]);
+    expect(result).toEqual({ profileId: broken, ok: false, error: "runs folder unreadable" });
+    expect((await registry.get(healthy)).recoveryError).toBeNull();
   });
 
   it("releasing one profile leaves the others in place", async () => {

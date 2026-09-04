@@ -57,16 +57,28 @@ export function createProfileRuntimeRegistry(dependencies = {}) {
       createdAt: new Date().toISOString()
     };
     runtimes.set(profileId, runtime);
+
+    // Recover this profile's own interrupted runs the moment it is first used, so a
+    // profile added (or first opened) mid-session is in the same state a restart
+    // would leave it in.
+    try {
+      await runtime.runner.initializeRunner();
+      runtime.recoveryError = null;
+    } catch (error) {
+      runtime.recoveryError = error instanceof Error ? error.message : "Run recovery failed.";
+    }
+
     return runtime;
   }
 
-  /** Boot recovery, per profile: each profile recovers its own interrupted runs. */
+  /** Boot recovery, per profile: building a runtime already recovers its own runs. */
   async function initialize(profileIds = []) {
     return await Promise.all(profileIds.map(async (profileId) => {
       try {
         const runtime = await get(profileId);
-        await runtime.runner.initializeRunner();
-        return { profileId, ok: true };
+        return runtime.recoveryError
+          ? { profileId, ok: false, error: runtime.recoveryError }
+          : { profileId, ok: true };
       } catch (error) {
         return {
           profileId,
