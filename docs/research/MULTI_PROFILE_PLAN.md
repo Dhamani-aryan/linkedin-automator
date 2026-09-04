@@ -73,9 +73,22 @@ cookies, verification handling, concurrency limits, and the ToS picture — is i
 - `server/lib/profileRuntime.js` — storage + browser + run store + runner per
   profile, built on first use, released independently.
 
-**Not done yet:** `server/index.js` still drives the default instances, so the
-app behaves exactly as it did for one profile. Wiring the endpoints and the UI to
-`getProfileRuntime(profileId)` is Phase 2/3 below.
+**Done — wiring (the app now really runs per profile):**
+
+- Every `/api/chrome/*` and campaign endpoint requires a `profileId` and is served
+  by that profile's runtime; a missing id is a 400, never a silent fallback.
+  Run-scoped endpoints (stop/pause/resume/retry) find the owning profile from the
+  run id. `GET /api/chrome/sessions` reports every profile at once.
+- The UI sends the account id with every Chrome and run call, and keeps a Chrome
+  status per account instead of one shared session, so each row shows its own
+  state and its own profile folder.
+- Which profile inherits the original `.local/chrome-profile` login is decided
+  from the existing run history and recorded in `.local/profiles/legacy-owner.json`,
+  so a newly added account can never open the original account's session.
+
+**Not done yet:** per-profile safety budgets (Phase 4) and the parallel-profile
+cap (`MAX_PARALLEL_PROFILES`) — profiles can run at the same time today with no
+ceiling.
 
 ---
 
