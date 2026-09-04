@@ -157,6 +157,55 @@ export async function migrateLegacyProfileStorage(profileId, options = {}) {
   return result;
 }
 
+/**
+ * Which profile owns the single-profile installation's Chrome directory.
+ *
+ * Guessing "whoever asks first" is dangerous: if a newly added account is opened
+ * before the original one, it would inherit the original account's LinkedIn
+ * login. So the owner is inferred from the run history that already exists on
+ * disk (every run records its profileId), recorded once, and never re-inferred.
+ */
+export async function resolveLegacyProfileOwner(options = {}) {
+  const markerPath = join(profilesRootDir(), "legacy-owner.json");
+  try {
+    const recorded = JSON.parse(await readFile(markerPath, "utf8"));
+    if (isValidProfileId(recorded?.profileId)) return recorded.profileId;
+    if (recorded?.profileId === null) return null;
+  } catch {
+    // not recorded yet
+  }
+
+  const runsSource = options.legacyRunsDir ?? legacyRunsDir();
+  let newest = null;
+  if (await exists(runsSource)) {
+    for (const entry of await readdir(runsSource, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      try {
+        const run = JSON.parse(await readFile(join(runsSource, entry.name, "state.json"), "utf8"));
+        if (!isValidProfileId(run?.profileId)) continue;
+        const at = Date.parse(run.updatedAt ?? run.createdAt ?? "") || 0;
+        if (newest === null || at > newest.at) newest = { profileId: run.profileId, at };
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  if (newest === null) return null;
+  await recordLegacyProfileOwner(newest.profileId);
+  return newest.profileId;
+}
+
+export async function recordLegacyProfileOwner(profileId) {
+  await mkdir(profilesRootDir(), { recursive: true });
+  await writeFile(
+    join(profilesRootDir(), "legacy-owner.json"),
+    `${JSON.stringify({ profileId: profileId ?? null, recordedAt: new Date().toISOString() }, null, 2)}\n`,
+    "utf8"
+  );
+  return profileId ?? null;
+}
+
 async function exists(path) {
   try {
     await access(path, constants.F_OK);

@@ -11,6 +11,8 @@ import {
   profileSlug,
   profileStoragePaths,
   readProfileSession,
+  recordLegacyProfileOwner,
+  resolveLegacyProfileOwner,
   writeProfileSession
 } from "./profilePaths.js";
 
@@ -109,5 +111,37 @@ describe("migrateLegacyProfileStorage", () => {
     const result = await migrateLegacyProfileStorage(profileId, await legacyFixture(profileId));
     expect(result.chromeProfileCopied).toBe(false);
     expect(await readFile(join(paths.chromeProfileDir, "Default", "Cookies"), "utf8")).toBe("existing-session");
+  });
+});
+
+describe("resolveLegacyProfileOwner", () => {
+  it("infers the owner from the run history already on disk", async () => {
+    process.env.LINKEDIN_AUTOMATOR_LOCAL_DIR = mkdtempSync(join(tmpdir(), "legacy-owner-"));
+    const runs = join(tmpdir(), `legacy-runs-${Math.random().toString(36).slice(2)}`);
+    await mkdir(join(runs, "old"), { recursive: true });
+    await writeFile(join(runs, "old", "state.json"), JSON.stringify({
+      id: "old", profileId: "the-original-account", updatedAt: "2026-08-01T00:00:00.000Z"
+    }), "utf8");
+    await mkdir(join(runs, "newer"), { recursive: true });
+    await writeFile(join(runs, "newer", "state.json"), JSON.stringify({
+      id: "newer", profileId: "the-original-account", updatedAt: "2026-08-22T00:00:00.000Z"
+    }), "utf8");
+
+    const owner = await resolveLegacyProfileOwner({ legacyRunsDir: runs });
+    expect(owner).toBe("the-original-account");
+    // recorded, so a later call never re-infers from a different runs folder
+    expect(await resolveLegacyProfileOwner({ legacyRunsDir: join(tmpdir(), "does-not-exist") }))
+      .toBe("the-original-account");
+  });
+
+  it("returns null when no run history says who the login belongs to", async () => {
+    process.env.LINKEDIN_AUTOMATOR_LOCAL_DIR = mkdtempSync(join(tmpdir(), "legacy-owner-empty-"));
+    expect(await resolveLegacyProfileOwner({ legacyRunsDir: join(tmpdir(), "missing") })).toBeNull();
+  });
+
+  it("keeps a recorded claim", async () => {
+    process.env.LINKEDIN_AUTOMATOR_LOCAL_DIR = mkdtempSync(join(tmpdir(), "legacy-owner-claim-"));
+    await recordLegacyProfileOwner("claimed-account");
+    expect(await resolveLegacyProfileOwner()).toBe("claimed-account");
   });
 });
