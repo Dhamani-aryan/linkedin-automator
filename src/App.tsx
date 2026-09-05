@@ -30,7 +30,6 @@ import {
   clearCompanyUser,
   loadCompanyUser,
   loadLinkedInAccounts,
-  restoreSample UserAccountForWorkspace,
   saveCompanyUser,
   saveLinkedInAccounts
 } from "./lib/storage";
@@ -50,15 +49,8 @@ export function App() {
     password: ""
   });
   const [companyUser, setCompanyUser] = useState<CompanyUser | null>(() => loadCompanyUser());
-  const [accounts, setAccounts] = useState<LinkedInAccount[]>(() => {
-    const storedAccounts = loadLinkedInAccounts();
-    return companyUser ? restoreSample UserAccountForWorkspace(companyUser, storedAccounts) : storedAccounts;
-  });
-  const [selectedAccountId, setSelectedAccountId] = useState(() => {
-    const storedAccounts = loadLinkedInAccounts();
-    const restoredAccounts = companyUser ? restoreSample UserAccountForWorkspace(companyUser, storedAccounts) : storedAccounts;
-    return restoredAccounts[0]?.id ?? "";
-  });
+  const [accounts, setAccounts] = useState<LinkedInAccount[]>(() => loadLinkedInAccounts());
+  const [selectedAccountId, setSelectedAccountId] = useState(() => loadLinkedInAccounts()[0]?.id ?? "");
   const [statusByAccount, setStatusByAccount] = useState<Record<string, ChromeStatus | null>>({});
   const statusFor = (accountId?: string) => (accountId ? statusByAccount[accountId] ?? null : null);
   const [isBusy, setIsBusy] = useState(false);
@@ -213,9 +205,9 @@ export function App() {
       createdAt: new Date().toISOString()
     };
     saveCompanyUser(nextUser);
-    const restoredAccounts = restoreSample UserAccountForWorkspace(nextUser, loadLinkedInAccounts());
-    setAccounts(restoredAccounts);
-    setSelectedAccountId(restoredAccounts[0]?.id ?? "");
+    const storedAccounts = loadLinkedInAccounts();
+    setAccounts(storedAccounts);
+    setSelectedAccountId(storedAccounts[0]?.id ?? "");
     setCompanyUser(nextUser);
   }
 
