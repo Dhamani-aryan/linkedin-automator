@@ -6,15 +6,22 @@
 # Local data exports
 /data/
 /exports/
+/captures/
+/screenshots/
+/Claude outputs/
 *.csv
 *.xlsx
 *.xls
+*.har
 
 # Logs and temporary files
 logs/
 *.log
 tmp/
 temp/
+*.sqlite
+*.sqlite3
+*.db
 
 # OS/editor noise
 .DS_Store
@@ -22,6 +29,15 @@ Thumbs.db
 .vscode/
 .idea/
 .local/
+**/chrome-profile/
+
+# Private keys and credential bundles
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
+secrets*.json
 
 # Dependencies/build outputs
 node_modules/
