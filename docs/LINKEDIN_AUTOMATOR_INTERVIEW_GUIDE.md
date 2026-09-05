@@ -1,6 +1,6 @@
 # LinkedIn Automator: Interview Study Guide
 
-> Codebase reviewed on September 5, 2026, at commit `427f433`.
+> Codebase reviewed on September 5, 2026.
 >
 > This document describes the implementation that exists in the repository today. It deliberately separates completed behavior from planned behavior so it can be used safely in an interview.
 
@@ -737,11 +737,10 @@ Be ready to discuss these without becoming defensive:
 3. Safety settings are global in frontend storage and caps are per run, not a single profile-wide action ledger.
 4. Live connection requests are not enabled.
 5. Campaign-list dry-run invitation semantics can be mistaken for actual invitations.
-6. There is a prototype-specific one-time account restoration rule in `src/lib/storage.ts` that should become a general migration or be removed.
-7. The `chromeProfileMode` value still says `single-local-profile`, even though runtime isolation now supports multiple profiles.
-8. There is no global concurrency limit across profile runners.
-9. The browser automation lacks a maintained fixture suite and controlled end-to-end test environment.
-10. Reply scanning is periodic and UI-driven; it is not a background OS service and cannot discover replies while the controller is offline.
+6. The `chromeProfileMode` value still says `single-local-profile`, even though runtime isolation now supports multiple profiles.
+7. There is no global concurrency limit across profile runners.
+8. The browser automation lacks a maintained fixture suite and controlled end-to-end test environment.
+9. Reply scanning is periodic and UI-driven; it is not a background OS service and cannot discover replies while the controller is offline.
 
 ## 29. Production evolution
 

@@ -578,7 +578,7 @@ At the time these interview documents were created, both passed.
 
 ### 130. What technical debt would you mention proactively?
 
-**Answer:** Outdated README claims, global frontend safety settings, per-run rather than profile-wide caps, split storage, disabled live invitations, dry-run invitation labeling, no global profile concurrency cap, a prototype-specific account migration, and missing controlled browser E2E tests.
+**Answer:** Outdated README claims, global frontend safety settings, per-run rather than profile-wide caps, split storage, disabled live invitations, dry-run invitation labeling, no global profile concurrency cap, and missing controlled browser E2E tests.
 
 ## Scenario questions
 

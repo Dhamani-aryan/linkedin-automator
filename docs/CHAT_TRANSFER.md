@@ -1,8 +1,6 @@
 # Chat Transfer: LinkedIn Automator
 
 Last updated: 2026-08-09  
-Repository: `https://github.com/repository-owner/linkedin-automator.git`  
-Local workspace: `C:\Projects\linkedin-automator`  
 Branch: `main`  
 Verified HEAD before this update: `e01a107 Document controller and campaign lifecycle`
 
@@ -127,8 +125,8 @@ in browser `localStorage`.
 - Add multiple logical LinkedIn profile records.
 - Open one profile workspace at a time.
 - Delete a logical profile after an explicit confirmation dialog.
-- A one-time recovery rule restores Sample User's accidentally deleted profile only
-  for the local workspace email `workspace@example.test` when its account list is empty.
+- Profile records are loaded only from the current browser's local storage;
+  the repository does not seed or restore a personal account.
 
 ### Managed Chrome proof
 
@@ -217,11 +215,6 @@ with feature work.
 - `linkedin-automator.company-user`
 - `linkedin-automator.linkedin-accounts`
 - `linkedin-automator.campaign-workspace-v1`
-- `linkedin-automator.restore-sample-user-account-v1.<workspace-email>`
-
-The Sample User restoration code in `src/lib/storage.ts` is a narrowly scoped data
-recovery migration, not a default profile seed. It should be removed after the
-local recovery is no longer needed and must not ship as production behavior.
 
 ### Browser controller endpoints
 
