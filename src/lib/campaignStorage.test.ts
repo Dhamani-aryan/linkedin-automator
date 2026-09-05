@@ -55,12 +55,12 @@ describe("createLeadFromUrl", () => {
     const lead = createLeadFromUrl(
       "https://www.linkedin.com/in/sample-recipient/",
       "source-1",
-      "  Casey   Khandelwal  "
+      "  Casey   Example  "
     );
 
     expect(lead.displayName).toBe("Casey Example");
     expect(lead.firstName).toBe("Casey");
-    expect(lead.lastName).toBe("Khandelwal");
+    expect(lead.lastName).toBe("Example");
   });
 
   it("does not treat a profile URL slug as a person's name", () => {

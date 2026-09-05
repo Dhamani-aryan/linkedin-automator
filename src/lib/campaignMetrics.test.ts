@@ -16,18 +16,18 @@ describe("campaignListMetrics", () => {
       leads: [
         {
           id: "lead-1",
-          lead: { linkedinUrl: "https://www.linkedin.com/in/one", displayName: "Taylor" },
+          lead: { linkedinUrl: "https://www.linkedin.com/in/sample-one", displayName: "Casey" },
           state: "replied",
           acceptedAt: "2026-08-22T16:10:00.000Z",
           attempts: [
             { actionId: "invite", completedAt: "2026-08-22T16:05:00.000Z", outcome: "sent", errorCode: null, detail: { actionType: "connection_request" } },
             { actionId: "message", completedAt: "2026-08-22T16:15:00.000Z", outcome: "sent", errorCode: null, detail: { actionType: "message" } },
-            { actionId: "message", completedAt: "2026-08-22T16:20:00.000Z", outcome: "replied", errorCode: null, detail: { actionType: "reply_check", replyText: "Hi, Sample User" } }
+            { actionId: "message", completedAt: "2026-08-22T16:20:00.000Z", outcome: "replied", errorCode: null, detail: { actionType: "reply_check", replyText: "Hello" } }
           ]
         },
         {
           id: "lead-2",
-          lead: { linkedinUrl: "https://www.linkedin.com/in/two" },
+          lead: { linkedinUrl: "https://www.linkedin.com/in/sample-two" },
           state: "waiting_delay",
           acceptedAt: null,
           attempts: [
@@ -36,7 +36,7 @@ describe("campaignListMetrics", () => {
         },
         {
           id: "lead-3",
-          lead: { linkedinUrl: "https://www.linkedin.com/in/three" },
+          lead: { linkedinUrl: "https://www.linkedin.com/in/sample-three" },
           state: "failed",
           acceptedAt: null,
           attempts: [
@@ -57,9 +57,9 @@ describe("campaignListMetrics", () => {
       replied: 1
     });
     expect(campaignOutcomeRecords("campaign-1", [run]).replied).toMatchObject([{
-      lead: { displayName: "Taylor" },
+      lead: { displayName: "Casey" },
       occurredAt: "2026-08-22T16:20:00.000Z",
-      replyText: "Hi, Sample User"
+      replyText: "Hello"
     }]);
   });
 

@@ -68,28 +68,28 @@ describe("prospect CSV", () => {
   it("keeps resolved job, company, and company LinkedIn data in the CRM export", () => {
     const enrichedLead = mergeResolvedProfileData({
       ...lead,
-      displayName: "Taylor Example",
-      firstName: "Taylor",
-      lastName: "Shrimal",
-      linkedinUrl: "https://www.linkedin.com/in/sample-enriched-profile/",
+      displayName: "Casey Example",
+      firstName: "Casey",
+      lastName: "Example",
+      linkedinUrl: "https://www.linkedin.com/in/sample-recipient/",
       company: "",
       position: ""
     }, {
       id: lead.id,
-      requestedUrl: "https://www.linkedin.com/in/sample-enriched-profile/",
+      requestedUrl: "https://www.linkedin.com/in/sample-recipient/",
       resolved: true,
-      displayName: "Taylor Example",
-      firstName: "Taylor",
-      lastName: "Shrimal",
-      headline: "SWE @ Example Systems Ltd. | Python Developer",
-      position: "SWE",
+      displayName: "Casey Example",
+      firstName: "Casey",
+      lastName: "Example",
+      headline: "Engineer at Example Systems",
+      position: "Software Engineer",
       company: "Example Systems",
       companyLinkedinUrl: "https://www.linkedin.com/company/example-systems"
     });
 
-    const csv = buildProspectCsv({ campaignName: "First outreach campaign", leads: [enrichedLead], sources: [source] });
+    const csv = buildProspectCsv({ campaignName: "Sample outreach campaign", leads: [enrichedLead], sources: [source] });
 
-    expect(csv).toContain("Taylor,Shrimal,Taylor Example,SWE,SWE @ Example Systems Ltd. | Python Developer,Example Systems");
+    expect(csv).toContain("Casey,Example,Casey Example,Software Engineer,Engineer at Example Systems,Example Systems");
     expect(csv).toContain("https://www.linkedin.com/company/example-systems");
   });
 });

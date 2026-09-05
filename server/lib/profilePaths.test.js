@@ -22,11 +22,11 @@ process.env.LINKEDIN_AUTOMATOR_LOCAL_DIR = mkdtempSync(join(tmpdir(), "profile-p
 
 describe("profileSlug", () => {
   it("keeps readable ids readable", () => {
-    expect(profileSlug("restored-sample-linkedin")).toMatch(/^restored-sample-linkedin-[0-9a-f]{8}$/);
+    expect(profileSlug("primary-linkedin-profile")).toMatch(/^primary-linkedin-profile-[0-9a-f]{8}$/);
   });
 
   it("replaces characters that are unsafe in a folder name", () => {
-    expect(profileSlug("profile-owner@example.com/second")).toMatch(/^sample-user-klouddata.com-second-[0-9a-f]{8}$/);
+    expect(profileSlug("profile@example.test/second")).toMatch(/^profile-example.test-second-[0-9a-f]{8}$/);
   });
 
   it("keeps two ids apart when they sanitize to the same text", () => {
