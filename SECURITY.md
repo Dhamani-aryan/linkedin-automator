@@ -25,7 +25,7 @@ Chrome profile by signing in manually.
 Run:
 
 ```powershell
-npm run audit:repo -- --history
+npm run audit:repo:history
 npm test
 npm run build
 git status --short
