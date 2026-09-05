@@ -278,7 +278,7 @@ export function LeadSourceWizard({ onAddProfiles, onClose, onCollectSalesNavigat
               </div>
               <textarea
                 className="source-textarea"
-                placeholder="https://www.linkedin.com/sales/lead/sample-lead"
+                placeholder="https://www.linkedin.com/sales/lead/sample-lead/"
                 value={salesLeadUrls}
                 onChange={(event) => {
                   setSalesLeadUrls(event.target.value);

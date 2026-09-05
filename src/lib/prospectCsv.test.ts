@@ -9,7 +9,7 @@ const lead: LeadProfile = {
   displayName: "Taylor Example",
   firstName: "Taylor",
   lastName: "Example",
-  company: "Analytical, Engines Ltd.",
+  company: "Example, Engines Ltd.",
   position: "Founder",
   headline: "Founder & Mathematician",
   companyLinkedinUrl: "https://www.linkedin.com/company/example-engines/",
@@ -35,7 +35,7 @@ describe("prospect CSV", () => {
 
     expect(csv.startsWith("\uFEFFRecord ID,First Name,Last Name")).toBe(true);
     expect(csv).toContain("Location,City,State,Country,Industry");
-    expect(csv).toContain('"Analytical, Engines Ltd."');
+    expect(csv).toContain('"Example, Engines Ltd."');
     expect(csv).toContain('"London, United Kingdom",London,,United Kingdom');
     expect(csv).toContain('"Builds ""thinking machines""\nwith careful notes."');
     expect(csv).toContain("https://www.linkedin.com/company/example-engines/");

@@ -25,20 +25,20 @@ describe("mergeResolvedProfileData", () => {
       displayName: "Taylor Example",
       firstName: "Taylor",
       lastName: "Example",
-      personalLinkedInUrl: "https://www.linkedin.com/in/sample-founder",
+      personalLinkedInUrl: "https://www.linkedin.com/in/sample-enriched-profile",
       position: "",
       company: "Example Engines",
       companyLinkedinUrl: "https://www.linkedin.com/company/example-engines",
-      publicId: "sample-founder"
+      publicId: "sample-enriched-profile"
     })).toMatchObject({
       displayName: "Taylor Example",
       firstName: "Taylor",
       lastName: "Example",
-      linkedinUrl: "https://www.linkedin.com/in/sample-founder",
+      linkedinUrl: "https://www.linkedin.com/in/sample-enriched-profile",
       position: "Imported title",
       company: "Example Engines",
       companyLinkedinUrl: "https://www.linkedin.com/company/example-engines",
-      publicId: "sample-founder"
+      publicId: "sample-enriched-profile"
     });
   });
 });
